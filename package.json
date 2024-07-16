@@ -1,0 +1,55 @@
+{
+    "name": "react-probe",
+    "version": "0.0.0-dev",
+    "type": "module",
+    "scripts": {
+        "compile": "tsc --build",
+        "format:check": "dprint check --list-different",
+        "format:fix": "dprint fmt",
+        "eslint": "eslint . --cache --cache-location './target/.eslintcache' --cache-strategy content --max-warnings 0",
+        "eslint:fix": "npm run eslint -- --fix",
+        "lint": "npm run eslint && npm run format:check",
+        "lint:fix": "npm run eslint:fix && npm run format:fix",
+        "test": "npm run test:unit:with-coverage && npm run test:integration",
+        "pretest:unit": "tsc -b source/tsconfig.unit-tests.json",
+        "test:unit": "mt target/build/source",
+        "test:unit:with-coverage": "c8 npm run test:unit",
+        "pretest:integration": "tsc -b integration-tests/tsconfig.json",
+        "test:integration": "mt target/build/integration-tests"
+    },
+    "author": "Mathias Schreck <schreck.mathias@gmail.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+ssh://git@github.com/enormora/react-probe.git"
+    },
+    "dependencies": {
+        "react-reconciler": "0.29.2",
+        "tslib": "2.6.3"
+    },
+    "devDependencies": {
+        "@ben_12/eslint-plugin-dprint": "0.11.3",
+        "@dprint/json": "0.19.3",
+        "@dprint/markdown": "0.16.4",
+        "@dprint/typescript": "0.90.5",
+        "@enormora/eslint-config-base": "0.0.12",
+        "@enormora/eslint-config-node": "0.0.11",
+        "@enormora/eslint-config-typescript": "0.0.12",
+        "@packtory/cli": "0.0.4",
+        "@sondr3/minitest": "0.1.2",
+        "@types/node": "20.14.10",
+        "@types/react": "18.3.3",
+        "@types/react-reconciler": "0.28.8",
+        "@types/sinon": "17.0.3",
+        "c8": "10.1.2",
+        "common-tags": "1.8.2",
+        "dprint": "0.47.2",
+        "eslint": "8.57.0",
+        "react": "18.3.1",
+        "sinon": "18.0.0",
+        "typescript": "5.5.3"
+    },
+    "engines": {
+        "node": "^22"
+    }
+}
