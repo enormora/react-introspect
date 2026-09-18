@@ -3,12 +3,16 @@ import { defineConfig } from '@overkill-dev/test/config';
 export const config = defineConfig({
     profiles: {
         microtest: {
+            execution: {
+                processModel: 'in-process',
+                scheduling: 'serial'
+            },
             testFamily: 'microtest',
             files: {
-                include: [ './source/test-runner-smoke.test.ts' ]
+                include: [ 'target/build/source/*.test.js' ]
             },
             timeouts: {
-                collectionMilliseconds: 5000
+                collectionMilliseconds: 30_000
             }
         }
     }

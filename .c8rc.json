@@ -1,9 +1,16 @@
 {
     "all": true,
     "check-coverage": true,
+    "exclude-after-remap": true,
     "extension": [".ts"],
     "src": ["source"],
-    "exclude": ["source/**/*.entry-point.ts", "source/**/*.test.ts", "source/**/*.type-test.ts", "target/**"],
+    "exclude": [
+        "source/**/*.entry-point.ts",
+        "source/**/*.test.ts",
+        "source/**/*.type-test.ts",
+        "source/**/*-types.ts",
+        "target/**"
+    ],
     "lines": 100,
     "functions": 100,
     "statements": 100,

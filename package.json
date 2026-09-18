@@ -16,6 +16,8 @@
     "license": "MIT",
     "author": "Mathias Schreck <schreck.mathias@gmail.com>",
     "type": "module",
+    "main": "source/react-probe.entry-point.ts",
+    "types": "source/react-probe.entry-point.ts",
     "scripts": {
         "compile": "just compile",
         "lint": "just lint",

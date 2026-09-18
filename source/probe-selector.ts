@@ -1,0 +1,117 @@
+import type { ProbeHostSchema, ProbeSelector } from './probe-public-types.ts';
+import type { RuntimeProbeNode } from './probe-runtime-types.ts';
+
+const selectorFields = Object.freeze([
+    'has',
+    'key',
+    'props',
+    'textContent',
+    'type',
+    'where'
+]);
+
+function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
+    return Reflect.has(value, property);
+}
+
+function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
+    return typeof value === 'object' && value !== null;
+}
+
+function isSelectorObject(value: unknown): value is ProbeSelector {
+    return isRecord(value) && !hasProperty(value, '$$typeof') && selectorFields.some(function hasSelectorField(field) {
+        return hasProperty(value, field);
+    });
+}
+
+function matchesPartial(value: unknown, partial: unknown): boolean {
+    if (Object.is(value, partial)) {
+        return true;
+    }
+
+    if (!isRecord(value) || !isRecord(partial)) {
+        return false;
+    }
+
+    return Reflect.ownKeys(partial).every(function matchesKey(key) {
+        return matchesPartial(value[key], partial[key]);
+    });
+}
+
+function typeMatches<HostSchema extends ProbeHostSchema>(
+    node: RuntimeProbeNode,
+    selector: ProbeSelector<HostSchema>
+): boolean {
+    return !hasProperty(selector, 'type') || selector.type === node.type;
+}
+
+function keyMatches<HostSchema extends ProbeHostSchema>(
+    node: RuntimeProbeNode,
+    selector: ProbeSelector<HostSchema>
+): boolean {
+    return !hasProperty(selector, 'key') || selector.key === node.key;
+}
+
+function propsMatch<HostSchema extends ProbeHostSchema>(
+    node: RuntimeProbeNode,
+    selector: ProbeSelector<HostSchema>
+): boolean {
+    return !hasProperty(selector, 'props') || matchesPartial(node.props, selector.props);
+}
+
+function textContentMatches<HostSchema extends ProbeHostSchema>(
+    node: RuntimeProbeNode,
+    selector: ProbeSelector<HostSchema>
+): boolean {
+    if (!hasProperty(selector, 'textContent')) {
+        return true;
+    }
+
+    const { textContent } = selector;
+
+    if (textContent === undefined) {
+        return true;
+    }
+
+    return typeof textContent === 'string'
+        ? textContent === node.textContent
+        : textContent.test(node.textContent);
+}
+
+function hasMatches<HostSchema extends ProbeHostSchema>(
+    node: RuntimeProbeNode,
+    selector: ProbeSelector<HostSchema>
+): boolean {
+    return !hasProperty(selector, 'has') || node.find(selector.has) !== undefined;
+}
+
+function whereMatches<HostSchema extends ProbeHostSchema>(
+    node: RuntimeProbeNode,
+    selector: ProbeSelector<HostSchema>
+): boolean {
+    const { where } = selector;
+
+    return where === undefined || Reflect.apply(where, undefined, [ node ]) === true;
+}
+
+export function toSelector<HostSchema extends ProbeHostSchema>(
+    selector: unknown
+): ProbeSelector<HostSchema> {
+    if (isSelectorObject(selector)) {
+        return selector;
+    }
+
+    return { type: selector };
+}
+
+export function nodeMatchesSelector<HostSchema extends ProbeHostSchema>(
+    node: RuntimeProbeNode,
+    selector: ProbeSelector<HostSchema>
+): boolean {
+    return typeMatches(node, selector) &&
+        keyMatches(node, selector) &&
+        propsMatch(node, selector) &&
+        textContentMatches(node, selector) &&
+        hasMatches(node, selector) &&
+        whereMatches(node, selector);
+}

@@ -15,11 +15,9 @@
         "@dprint/markdown",
         "@dprint/typescript",
         "@ls-lint/ls-lint",
-        "@types/react",
         "c8",
         "dprint",
         "jscpd",
-        "react",
         "react-reconciler"
     ]
 }
