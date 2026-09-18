@@ -17,7 +17,6 @@
         "@ls-lint/ls-lint",
         "c8",
         "dprint",
-        "jscpd",
-        "react-reconciler"
+        "jscpd"
     ]
 }
