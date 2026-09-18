@@ -2,14 +2,23 @@ import { defineConfig } from '@overkill-dev/test/config';
 
 export const config = defineConfig({
     profiles: {
-        microtest: {
+        coverage: {
             execution: {
                 processModel: 'in-process',
-                scheduling: 'serial'
+                scheduling: 'concurrent'
             },
             testFamily: 'microtest',
             files: {
-                include: [ 'target/build/source/*.test.js' ]
+                include: [ 'source/**/*.test.ts' ]
+            },
+            timeouts: {
+                collectionMilliseconds: 30_000
+            }
+        },
+        microtest: {
+            testFamily: 'microtest',
+            files: {
+                include: [ 'source/**/*.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000

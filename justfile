@@ -28,11 +28,11 @@ lint: eslint lint-filename lint-unused-code lint-dependencies lint-duplication
 
 lint-fix: eslint-fix
 
-test-unit: compile
-    ./node_modules/.bin/overkill run --config overkill.config.ts --profile microtest target/build/source/test-runner-smoke.test.js target/build/source/probe-public-api.test.js
+test-unit:
+    NODE_OPTIONS='--allow-fs-read=.' overkill run --profile microtest
 
-test-unit-with-coverage: compile
-    ./node_modules/.bin/c8 --config .c8rc.json node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config overkill.config.ts --profile microtest target/build/source/test-runner-smoke.test.js target/build/source/probe-public-api.test.js --measure-resource-usage
+test-unit-with-coverage:
+    c8 --config .c8rc.json node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --profile coverage --measure-resource-usage
 
 test-types:
     ./node_modules/.bin/tstyche
