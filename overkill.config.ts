@@ -16,6 +16,10 @@ export const config = defineConfig({
             }
         },
         microtest: {
+            execution: {
+                processModel: 'in-process',
+                scheduling: 'concurrent'
+            },
             testFamily: 'microtest',
             files: {
                 include: [ 'source/**/*.test.ts' ]
