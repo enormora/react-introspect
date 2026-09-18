@@ -338,6 +338,17 @@ function assertViewDiagnostics(scope: EqualScope, view: ProbeView): void {
     scope.assert.equal(currentView.currentSnapshot.renderCount, 1);
 }
 
+async function assertStaticWaits(scope: EqualScope): Promise<void> {
+    const view = probe(React.createElement('main', null, 'static'));
+
+    await view.waitForIdle();
+    await view.waitForNextRender();
+    await view.waitForRenderCount(1);
+    await view.waitUntil(alwaysTrue);
+
+    scope.assert.equal(view.textContent, 'static');
+}
+
 function assertButtonIdentity(
     scope: EqualScope,
     button: ButtonIdentity | undefined
@@ -495,6 +506,7 @@ export const testNode = suite('public API skeleton', [
         await view.waitForNextRender();
         await view.waitForRenderCount(1);
         await view.waitUntil(alwaysTrue);
+        await assertStaticWaits(scope);
 
         assertViewDiagnostics(scope, view);
 

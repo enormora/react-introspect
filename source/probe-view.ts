@@ -3,6 +3,7 @@ import { createProbeList } from './probe-list.ts';
 import { createProbeListLocator, createProbeLocator } from './probe-locator.ts';
 import { createProbeNode, type SnapshotReader } from './probe-node.ts';
 import type { ProbeError, ProbeWarning } from './probe-public-types.ts';
+import { createProbeReconcilerRoot, type ProbeReconcilerRoot } from './probe-reconciler.ts';
 import type {
     RuntimeProbeList,
     RuntimeProbeNode,
@@ -10,14 +11,15 @@ import type {
     RuntimeProbeView
 } from './probe-runtime-types.ts';
 import { nodeMatchesSelector, toSelector } from './probe-selector.ts';
-import { createProbeSnapshot, type ProbeSnapshot, type SnapshotNode } from './probe-snapshot.ts';
+import {
+    createEmptyProbeSnapshot,
+    createProbeSnapshot,
+    type ProbeSnapshot,
+    type SnapshotNode
+} from './probe-snapshot.ts';
 
 const emptyErrors: readonly ProbeError[] = Object.freeze([]);
 const emptyWarnings: readonly ProbeWarning[] = Object.freeze([]);
-
-function readProbeOptions(options: RuntimeProbeOptions): void {
-    Object.freeze({ ...options });
-}
 
 function nodeList(
     reader: SnapshotReader,
@@ -41,8 +43,12 @@ function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
 }
 
 export function createProbeView(element: React.ReactElement, options: RuntimeProbeOptions = {}): RuntimeProbeView {
-    let currentSnapshot = createProbeSnapshot(element, 1);
+    let currentSnapshot = createEmptyProbeSnapshot(0);
+    let reconcilerRoot: ProbeReconcilerRoot | null = null;
     const state: SnapshotReader = {
+        act(action: () => unknown) {
+            return reconcilerRoot === null ? action() : reconcilerRoot.act(action);
+        },
         get currentSnapshot() {
             return currentSnapshot;
         }
@@ -110,30 +116,48 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
             return createProbeListLocator(view, selector);
         },
         unmount() {
-            currentSnapshot = {
-                nodes: Object.freeze([]),
-                renderCount: currentSnapshot.renderCount + 1,
-                root: undefined
-            };
+            if (reconcilerRoot === null) {
+                currentSnapshot = createEmptyProbeSnapshot(currentSnapshot.renderCount + 1);
+
+                return;
+            }
+
+            reconcilerRoot.unmount();
         },
         update(nextElement: React.ReactElement) {
-            currentSnapshot = createProbeSnapshot(nextElement, currentSnapshot.renderCount + 1);
+            if (reconcilerRoot === null) {
+                currentSnapshot = createProbeSnapshot(nextElement, currentSnapshot.renderCount + 1);
+
+                return;
+            }
+
+            reconcilerRoot.update(nextElement);
         },
         async waitForIdle() {
-            await Promise.resolve();
+            await (reconcilerRoot === null ? Promise.resolve() : reconcilerRoot.waitForIdle());
         },
         async waitForNextRender() {
-            await Promise.resolve();
+            await (reconcilerRoot === null ? Promise.resolve() : reconcilerRoot.waitForNextRender());
         },
         async waitForRenderCount(count: number) {
-            await Promise.resolve(count);
+            await (reconcilerRoot === null ? Promise.resolve(count) : reconcilerRoot.waitForRenderCount(count));
         },
         async waitUntil(predicate: () => boolean) {
-            await Promise.resolve(predicate());
+            await (reconcilerRoot === null ? Promise.resolve(predicate()) : reconcilerRoot.waitUntil(predicate));
         }
     });
 
-    readProbeOptions(options);
+    if (options.depth === 'full') {
+        reconcilerRoot = createProbeReconcilerRoot({
+            element,
+            publish(snapshot) {
+                currentSnapshot = snapshot;
+            },
+            strictMode: options.strictMode ?? true
+        });
+    } else {
+        currentSnapshot = createProbeSnapshot(element, 1);
+    }
 
     return view;
 }

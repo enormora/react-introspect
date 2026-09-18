@@ -337,7 +337,15 @@ const snapshotOperations = {
     }
 };
 
-export function createProbeSnapshot(element: React.ReactElement, renderCount: number): ProbeSnapshot {
+export function createEmptyProbeSnapshot(renderCount: number): ProbeSnapshot {
+    return Object.freeze({
+        nodes: Object.freeze([]),
+        renderCount,
+        root: undefined
+    });
+}
+
+export function createProbeSnapshot(element: unknown, renderCount: number): ProbeSnapshot {
     const result = snapshotOperations.createSnapshotNode({
         build: {
             nextId: 0,

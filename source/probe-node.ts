@@ -6,6 +6,7 @@ import type { ProbeSnapshot, SnapshotNode, SnapshotProps } from './probe-snapsho
 
 export type SnapshotReader = {
     readonly currentSnapshot: ProbeSnapshot;
+    readonly act: (action: () => unknown) => unknown;
 };
 
 function readProperty(value: SnapshotProps, property: PropertyKey): unknown {
@@ -163,7 +164,9 @@ export function createProbeNode(
             return node.renderedReason === undefined ? 'visible' : 'notRendered';
         },
         callProp(property: PropertyKey, ...parameters: readonly unknown[]) {
-            return callProp(node.props, String(property), parameters);
+            return reader.act(function callSnapshotProp() {
+                return callProp(node.props, String(property), parameters);
+            });
         },
         find(selector: unknown) {
             return findAll(selector).first;
@@ -197,7 +200,9 @@ export function createProbeNode(
         sendEvent(name: string, ...parameters: readonly unknown[]) {
             const eventName = `on${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
 
-            return callProp(node.props, eventName, parameters);
+            return reader.act(function sendSnapshotEvent() {
+                return callProp(node.props, eventName, parameters);
+            });
         }
     });
 }
