@@ -1,0 +1,130 @@
+---
+name: Publish
+
+on:
+    workflow_dispatch:
+        inputs:
+            publish_now:
+                description: Publish immediately without evaluating the release gate.
+                required: true
+                default: false
+                type: boolean
+            confirmation:
+                description: 'Required when publish_now is true: type "publish react-probe".'
+                required: false
+                type: string
+
+permissions: {}
+
+concurrency:
+    group: publish-main
+
+jobs:
+    evaluate-gate:
+        runs-on: ubuntu-latest
+        name: Evaluate GitHub release gate
+        permissions:
+            contents: read
+            issues: read
+            pull-requests: read
+        outputs:
+            should_publish: ${{ steps.force-publish.outputs.should_publish || steps.release-gate.outputs.should_publish }}
+            reason: ${{ steps.force-publish.outputs.reason || steps.release-gate.outputs.reason }}
+            main_head_sha: ${{ steps.main-head.outputs.main_head_sha }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: main
+                  persist-credentials: false
+            - name: Resolve main commit
+              id: main-head
+              run: echo "main_head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            - name: Confirm manual publish override
+              id: force-publish
+              if: inputs.publish_now
+              env:
+                  CONFIRMATION: ${{ inputs.confirmation }}
+              run: |
+                  if [ "${CONFIRMATION}" != "publish react-probe" ]; then
+                    echo "::error::Manual publish override requires confirmation: publish react-probe"
+                    exit 1
+                  fi
+                  echo "should_publish=true" >> "$GITHUB_OUTPUT"
+                  echo "reason=manual publish override confirmed" >> "$GITHUB_OUTPUT"
+            - name: Use Node.js from package metadata
+              if: ${{ !inputs.publish_now }}
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: package.json
+            - name: Install dependencies
+              if: ${{ !inputs.publish_now }}
+              run: npm ci
+            - name: Verify registry signatures for installed dependencies
+              if: ${{ !inputs.publish_now }}
+              run: npm audit signatures
+            - name: Verify release gate package provenance
+              if: ${{ !inputs.publish_now }}
+              run: |
+                  version=$(jq -r '.devDependencies["@packtory/github-release-gate"]' package.json)
+                  spec="@packtory/github-release-gate@${version}"
+                  attestation=$(npm view "${spec}" --json | jq -r '.dist.attestations // empty')
+                  if [ -z "${attestation}" ]; then
+                    echo "::error::${spec} is missing a provenance attestation"
+                    exit 1
+                  fi
+            - name: Compile TypeScript
+              if: ${{ !inputs.publish_now }}
+              run: npx just compile
+            - name: Evaluate GitHub release gate
+              id: release-gate
+              if: ${{ !inputs.publish_now }}
+              run: npx github-release-gate
+              env:
+                  CI_WORKFLOW_FILE: continuous-integration.yml
+                  DEFAULT_BRANCH: main
+                  DEPENDENCY_ONLY_MIN_AGE_DAYS: "7"
+                  GITHUB_TOKEN: ${{ github.token }}
+                  MAX_LATENCY_HOURS: "24"
+                  QUIET_PERIOD_MINUTES: "45"
+
+    publish:
+        needs: evaluate-gate
+        if: needs.evaluate-gate.outputs.should_publish == 'true'
+        runs-on: ubuntu-latest
+        name: Publish package
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ needs.evaluate-gate.outputs.main_head_sha }}
+                  persist-credentials: false
+            - name: Use Node.js from package metadata
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: package.json
+            - name: Install dependencies
+              run: npm ci
+            - name: Verify registry signatures for installed dependencies
+              run: npm audit signatures
+            - name: Verify Packtory provenance
+              run: |
+                  version=$(jq -r '.devDependencies["@packtory/cli"]' package.json)
+                  spec="@packtory/cli@${version}"
+                  attestation=$(npm view "${spec}" --json | jq -r '.dist.attestations // empty')
+                  if [ -z "${attestation}" ]; then
+                    echo "::error::${spec} is missing a provenance attestation"
+                    exit 1
+                  fi
+            - name: Compile TypeScript
+              run: npx just compile
+            - name: Publish package
+              id: publish-package
+              continue-on-error: true
+              run: npx packtory publish --no-dry-run
+            - name: Re-publish after a transient sigstore failure
+              if: steps.publish-package.outcome == 'failure'
+              run: |
+                  sleep 10
+                  npx packtory publish --no-dry-run

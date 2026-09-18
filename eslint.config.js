@@ -1,63 +1,54 @@
-import dprintPlugin from '@ben_12/eslint-plugin-dprint';
 import { baseConfig } from '@enormora/eslint-config-base';
-import { nodeConfig, nodeConfigFileConfig } from '@enormora/eslint-config-node';
+import { nodeConfig, nodeConfigFileConfig, nodeEntryPointFileConfig } from '@enormora/eslint-config-node';
+import { testSupportConfig } from '@enormora/eslint-config-test-base';
 import { typescriptConfig } from '@enormora/eslint-config-typescript';
 
 export default [
     {
-        ignores: ['target/**/*', 'integration-tests/fixtures/**/*']
+        ignores: [ 'target/**/*' ]
     },
-    baseConfig,
-    nodeConfig,
+    ...baseConfig,
     {
-        plugins: { dprint: dprintPlugin },
-        rules: {
-            'prettier/prettier': 'off',
-            'dprint/typescript': ['error', { configFile: 'dprint.json' }],
-            'import/order': 'off',
-            '@stylistic/member-delimiter-style': 'off'
-        }
+        ...nodeConfig,
+        files: [ '**/*.{js,cjs,mjs,ts,cts,mts}' ]
     },
     {
         ...typescriptConfig,
-        files: ['**/*.ts']
+        files: [ '**/*.ts' ]
+    },
+    {
+        ...testSupportConfig,
+        files: [ '**/*.test.ts' ]
     },
     {
         ...nodeConfigFileConfig,
-        files: ['eslint.config.js', 'packtory.config.js']
+        files: [ 'dependency-cruiser.config.js', 'eslint.config.js' ]
     },
     {
-        files: ['packtory.config.js'],
+        ...nodeConfigFileConfig,
+        ...typescriptConfig,
+        files: [ 'overkill.config.ts' ]
+    },
+    {
+        ...nodeEntryPointFileConfig,
+        files: [ 'packtory.config.js' ],
         rules: {
-            'node/no-process-env': 'off'
+            ...nodeConfigFileConfig.rules,
+            ...nodeEntryPointFileConfig.rules
         }
     },
     {
-        files: ['**/*.ts'],
+        ...nodeEntryPointFileConfig,
+        files: [ 'source/**/*.entry-point.ts' ],
         rules: {
-            // re-enable once https://github.com/eslint-functional/eslint-plugin-functional/issues/733 is fixed
-            'functional/prefer-immutable-types': 'off',
-            // re-enable once https://github.com/eslint-functional/eslint-plugin-functional/issues/733 is fixed
-            'functional/type-declaration-immutability': 'off'
+            ...nodeEntryPointFileConfig.rules,
+            'no-barrel-files/no-barrel-files': 'off'
         }
     },
     {
-        files: ['**/*.test.ts'],
+        files: [ '**/*.test.ts' ],
         rules: {
-            'max-statements': 'off',
             'max-lines': 'off'
-        }
-    },
-    {
-        files: ['source/zod-graphql-query-builder/builder.ts'],
-        // those rules crash for some reason, we should re-enable them as soon as they are not crashing anymore
-        rules: {
-            '@typescript-eslint/no-unnecessary-type-assertion': 'off',
-            '@typescript-eslint/no-unsafe-argument': 'off',
-            '@typescript-eslint/no-confusing-void-expression': 'off',
-            '@typescript-eslint/promise-function-async': 'off',
-            '@typescript-eslint/no-misused-promises': 'off',
-            '@typescript-eslint/no-unsafe-return': 'off'
         }
     }
 ];

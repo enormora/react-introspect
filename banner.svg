@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="360" viewBox="0 0 880 360" role="img" aria-labelledby="title description">
+  <title id="title">React Probe banner</title>
+  <desc id="description">A React-inspired atom mark combined with a magnifying probe and the React Probe wordmark.</desc>
+  <style>
+    .ink-fill,
+    .wordmark {
+      fill: #0F172A;
+    }
+
+    .wordmark {
+      paint-order: stroke fill;
+      stroke: #F8FAFC;
+      stroke-linejoin: round;
+      stroke-width: 8px;
+    }
+
+    .ink-stroke {
+      stroke: #0F172A;
+    }
+
+    .lens-highlight {
+      fill: #FFFFFF;
+      opacity: 0.82;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .ink-fill,
+      .wordmark {
+        fill: #F8FAFC;
+      }
+
+      .wordmark {
+        stroke: #0F172A;
+      }
+
+      .ink-stroke {
+        stroke: #F8FAFC;
+      }
+
+      .lens-start {
+        stop-color: #263449;
+      }
+
+      .lens-mid {
+        stop-color: #164E63;
+      }
+
+      .lens-end {
+        stop-color: #0E7490;
+      }
+
+      .lens-highlight {
+        fill: #F8FAFC;
+        opacity: 0.24;
+      }
+    }
+  </style>
+  <defs>
+    <linearGradient id="orbit-gradient" x1="103" y1="60" x2="317" y2="274" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#61DAFB"/>
+      <stop offset="0.52" stop-color="#42E6B2"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="lens-gradient" x1="160" y1="112" x2="254" y2="226" gradientUnits="userSpaceOnUse">
+      <stop class="lens-start" offset="0" stop-color="#F8FEFF"/>
+      <stop class="lens-mid" offset="0.58" stop-color="#D7F7FF"/>
+      <stop class="lens-end" offset="1" stop-color="#9EEBFF"/>
+    </linearGradient>
+    <linearGradient id="probe-gradient" x1="228" y1="221" x2="318" y2="311" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#42E6B2"/>
+      <stop offset="1" stop-color="#61DAFB"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <g filter="url(#soft-shadow)">
+    <path d="M72 180c0-41.85 59.1-75.78 132-75.78S336 138.15 336 180s-59.1 75.78-132 75.78S72 221.85 72 180Z" fill="none" stroke="url(#orbit-gradient)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M138 294.32c-36.25-20.92-36.07-88.98.37-152.1C174.81 79.1 233.4 44.96 269.65 65.88c36.24 20.93 36.08 88.98-.37 152.1-36.44 63.12-94.99 97.27-131.28 76.34Z" fill="none" stroke="url(#orbit-gradient)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M138 65.68c36.25-20.92 94.84 13.22 131.28 76.34 36.45 63.12 36.61 131.17.37 152.1-36.25 20.92-94.84-13.22-131.28-76.34C101.93 154.66 101.75 86.61 138 65.68Z" fill="none" stroke="url(#orbit-gradient)" stroke-width="12" stroke-linecap="round"/>
+    <circle class="ink-stroke" cx="204" cy="180" r="68" fill="url(#lens-gradient)" stroke-width="14"/>
+    <circle class="lens-highlight" cx="184" cy="158" r="17"/>
+    <path class="ink-stroke" d="M248.6 230.6 317.2 299.2" fill="none" stroke-width="28" stroke-linecap="round"/>
+    <path d="M248.6 230.6 317.2 299.2" fill="none" stroke="url(#probe-gradient)" stroke-width="13" stroke-linecap="round"/>
+    <path class="ink-stroke" d="M164 181.5h80" fill="none" stroke-width="10" stroke-linecap="round"/>
+    <path class="ink-stroke" d="M176 157h56" fill="none" stroke-width="10" stroke-linecap="round"/>
+    <path class="ink-stroke" d="M176 206h56" fill="none" stroke-width="10" stroke-linecap="round"/>
+    <circle class="ink-fill" cx="204" cy="180" r="14"/>
+  </g>
+  <g class="wordmark">
+    <text x="424" y="165" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="82" font-weight="760" letter-spacing="0">React</text>
+    <text x="424" y="251" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="82" font-weight="760" letter-spacing="0">Probe</text>
+  </g>
+</svg>

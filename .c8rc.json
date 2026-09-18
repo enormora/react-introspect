@@ -1,19 +1,14 @@
 {
     "all": true,
+    "check-coverage": true,
+    "extension": [".ts"],
+    "src": ["source"],
+    "exclude": ["source/**/*.entry-point.ts", "source/**/*.test.ts", "source/**/*.type-test.ts", "target/**"],
+    "lines": 100,
+    "functions": 100,
     "statements": 100,
     "branches": 100,
-    "functions": 100,
-    "lines": 100,
-    "instrument": true,
-    "check-coverage": true,
-    "extension": [".js"],
-    "src": "target/build/source",
-    "reporter": ["lcov", "text-summary", "cobertura"],
-    "reportDir": "./target/coverage",
-    "tempDirectory": "./target/c8_output",
-    "exclude": [
-        "target/build/source/**/*.test.js",
-        "target/build/source/**/entry-point.js",
-        "target/build/source/zod-graphql-client/operation-result.js"
-    ]
+    "reporter": ["lcov", "text-summary"],
+    "report-dir": "./target/coverage",
+    "temp-directory": "./target/c8_output"
 }

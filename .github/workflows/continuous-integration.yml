@@ -1,0 +1,88 @@
+---
+name: Continuous integration
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        types: [opened, reopened, synchronize]
+    merge_group:
+
+permissions: {}
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    static-analysis:
+        runs-on: ubuntu-latest
+        name: Static analysis
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+            - name: Use Node.js from package metadata
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: package.json
+            - name: Install dependencies
+              run: npm ci
+            - name: Run static analysis
+              run: npx just lint
+
+    compile:
+        runs-on: ubuntu-latest
+        name: Compile TypeScript
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+            - name: Use Node.js from package metadata
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: package.json
+            - name: Install dependencies
+              run: npm ci
+            - name: Compile TypeScript
+              run: npx just compile
+
+    tests:
+        runs-on: ubuntu-latest
+        name: Tests
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+            - name: Use Node.js from package metadata
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: package.json
+            - name: Install dependencies
+              run: npm ci
+            - name: Run tests
+              run: npx just test
+
+    package-dry-run:
+        runs-on: ubuntu-latest
+        name: Package dry run
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+            - name: Use Node.js from package metadata
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: package.json
+            - name: Install dependencies
+              run: npm ci
+            - name: Dry-run package publish
+              run: npx just publish-dry-run

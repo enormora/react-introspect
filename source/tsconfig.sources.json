@@ -5,6 +5,6 @@
         "rootDir": "..",
         "types": ["node"]
     },
-    "include": ["./**/*.ts"],
-    "exclude": ["./**/*.test.ts"]
+    "include": ["./**/*.ts", "../overkill.config.ts"],
+    "exclude": ["./**/*.test.ts", "./**/*.type-test.ts"]
 }

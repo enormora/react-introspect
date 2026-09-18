@@ -1,0 +1,25 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "entry": [
+        "source/**/*.test.ts",
+        "source/**/*.type-test.ts",
+        "source/**/*.entry-point.ts",
+        "dependency-cruiser.config.js",
+        "overkill.config.ts",
+        "packtory.config.js",
+        "tstyche.json"
+    ],
+    "project": ["source/**/*.ts!", "*.js", "*.ts", "!source/**/*.test.ts!", "!source/**/*.type-test.ts!"],
+    "ignoreDependencies": [
+        "@dprint/json",
+        "@dprint/markdown",
+        "@dprint/typescript",
+        "@ls-lint/ls-lint",
+        "@types/react",
+        "c8",
+        "dprint",
+        "jscpd",
+        "react",
+        "react-reconciler"
+    ]
+}
