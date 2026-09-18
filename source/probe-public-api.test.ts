@@ -160,11 +160,11 @@ function assertHostCapabilities(scope: EqualScope, view: HostView, button: HostB
 }
 
 function assertSelectorMatches(scope: EqualScope, view: HostView, buttonPath: string): void {
-    scope.assert.equal(view.find({ props: {} })?.name, '#text');
+    scope.assert.equal(view.find({ props: {}, type: '#text' })?.name, '#text');
     scope.assert.equal(view.find({ key: 'save' })?.path, buttonPath);
     scope.assert.equal(view.find({ key: 'missing' }), undefined);
-    scope.assert.equal(view.find({ textContent: /save/i })?.path, `${buttonPath} > #text[0]`);
-    scope.assert.equal(view.find({ textContent: undefined })?.name, '#text');
+    scope.assert.equal(view.find({ textContent: /save/i, type: '#text' })?.path, `${buttonPath} > #text[0]`);
+    scope.assert.equal(view.find({ textContent: undefined } as never)?.name, 'form');
 }
 
 function assertSelectorMisses(scope: EqualScope, view: HostView): void {
@@ -317,6 +317,17 @@ function assertUpdatedListLocator(scope: EqualScope, items: ReturnType<ProbeView
     scope.assert.equal(items.at(1)?.textContent, 'two');
 }
 
+function assertUnmountedView(scope: EqualScope, view: ProbeView, root: ProbeView['root']): void {
+    const staleRoot = requireValue(root);
+
+    scope.assert.equal(staleRoot.isStale, true);
+    scope.assert.equal(view.root, undefined);
+    scope.assert.equal(view.renderedChildren.length, 0);
+    scope.assert.equal(view.findAll('main').length, 0);
+    scope.assert.equal(view.textContent, '');
+    scope.assert.equal(view.formatTree(), '');
+}
+
 function assertViewDiagnostics(scope: EqualScope, view: ProbeView): void {
     const currentView = view as ProbeView & { readonly currentSnapshot: { readonly renderCount: number; }; };
 
@@ -408,7 +419,7 @@ export const testNode = suite('public API skeleton', [
         assertOpaqueEdge(scope, view);
         scope.assert.equal(
             view.formatTree(),
-            'Fragment\n  DisplayPanel\n  Component\n  span\n    #text\n  em\n    #text\n  Opaque'
+            'Fragment\n  DisplayPanel\n  Component\n  #empty\n  #empty\n  span\n    #text\n  em\n    #text\n  Opaque'
         );
 
         return scope.assert.collect();
@@ -467,13 +478,7 @@ export const testNode = suite('public API skeleton', [
 
         view.unmount();
 
-        const staleRoot = requireValue(root);
-
-        scope.assert.equal(staleRoot.isStale, true);
-        scope.assert.equal(view.root, undefined);
-        scope.assert.equal(view.renderedChildren.length, 0);
-        scope.assert.equal(view.textContent, '');
-        scope.assert.equal(view.formatTree(), '');
+        assertUnmountedView(scope, view, root);
 
         return scope.assert.collect();
     }),

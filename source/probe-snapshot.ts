@@ -9,12 +9,15 @@ export type ProbeSnapshot = {
 
 export type SnapshotProps = Readonly<Record<PropertyKey, unknown>>;
 
+type SnapshotNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
+
 export type SnapshotNode = {
     readonly givenChildren: readonly SnapshotNode[];
     readonly id: number;
     readonly key: string | null;
+    readonly kind: SnapshotNodeKind;
     readonly name: string;
-    readonly parent: SnapshotNode | undefined;
+    readonly parentId: number | undefined;
     readonly path: string;
     readonly props: SnapshotProps;
     readonly renderedChildren: readonly SnapshotNode[];
@@ -28,11 +31,18 @@ type SnapshotBuild = {
     readonly nodes: readonly SnapshotNode[];
 };
 
+type NodeIdAllocation = {
+    readonly build: SnapshotBuild;
+    readonly id: number;
+};
+
 type SnapshotNodeInput = {
     readonly givenChildren: readonly SnapshotNode[];
+    readonly id: number;
     readonly key: string | null;
+    readonly kind: SnapshotNodeKind;
     readonly name: string;
-    readonly parent: SnapshotNode | undefined;
+    readonly parentId: number | undefined;
     readonly path: string;
     readonly props: SnapshotProps;
     readonly renderedChildren: readonly SnapshotNode[];
@@ -45,7 +55,7 @@ type SnapshotNodeRequest = {
     readonly build: SnapshotBuild;
     readonly index: number;
     readonly node: unknown;
-    readonly parent: SnapshotNode | undefined;
+    readonly parentId: number | undefined;
     readonly parentPath: string;
 };
 
@@ -56,7 +66,7 @@ type ElementNodeRequest = SnapshotNodeRequest & {
 type ChildSnapshotsRequest = {
     readonly build: SnapshotBuild;
     readonly children: unknown;
-    readonly parent: SnapshotNode | undefined;
+    readonly parentId: number | undefined;
     readonly parentPath: string;
 };
 
@@ -118,12 +128,24 @@ function getTypeName(type: unknown): string {
     return 'Component';
 }
 
-function getElementPath(request: ElementNodeRequest, name: string): string {
-    return request.parentPath === 'root' ? name : `${request.parentPath} > ${name}[${request.index}]`;
+function getIndexedPath(parentPath: string, index: number, name: string): string {
+    return parentPath === 'root' ? name : `${parentPath} > ${name}[${index}]`;
 }
 
 function rendersOwnChildren(type: unknown): boolean {
     return typeof type === 'string' || type === React.Fragment;
+}
+
+function getElementKind(type: unknown): SnapshotNodeKind {
+    if (typeof type === 'string') {
+        return 'host';
+    }
+
+    if (type === React.Fragment) {
+        return 'fragment';
+    }
+
+    return 'component';
 }
 
 function getElementChildrenState(type: unknown, children: readonly SnapshotNode[]): ElementChildrenState {
@@ -148,29 +170,22 @@ function freezePropsWithoutChildren(props: SnapshotProps): SnapshotProps {
     return Object.freeze(publicProps);
 }
 
-function setParent(node: SnapshotNode, parent: SnapshotNode): void {
-    Object.defineProperty(node, 'parent', {
-        value: parent
-    });
-}
-
-function setChildrenParent(parent: SnapshotNode | undefined, children: readonly SnapshotNode[]): void {
-    if (parent !== undefined) {
-        for (const child of children) {
-            setParent(child, parent);
-        }
-    }
-}
-
-function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNodeInput): SnapshotNodeResult {
-    const node = {
-        ...input,
-        id: build.nextId
-    };
-
+function allocateNodeId(build: SnapshotBuild): NodeIdAllocation {
     return {
         build: {
             nextId: build.nextId + 1,
+            nodes: build.nodes
+        },
+        id: build.nextId
+    };
+}
+
+function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNodeInput): SnapshotNodeResult {
+    const node = Object.freeze(input);
+
+    return {
+        build: {
+            nextId: build.nextId,
             nodes: Object.freeze([
                 ...build.nodes,
                 node
@@ -181,10 +196,6 @@ function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNodeInput): Snaps
 }
 
 function flattenReactNodes(children: unknown): readonly unknown[] {
-    if (isEmptyNode(children)) {
-        return Object.freeze([]);
-    }
-
     if (Array.isArray(children)) {
         return children.flatMap(flattenReactNodes);
     }
@@ -204,7 +215,7 @@ const snapshotOperations = {
                     build: result.build,
                     index,
                     node: child,
-                    parent: request.parent,
+                    parentId: request.parentId,
                     parentPath: request.parentPath
                 });
 
@@ -225,20 +236,23 @@ const snapshotOperations = {
     createElementSnapshotNode(request: ElementNodeRequest): SnapshotNodeResult {
         const props = readElementProps(request.element);
         const { type } = request.element;
+        const idAllocation = allocateNodeId(request.build);
         const name = getTypeName(type);
-        const path = getElementPath(request, name);
+        const path = getIndexedPath(request.parentPath, request.index, name);
         const childrenResult = snapshotOperations.createChildSnapshots({
-            build: request.build,
+            build: idAllocation.build,
             children: props.children,
-            parent: undefined,
+            parentId: idAllocation.id,
             parentPath: path
         });
         const childrenState = getElementChildrenState(type, childrenResult.nodes);
         const result = pushSnapshotNode(childrenResult.build, {
             givenChildren: childrenResult.nodes,
+            id: idAllocation.id,
             key: request.element.key ?? null,
+            kind: getElementKind(type),
             name,
-            parent: request.parent,
+            parentId: request.parentId,
             path,
             props: freezePropsWithoutChildren(props),
             renderedChildren: childrenState.renderedChildren,
@@ -247,17 +261,37 @@ const snapshotOperations = {
             type
         });
 
-        setChildrenParent(result.node, childrenResult.nodes);
-
         return result;
     },
-    createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
-        return pushSnapshotNode(request.build, {
+    createEmptySnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
+        const idAllocation = allocateNodeId(request.build);
+
+        return pushSnapshotNode(idAllocation.build, {
             givenChildren: Object.freeze([]),
+            id: idAllocation.id,
             key: null,
+            kind: 'empty',
+            name: '#empty',
+            parentId: request.parentId,
+            path: getIndexedPath(request.parentPath, request.index, '#empty'),
+            props: Object.freeze({ value: request.node }),
+            renderedChildren: Object.freeze([]),
+            renderedReason: undefined,
+            textContent: '',
+            type: '#empty'
+        });
+    },
+    createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
+        const idAllocation = allocateNodeId(request.build);
+
+        return pushSnapshotNode(idAllocation.build, {
+            givenChildren: Object.freeze([]),
+            id: idAllocation.id,
+            key: null,
+            kind: 'opaque',
             name: 'Opaque',
-            parent: request.parent,
-            path: `${request.parentPath} > Opaque[${request.index}]`,
+            parentId: request.parentId,
+            path: getIndexedPath(request.parentPath, request.index, 'Opaque'),
             props: Object.freeze({ value: request.node }),
             renderedChildren: Object.freeze([]),
             renderedReason: 'unsupported',
@@ -266,6 +300,10 @@ const snapshotOperations = {
         });
     },
     createSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
+        if (isEmptyNode(request.node)) {
+            return snapshotOperations.createEmptySnapshotNode(request);
+        }
+
         if (typeof request.node === 'string' || typeof request.node === 'number' || typeof request.node === 'bigint') {
             return snapshotOperations.createTextSnapshotNode(request);
         }
@@ -280,12 +318,16 @@ const snapshotOperations = {
         return snapshotOperations.createOpaqueSnapshotNode(request);
     },
     createTextSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
-        return pushSnapshotNode(request.build, {
+        const idAllocation = allocateNodeId(request.build);
+
+        return pushSnapshotNode(idAllocation.build, {
             givenChildren: Object.freeze([]),
+            id: idAllocation.id,
             key: null,
+            kind: 'text',
             name: '#text',
-            parent: request.parent,
-            path: `${request.parentPath} > #text[${request.index}]`,
+            parentId: request.parentId,
+            path: getIndexedPath(request.parentPath, request.index, '#text'),
             props: Object.freeze({ value: request.node }),
             renderedChildren: Object.freeze([]),
             renderedReason: undefined,
@@ -303,7 +345,7 @@ export function createProbeSnapshot(element: React.ReactElement, renderCount: nu
         },
         index: 0,
         node: element,
-        parent: undefined,
+        parentId: undefined,
         parentPath: 'root'
     });
 

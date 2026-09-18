@@ -76,6 +76,12 @@ function nodeState(node: SnapshotNode): ProbeNodeState {
     });
 }
 
+function findSnapshotNode(snapshot: ProbeSnapshot, id: number): SnapshotNode | undefined {
+    return snapshot.nodes.find(function hasNodeId(node) {
+        return node.id === id;
+    });
+}
+
 export function createProbeNode(
     reader: SnapshotReader,
     snapshot: ProbeSnapshot,
@@ -165,7 +171,7 @@ export function createProbeNode(
         findAll,
         findClosest(selector: unknown) {
             const normalizedSelector = toSelector(selector);
-            let { parent } = node;
+            let parent = node.parentId === undefined ? undefined : findSnapshotNode(snapshot, node.parentId);
 
             while (parent !== undefined) {
                 const parentNode = createProbeNode(reader, snapshot, parent);
@@ -174,7 +180,7 @@ export function createProbeNode(
                     return parentNode;
                 }
 
-                parent = parent.parent;
+                parent = parent.parentId === undefined ? undefined : findSnapshotNode(snapshot, parent.parentId);
             }
 
             return undefined;

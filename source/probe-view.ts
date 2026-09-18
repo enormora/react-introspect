@@ -29,6 +29,17 @@ function nodeList(
     }));
 }
 
+function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
+    function collect(node: SnapshotNode): readonly SnapshotNode[] {
+        return [
+            node,
+            ...node.renderedChildren.flatMap(collect)
+        ];
+    }
+
+    return snapshot.root === undefined ? Object.freeze([]) : collect(snapshot.root);
+}
+
 export function createProbeView(element: React.ReactElement, options: RuntimeProbeOptions = {}): RuntimeProbeView {
     let currentSnapshot = createProbeSnapshot(element, 1);
     const state: SnapshotReader = {
@@ -45,8 +56,7 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
 
     function findAll(selector: unknown): RuntimeProbeList {
         const normalizedSelector = toSelector(selector);
-        const nodes = currentSnapshot
-            .nodes
+        const nodes = snapshotTreeNodes(currentSnapshot)
             .map(function createNode(node) {
                 return createProbeNode(state, currentSnapshot, node);
             })

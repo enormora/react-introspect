@@ -29,6 +29,12 @@ function matchesPartial(value: unknown, partial: unknown): boolean {
         return true;
     }
 
+    if (Array.isArray(value) && Array.isArray(partial)) {
+        return partial.every(function matchesArrayItem(item, index) {
+            return matchesPartial(value[index], item);
+        });
+    }
+
     if (!isRecord(value) || !isRecord(partial)) {
         return false;
     }
@@ -59,6 +65,12 @@ function propsMatch<HostSchema extends ProbeHostSchema>(
     return !hasProperty(selector, 'props') || matchesPartial(node.props, selector.props);
 }
 
+function regexpMatches(pattern: RegExp, value: string): boolean {
+    const freshPattern = new RegExp(pattern.source, pattern.flags);
+
+    return freshPattern.test(value);
+}
+
 function textContentMatches<HostSchema extends ProbeHostSchema>(
     node: RuntimeProbeNode,
     selector: ProbeSelector<HostSchema>
@@ -75,7 +87,7 @@ function textContentMatches<HostSchema extends ProbeHostSchema>(
 
     return typeof textContent === 'string'
         ? textContent === node.textContent
-        : textContent.test(node.textContent);
+        : regexpMatches(textContent, node.textContent);
 }
 
 function hasMatches<HostSchema extends ProbeHostSchema>(
