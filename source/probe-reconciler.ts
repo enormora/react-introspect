@@ -2,51 +2,24 @@ import * as timers from 'node:timers';
 import React from 'react';
 import createReconciler from 'react-reconciler';
 import {
-    probeComponentHostType,
-    probeComponentMetadata,
-    probeElementKeyMetadata,
-    probeEmptyHostType,
-    probeOpaqueHostType,
-    probeValueMetadata,
-    type ProbeComponentMetadata
-} from './probe-frame.ts';
-import {
-    createEmptyProbeSnapshot,
-    createProbeSnapshotFromSource,
-    type ProbeSnapshot,
-    type SnapshotSourceNode
-} from './probe-snapshot.ts';
-
-type ProbeHostProps = Readonly<Record<PropertyKey, unknown>>;
-
-type ProbeHostParent = ProbeHostContainer | ProbeHostInstance;
-
-type ProbeHostChild = ProbeHostInstance | ProbeTextInstance;
-
-type ProbeChildStore = {
-    readonly readChildren: () => readonly ProbeHostChild[];
-    readonly writeChildren: (children: readonly ProbeHostChild[]) => void;
-};
-
-type ProbeHostContainer = {
-    readonly publish: (snapshot: ProbeSnapshot) => void;
-    readonly readNextRenderCount: () => number;
-    readonly readMounted: () => boolean;
-    readonly writeMounted: (mounted: boolean) => void;
-} & ProbeChildStore;
-
-type ProbeHostInstance = {
-    readonly readProps: () => ProbeHostProps;
-    readonly type: string;
-    readonly writeProps: (props: ProbeHostProps) => void;
-} & ProbeChildStore;
-
-type ProbeTextInstance = {
-    readonly readText: () => string;
-    readonly writeText: (text: string) => void;
-};
-
-type ProbeHostContext = Readonly<Record<PropertyKey, never>>;
+    appendChild,
+    clearContainer,
+    createHostContainer,
+    createHostInstance,
+    createTextInstance,
+    getChildHostContext,
+    getRootHostContext,
+    insertBefore,
+    type ProbeHostContainer,
+    type ProbeHostInstance,
+    type ProbeHostProps,
+    type ProbeTextInstance,
+    removeChild,
+    toSnapshot,
+    validateContainerRefs
+} from './probe-host-tree.ts';
+import type { ProbeRefs } from './probe-public-types.ts';
+import type { ProbeSnapshot } from './probe-snapshot.ts';
 
 type Waiter = {
     readonly predicate: () => boolean;
@@ -56,6 +29,7 @@ type Waiter = {
 type ProbeReconcilerRootOptions = {
     readonly element: React.ReactElement;
     readonly publish: (snapshot: ProbeSnapshot) => void;
+    readonly refs: ProbeRefs | undefined;
     readonly strictMode: boolean;
 };
 
@@ -70,220 +44,6 @@ export type ProbeReconcilerRoot = {
 };
 
 const defaultEventPriority = 32;
-const parentByChild = new WeakMap<ProbeHostChild, ProbeHostParent>();
-
-function createChildStore(): ProbeChildStore {
-    let currentChildren: readonly ProbeHostChild[] = [];
-
-    return Object.freeze({
-        readChildren() {
-            return currentChildren;
-        },
-        writeChildren(children: readonly ProbeHostChild[]) {
-            currentChildren = children;
-        }
-    });
-}
-
-function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Object.hasOwn(value, property);
-}
-
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
-function isPublicHostPropKey(key: PropertyKey): boolean {
-    return key !== 'children' &&
-        key !== 'key' &&
-        key !== probeComponentMetadata &&
-        key !== probeElementKeyMetadata &&
-        key !== probeValueMetadata;
-}
-
-function publicProps(props: ProbeHostProps): ProbeHostProps {
-    const result: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        if (isPublicHostPropKey(key)) {
-            result[key] = props[key];
-        }
-    }
-
-    return Object.freeze(result);
-}
-
-function isProbeComponentMetadata(value: unknown): value is ProbeComponentMetadata {
-    return isRecord(value) &&
-        hasProperty(value, 'givenChildren') &&
-        hasProperty(value, 'key') &&
-        hasProperty(value, 'props') &&
-        hasProperty(value, 'renderedReason') &&
-        hasProperty(value, 'type');
-}
-
-function isTextInstance(child: ProbeHostChild): child is ProbeTextInstance {
-    return !Reflect.has(child, 'type');
-}
-
-function detachChild(child: ProbeHostChild): void {
-    const parent = parentByChild.get(child);
-
-    if (parent === undefined) {
-        return;
-    }
-
-    const children = parent.readChildren();
-    const index = children.indexOf(child);
-
-    if (index !== -1) {
-        parent.writeChildren(children.toSpliced(index, 1));
-    }
-
-    parentByChild.delete(child);
-}
-
-function appendChild(parent: ProbeHostParent, child: ProbeHostChild): void {
-    detachChild(child);
-
-    const children = parent.readChildren();
-
-    parent.writeChildren([
-        ...children,
-        child
-    ]);
-    parentByChild.set(child, parent);
-}
-
-function insertBefore(parent: ProbeHostParent, child: ProbeHostChild, beforeChild: ProbeHostChild): void {
-    detachChild(child);
-
-    const children = parent.readChildren();
-
-    parent.writeChildren(children.toSpliced(children.indexOf(beforeChild), 0, child));
-    parentByChild.set(child, parent);
-}
-
-function removeChild(parent: ProbeHostParent, child: ProbeHostChild): void {
-    const children = parent.readChildren();
-    const index = children.indexOf(child);
-
-    if (index !== -1) {
-        parent.writeChildren(children.toSpliced(index, 1));
-    }
-
-    parentByChild.delete(child);
-}
-
-function readSpecialValue(instance: ProbeHostInstance): unknown {
-    return instance.readProps()[probeValueMetadata];
-}
-
-function readHostKey(instance: ProbeHostInstance): string | null {
-    const key = instance.readProps()[probeElementKeyMetadata];
-
-    return typeof key === 'string' ? key : null;
-}
-
-function readComponentMetadata(instance: ProbeHostInstance): ProbeComponentMetadata {
-    const value = instance.readProps()[probeComponentMetadata];
-
-    if (!isProbeComponentMetadata(value)) {
-        return Object.freeze({
-            givenChildren: undefined,
-            key: null,
-            props: Object.freeze({}),
-            renderedReason: 'unsupported',
-            type: probeComponentHostType
-        });
-    }
-
-    return value;
-}
-
-function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
-    if (isTextInstance(child)) {
-        return { kind: 'text', value: child.readText() };
-    }
-
-    if (child.type === probeEmptyHostType || child.type === probeOpaqueHostType) {
-        return {
-            kind: child.type === probeEmptyHostType ? 'empty' : 'opaque',
-            value: readSpecialValue(child)
-        };
-    }
-
-    if (child.type === probeComponentHostType) {
-        const metadata = readComponentMetadata(child);
-
-        return {
-            children: child.readChildren().map(toSourceNode),
-            givenChildren: metadata.givenChildren,
-            givenChildrenKind: 'react',
-            key: metadata.key,
-            props: metadata.props,
-            renderedReason: metadata.renderedReason,
-            type: metadata.type
-        };
-    }
-
-    const children = child.readChildren().map(toSourceNode);
-
-    return {
-        children,
-        givenChildren: children,
-        givenChildrenKind: 'source',
-        key: readHostKey(child),
-        props: publicProps(child.readProps()),
-        renderedReason: undefined,
-        type: child.type
-    };
-}
-
-function toSnapshot(container: ProbeHostContainer): ProbeSnapshot {
-    if (!container.readMounted()) {
-        return createEmptyProbeSnapshot(container.readNextRenderCount());
-    }
-
-    return createProbeSnapshotFromSource(
-        container.readChildren().map(toSourceNode),
-        container.readNextRenderCount()
-    );
-}
-
-function createHostInstance(type: string, props: ProbeHostProps): ProbeHostInstance {
-    let currentProps = props;
-
-    return Object.freeze({
-        ...createChildStore(),
-        readProps() {
-            return currentProps;
-        },
-        type,
-        writeProps(nextProps: ProbeHostProps) {
-            currentProps = nextProps;
-        }
-    });
-}
-
-function createTextInstance(text: string): ProbeTextInstance {
-    let currentText = text;
-
-    return Object.freeze({
-        readText() {
-            return currentText;
-        },
-        writeText(nextText: string) {
-            currentText = nextText;
-        }
-    });
-}
-
-function clearContainer(container: ProbeHostContainer): void {
-    container.writeChildren([]);
-}
-
-const hostContext: ProbeHostContext = Object.freeze({});
 
 function noop(): void {
     return undefined;
@@ -295,10 +55,6 @@ function alwaysFalse(): boolean {
 
 function returnNull(): null {
     return null;
-}
-
-function getHostContext(): ProbeHostContext {
-    return hostContext;
 }
 
 function getDefaultEventPriority(): number {
@@ -334,14 +90,18 @@ const renderer = createReconciler({
         newProps: ProbeHostProps
     ) {
         instance.writeProps(newProps);
+        instance.refreshPublicInstance(newProps);
     },
     createInstance: createHostInstance,
     createTextInstance,
     detachDeletedInstance: noop,
     finalizeInitialChildren: alwaysFalse,
-    getChildHostContext: getHostContext,
+    getChildHostContext,
     getCurrentUpdatePriority: getDefaultEventPriority,
-    getRootHostContext: getHostContext,
+    getPublicInstance(instance: ProbeHostInstance) {
+        return instance.readPublicInstance();
+    },
+    getRootHostContext,
     insertBefore,
     insertInContainerBefore: insertBefore,
     isPrimaryRenderer: false,
@@ -381,25 +141,6 @@ const renderer = createReconciler({
     trackSchedulerEvent: noop,
     waitForCommitToBeReady: returnNull
 });
-
-function createHostContainer(
-    publish: (snapshot: ProbeSnapshot) => void,
-    readNextRenderCount: () => number
-): ProbeHostContainer {
-    let mounted = true;
-
-    return Object.freeze({
-        ...createChildStore(),
-        publish,
-        readMounted() {
-            return mounted;
-        },
-        readNextRenderCount,
-        writeMounted(nextMounted: boolean) {
-            mounted = nextMounted;
-        }
-    });
-}
 
 function createReconcilerContainer(container: ProbeHostContainer, strictMode: boolean): Record<string, unknown> {
     return renderer.createContainer(
@@ -452,7 +193,8 @@ export function createProbeReconcilerRoot(options: ProbeReconcilerRootOptions): 
         },
         function readNextRenderCount() {
             return renderCount + 1;
-        }
+        },
+        options.refs
     );
 
     const root = createReconcilerContainer(container, options.strictMode);
@@ -481,6 +223,7 @@ export function createProbeReconcilerRoot(options: ProbeReconcilerRootOptions): 
             });
             renderer.flushPassiveEffects();
         });
+        validateContainerRefs(container);
     }
 
     flushElement(options.element);

@@ -50,6 +50,7 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
         publish(snapshot) {
             currentSnapshot = snapshot;
         },
+        refs: options.refs,
         strictMode: options.strictMode ?? true
     });
     const state: SnapshotReader = {

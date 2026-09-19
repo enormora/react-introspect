@@ -1,6 +1,7 @@
 import type React from 'react';
-import { createProbeView } from './probe-view.ts';
 import type { ProbeOptions, ProbeView } from './probe-public-types.ts';
+import { createProbeView } from './probe-view.ts';
+
 export { createFakeRefNode, matchRefs } from './probe-ref.ts';
 
 export type {

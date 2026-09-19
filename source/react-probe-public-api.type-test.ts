@@ -9,11 +9,18 @@ import type {
     ProbeNode,
     ProbeNodeState,
     ProbeOptions,
+    ProbeRefMatcher,
+    ProbeRefRule,
+    ProbeRefTarget,
     ProbeSelector,
     ProbeView,
     ProbeWarning,
     RenderedChildren
 } from './probe-public-types.ts';
+import {
+    createFakeRefNode,
+    matchRefs
+} from './probe-ref.ts';
 import {
     probe
 } from './react-probe.entry-point.ts';
@@ -53,6 +60,17 @@ const button = view.find(Button);
 
 expect(view).type.toBeAssignableTo<ProbeView>();
 expect({ depth: 1, warningMode: 'throw' } as const).type.toBeAssignableTo<ProbeOptions>();
+expect({
+    refs: {
+        input: createFakeRefNode({
+            focus() {
+                return undefined;
+            }
+        })
+    }
+})
+    .type
+    .toBeAssignableTo<ProbeOptions>();
 expect({ message: 'warning', cause: undefined }).type.toBeAssignableTo<ProbeWarning>();
 expect({ cause: undefined, handled: false, message: 'error' }).type.toBeAssignableTo<ProbeError>();
 expect({ activityMode: undefined, reason: undefined, rendered: true, visible: true })
@@ -147,3 +165,35 @@ expect({
 })
     .type
     .toBeAssignableTo<ProbeSelector<HostSchema, HostSchema['button'], 'button'>>();
+
+const fakeInput = createFakeRefNode({
+    focus() {
+        return 1;
+    }
+});
+const buttonRefRule: ProbeRefRule<HostSchema, 'button'> = {
+    node: fakeInput,
+    props: { type: 'submit' },
+    type: 'button',
+    where(target) {
+        expect(target).type.toBeAssignableTo<ProbeRefTarget<HostSchema['button'], 'button'>>();
+
+        return target.props.disabled;
+    }
+};
+const refMatcher = matchRefs<HostSchema>([
+    {
+        node: fakeInput,
+        props: { type: 'submit' },
+        type: 'button'
+    }
+]);
+
+expect(fakeInput.focus()).type.toBe<1>();
+expect(buttonRefRule).type.toBeAssignableTo<ProbeRefRule<HostSchema, 'button'>>();
+expect(refMatcher).type.toBeAssignableTo<ProbeRefMatcher<HostSchema>>();
+expect({ refs: refMatcher }).type.toBeAssignableTo<ProbeOptions<HostSchema>>();
+
+if (refMatcher.rules[0] !== undefined) {
+    expect(refMatcher.rules[0]).type.toBeAssignableTo<ProbeRefRule<HostSchema>>();
+}

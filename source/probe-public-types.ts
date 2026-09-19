@@ -34,7 +34,7 @@ export type ProbeHostSchema = Readonly<Record<string, unknown>>;
 
 export type ProbeNotRenderedReason = 'depth' | 'errored' | 'suspended' | 'unsupported';
 
-export type ProbeFakeRefNode<Node extends object = Record<PropertyKey, unknown>> = Node;
+export type ProbeFakeRefNode<Node = Record<PropertyKey, unknown>> = Node;
 
 export type ProbeRefTarget<Props = unknown, Type = unknown> = {
     readonly key: string | null;
@@ -69,9 +69,9 @@ export type ProbeRefMatcher<HostSchema extends ProbeHostSchema = ProbeHostSchema
 
 export type ProbeRefShorthand = Readonly<Record<string, ProbeFakeRefNode>>;
 
-export type ProbeRefs<HostSchema extends ProbeHostSchema = ProbeHostSchema> =
-    | ProbeRefMatcher<HostSchema>
-    | ProbeRefShorthand;
+type ProbeRefConfiguration<HostSchema extends ProbeHostSchema> = ProbeRefMatcher<HostSchema> | ProbeRefShorthand;
+
+export type ProbeRefs<HostSchema extends ProbeHostSchema = ProbeHostSchema> = ProbeRefConfiguration<HostSchema>;
 
 type RenderedChildNodes<HostSchema extends ProbeHostSchema> = {
     readonly nodes: ProbeList<unknown, unknown, HostSchema>;
