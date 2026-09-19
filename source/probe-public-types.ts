@@ -24,7 +24,7 @@ export type ProbeOptions<HostSchema extends ProbeHostSchema = ProbeHostSchema> =
     readonly hostSchema?: HostSchema;
     readonly idGenerator?: ((generatedId: string) => string) | undefined;
     readonly idPrefix?: string | undefined;
-    readonly refs?: unknown;
+    readonly refs?: ProbeRefs<HostSchema> | undefined;
     readonly strictMode?: boolean;
     readonly waitTimeout?: number;
     readonly warningMode?: 'capture' | 'ignore' | 'throw';
@@ -33,6 +33,45 @@ export type ProbeOptions<HostSchema extends ProbeHostSchema = ProbeHostSchema> =
 export type ProbeHostSchema = Readonly<Record<string, unknown>>;
 
 export type ProbeNotRenderedReason = 'depth' | 'errored' | 'suspended' | 'unsupported';
+
+export type ProbeFakeRefNode<Node extends object = Record<PropertyKey, unknown>> = Node;
+
+export type ProbeRefTarget<Props = unknown, Type = unknown> = {
+    readonly key: string | null;
+    readonly name: string;
+    readonly props: Props;
+    readonly type: Type;
+};
+
+export type ProbeRefSelector<
+    HostSchema extends ProbeHostSchema = ProbeHostSchema,
+    Type = unknown,
+    Props = ProbeNodeProps<Type, HostSchema>
+> = {
+    readonly key?: React.Key | null;
+    readonly props?: ProbePartial<Props>;
+    readonly type?: Type;
+    readonly where?: (target: ProbeRefTarget<Props, Type>) => boolean;
+};
+
+export type ProbeRefRule<
+    HostSchema extends ProbeHostSchema = ProbeHostSchema,
+    Type = unknown,
+    Props = ProbeNodeProps<Type, HostSchema>
+> = ProbeRefSelector<HostSchema, Type, Props> & {
+    readonly node: ProbeFakeRefNode | ((target: ProbeRefTarget<Props, Type>) => ProbeFakeRefNode);
+};
+
+export type ProbeRefMatcher<HostSchema extends ProbeHostSchema = ProbeHostSchema> = {
+    readonly rules: readonly ProbeRefRule<HostSchema>[];
+    readonly type: 'matchRefs';
+};
+
+export type ProbeRefShorthand = Readonly<Record<string, ProbeFakeRefNode>>;
+
+export type ProbeRefs<HostSchema extends ProbeHostSchema = ProbeHostSchema> =
+    | ProbeRefMatcher<HostSchema>
+    | ProbeRefShorthand;
 
 type RenderedChildNodes<HostSchema extends ProbeHostSchema> = {
     readonly nodes: ProbeList<unknown, unknown, HostSchema>;
