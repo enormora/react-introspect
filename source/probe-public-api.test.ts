@@ -9,6 +9,18 @@ type ButtonProps = {
     readonly onSave: () => void;
 };
 
+type ActionButtonProps = {
+    readonly disabled: boolean;
+    readonly onSave: () => number;
+};
+
+type EventRecorderProps = {
+    readonly onChange: (value: string) => void;
+    readonly onMyCustomEvent: (value: string) => void;
+    readonly onPressCapture: (value: string) => void;
+    readonly onSave: () => void;
+};
+
 type HostSchema = {
     readonly button: {
         readonly disabled: boolean;
@@ -88,6 +100,16 @@ function Button(props: React.PropsWithChildren<ButtonProps>): React.ReactNode {
     Reflect.ownKeys(props);
 
     return null;
+}
+
+function ActionButton(props: ActionButtonProps): React.ReactNode {
+    return props.disabled ? React.createElement(React.Fragment) : null;
+}
+
+function EventRecorder(props: EventRecorderProps): React.ReactNode {
+    Reflect.ownKeys(props);
+
+    return React.createElement(React.Fragment);
 }
 
 function Panel(props: React.PropsWithChildren<{ readonly title: string; }>): React.ReactNode {
@@ -283,6 +305,19 @@ function createPropCallState(): PropCallState {
     };
 }
 
+function StatefulAction(): React.ReactNode {
+    const [ disabled, setDisabled ] = React.useState(false);
+
+    return React.createElement(ActionButton, {
+        disabled,
+        onSave() {
+            setDisabled(true);
+
+            return 7;
+        }
+    });
+}
+
 function performPropCalls(state: PropCallState): void {
     const button = requireValue(state.view.find(Button));
     const locator = state.view.locate(Button);
@@ -292,6 +327,21 @@ function performPropCalls(state: PropCallState): void {
     locator.callProp('onSave');
     hostButton.sendEvent('click', 'sent');
     state.hostView.locate('button').sendEvent('click', 'located');
+}
+
+function assertLocatorActUpdate(scope: EqualScope): void {
+    const view = probe(React.createElement(StatefulAction), {
+        strictMode: false
+    });
+    const action = view.locate(ActionButton);
+    const initialAction = requireValue(action.node);
+
+    const result = action.callProp('onSave');
+
+    scope.assert.equal(result, 7);
+    scope.assert.equal(initialAction.isStale, true);
+    scope.assert.equal(initialAction.props.disabled, false);
+    scope.assert.equal(action.node?.props.disabled, true);
 }
 
 function assertPropCallState(scope: EqualScope, state: PropCallState): void {
@@ -305,6 +355,37 @@ function assertPropCallState(scope: EqualScope, state: PropCallState): void {
         requireValue(state.hostView.find('button')),
         state.view
     );
+}
+
+function assertEventNameMapping(scope: EqualScope): void {
+    const calls: string[] = [];
+    const view = probe(React.createElement(EventRecorder, {
+        onChange(value: string) {
+            calls.push(`change:${value}`);
+        },
+        onMyCustomEvent(value: string) {
+            calls.push(`myCustomEvent:${value}`);
+        },
+        onPressCapture(value: string) {
+            calls.push(`pressCapture:${value}`);
+        },
+        onSave() {
+            calls.push('save');
+        }
+    }));
+    const recorder = requireValue(view.find(EventRecorder));
+
+    recorder.sendEvent('save');
+    recorder.sendEvent('change', 'field');
+    recorder.sendEvent('myCustomEvent', 'custom');
+    view.locate(EventRecorder).sendEvent('pressCapture', 'capture');
+
+    scope.assert.deepEqual(calls, [
+        'save',
+        'change:field',
+        'myCustomEvent:custom',
+        'pressCapture:capture'
+    ]);
 }
 
 function assertInitialListLocator(scope: EqualScope, items: ReturnType<ProbeView['locateAll']>): void {
@@ -440,6 +521,12 @@ export const testNode = suite('public API skeleton', [
 
         performPropCalls(state);
         assertPropCallState(scope, state);
+        assertLocatorActUpdate(scope);
+
+        return scope.assert.collect();
+    }),
+    test('maps event names to React-style handler props', function verifyEventNameMapping(scope) {
+        assertEventNameMapping(scope);
 
         return scope.assert.collect();
     }),
@@ -461,6 +548,7 @@ export const testNode = suite('public API skeleton', [
         const staleButton = requireValue(firstButton);
 
         scope.assert.equal(staleButton.isStale, true);
+        scope.assert.equal(staleButton.props.disabled, false);
         scope.assert.equal(locator.node?.props.disabled, true);
         scope.assert.equal(view.renderCount, 2);
 

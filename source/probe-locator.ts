@@ -4,26 +4,11 @@ import type {
     RuntimeProbeNode,
     RuntimeProbeView
 } from './probe-runtime-types.ts';
-import type { SnapshotProps } from './probe-snapshot.ts';
 
 type LocatorTarget = {
     readonly selector: unknown;
     readonly view: RuntimeProbeView;
 };
-
-function readProperty(value: SnapshotProps, property: PropertyKey): unknown {
-    return value[property];
-}
-
-function callProp(props: SnapshotProps, property: PropertyKey, parameters: readonly unknown[]): unknown {
-    const value = readProperty(props, property);
-
-    if (typeof value !== 'function') {
-        throw new TypeError(`Prop ${String(property)} is not callable.`);
-    }
-
-    return Reflect.apply(value, undefined, parameters);
-}
 
 function readLocatedNode(target: LocatorTarget): RuntimeProbeNode | undefined {
     return target.view.find(target.selector);
@@ -50,7 +35,7 @@ export function createProbeLocator(view: RuntimeProbeView, selector: unknown): R
                 throw new TypeError('Cannot call a prop on a missing locator.');
             }
 
-            return callProp(node.props, property, parameters);
+            return node.callProp(property, ...parameters);
         },
         sendEvent(name: string, ...parameters: readonly unknown[]) {
             const node = readLocatedNode(target);
