@@ -95,10 +95,22 @@ expect(view.find({
     .type
     .toBe<ProbeNode<ButtonPublicProps, typeof Button> | undefined>();
 
-expect(view.locate(Button)).type.toBeAssignableTo<ProbeLocator<ButtonPublicProps, typeof Button>>();
-expect(view.locateAll(Button)).type.toBeAssignableTo<
+const buttonLocator = view.locate(Button);
+const buttonListLocator = view.locateAll(Button);
+
+expect(buttonLocator).type.toBeAssignableTo<ProbeLocator<ButtonPublicProps, typeof Button>>();
+expect(buttonLocator.callProp('onSave')).type.toBe<number>();
+expect(buttonListLocator).type.toBeAssignableTo<
     ProbeListLocator<ButtonPublicProps, typeof Button>
 >();
+
+if (buttonLocator.node !== undefined) {
+    expect(buttonLocator.node.props.label).type.toBe<string>();
+}
+
+if (buttonListLocator.first !== undefined) {
+    expect(buttonListLocator.first.props.onSave()).type.toBe<number>();
+}
 
 const hostView = probe<HostSchema>(React.createElement('button'), {});
 const hostButton = hostView.find('button');
@@ -107,6 +119,12 @@ if (hostButton !== undefined) {
     expect(hostButton.props.disabled).type.toBe<boolean>();
     expect(hostButton.props.type).type.toBe<'button' | 'submit'>();
     expect(hostButton.pickProps([ 'disabled' ])).type.toBe<Pick<HostSchema['button'], 'disabled'>>();
+}
+
+const hostLocator = hostView.locate('button');
+
+if (hostLocator.node !== undefined) {
+    expect(hostLocator.node.props.type).type.toBe<'button' | 'submit'>();
 }
 
 const unknownHost = view.find('button');
