@@ -1,6 +1,8 @@
 import * as timers from 'node:timers';
 import React from 'react';
 import createReconciler from 'react-reconciler';
+import type { ProbeDiagnostics } from './probe-diagnostics.ts';
+import { isProbeRenderError } from './probe-frame.ts';
 import {
     appendChild,
     clearContainer,
@@ -19,7 +21,7 @@ import {
     validateContainerRefs
 } from './probe-host-tree.ts';
 import type { ProbeRefs } from './probe-public-types.ts';
-import type { ProbeSnapshot } from './probe-snapshot.ts';
+import { createEmptyProbeSnapshot, type ProbeSnapshot } from './probe-snapshot.ts';
 
 type Waiter = {
     readonly predicate: () => boolean;
@@ -27,6 +29,7 @@ type Waiter = {
 };
 
 type ProbeReconcilerRootOptions = {
+    readonly diagnostics: ProbeDiagnostics;
     readonly element: React.ReactElement;
     readonly publish: (snapshot: ProbeSnapshot) => void;
     readonly refs: ProbeRefs | undefined;
@@ -142,7 +145,11 @@ const renderer = createReconciler({
     waitForCommitToBeReady: returnNull
 });
 
-function createReconcilerContainer(container: ProbeHostContainer, strictMode: boolean): Record<string, unknown> {
+function createReconcilerContainer(
+    container: ProbeHostContainer,
+    diagnostics: ProbeDiagnostics,
+    strictMode: boolean
+): Record<string, unknown> {
     return renderer.createContainer(
         container,
         1,
@@ -150,9 +157,9 @@ function createReconcilerContainer(container: ProbeHostContainer, strictMode: bo
         strictMode,
         null,
         '',
-        noop,
-        noop,
-        noop,
+        diagnostics.recordUncaughtError,
+        diagnostics.recordCaughtError,
+        diagnostics.recordRecoverableError,
         null
     );
 }
@@ -169,100 +176,242 @@ function actNow(action: () => unknown): unknown {
     return results.values().next().value;
 }
 
-export function createProbeReconcilerRoot(options: ProbeReconcilerRootOptions): ProbeReconcilerRoot {
-    let renderCount = 0;
-    let nextRenderWaitStart = 0;
-    const waiters: Waiter[] = [];
+type ProbeReconcilerState = {
+    readonly readNextRenderWaitStart: () => number;
+    readonly readRenderCount: () => number;
+    readonly readWaiters: () => readonly Waiter[];
+    readonly writeNextRenderWaitStart: (count: number) => void;
+    readonly writeRenderCount: (count: number) => void;
+    readonly writeWaiters: (waiters: readonly Waiter[]) => void;
+};
 
-    function settleWaiters(): void {
-        const settledWaiters = waiters.slice().filter(function isSettled(waiter) {
-            return waiter.predicate();
-        });
+type ProbeReconcilerSession = {
+    readonly container: ProbeHostContainer;
+    readonly options: ProbeReconcilerRootOptions;
+    readonly root: Readonly<Record<string, unknown>>;
+    readonly state: ProbeReconcilerState;
+};
 
-        for (const waiter of settledWaiters) {
-            waiters.splice(waiters.indexOf(waiter), 1);
-            waiter.resolve();
-        }
+function settleWaiters(sessionState: ProbeReconcilerState): void {
+    const settledWaiters = sessionState.readWaiters().filter(function isSettled(waiter) {
+        return waiter.predicate();
+    });
+
+    for (const waiter of settledWaiters) {
+        sessionState.writeWaiters(
+            sessionState.readWaiters().toSpliced(
+                sessionState.readWaiters().indexOf(waiter),
+                1
+            )
+        );
+        waiter.resolve();
     }
+}
 
-    const container = createHostContainer(
+function createSessionContainer(
+    options: ProbeReconcilerRootOptions,
+    state: ProbeReconcilerState
+): ProbeHostContainer {
+    return createHostContainer(
         function publishSnapshot(snapshot) {
-            renderCount = snapshot.renderCount;
+            state.writeRenderCount(snapshot.renderCount);
             options.publish(snapshot);
-            settleWaiters();
+            settleWaiters(state);
         },
         function readNextRenderCount() {
-            return renderCount + 1;
+            return state.readRenderCount() + 1;
         },
         options.refs
     );
+}
 
-    const root = createReconcilerContainer(container, options.strictMode);
-
-    async function waitFor(predicate: () => boolean): Promise<void> {
-        if (predicate()) {
-            return;
+function createProbeReconcilerSession(options: ProbeReconcilerRootOptions): ProbeReconcilerSession {
+    let nextRenderWaitStart = 0;
+    let renderCount = 0;
+    let waiters: readonly Waiter[] = [];
+    const state = Object.freeze({
+        readNextRenderWaitStart() {
+            return nextRenderWaitStart;
+        },
+        readRenderCount() {
+            return renderCount;
+        },
+        readWaiters() {
+            return waiters;
+        },
+        writeNextRenderWaitStart(count: number) {
+            nextRenderWaitStart = count;
+        },
+        writeRenderCount(count: number) {
+            renderCount = count;
+        },
+        writeWaiters(nextWaiters: readonly Waiter[]) {
+            waiters = nextWaiters;
         }
+    });
+    const container = createSessionContainer(options, state);
+    const root = createReconcilerContainer(container, options.diagnostics, options.strictMode);
 
-        return new Promise(function createWait(resolve) {
-            const waiter: Waiter = {
-                predicate,
-                resolve
-            };
+    return Object.freeze({
+        container,
+        options,
+        root,
+        state
+    });
+}
 
-            waiters.push(waiter);
-        });
-    }
+function actSession(session: ProbeReconcilerSession, action: () => unknown): unknown {
+    return session.options.diagnostics.run(function actWithDiagnostics() {
+        return actNow(function runAction() {
+            const result = action();
 
-    function flushElement(element: Readonly<React.ReactElement> | null): void {
-        container.writeMounted(element !== null);
-
-        actNow(function renderElement() {
-            renderer.flushSyncFromReconciler(function updateContainer() {
-                renderer.updateContainer(element, root, null, null);
-            });
+            renderer.flushSyncWork();
             renderer.flushPassiveEffects();
+
+            return result;
         });
-        validateContainerRefs(container);
+    });
+}
+
+async function waitForSession(session: ProbeReconcilerSession, predicate: () => boolean): Promise<void> {
+    if (session.options.diagnostics.run(predicate)) {
+        return;
     }
 
-    flushElement(options.element);
+    return new Promise<void>(function createWait(resolve) {
+        const waiter: Waiter = {
+            predicate,
+            resolve
+        };
+
+        session.state.writeWaiters([
+            ...session.state.readWaiters(),
+            waiter
+        ]);
+    });
+}
+
+function publishEmptySnapshot(session: ProbeReconcilerSession, renderCountBefore: number): void {
+    const errorRenderCount = Math.max(session.state.readRenderCount(), renderCountBefore + 1);
+
+    session.options.publish(createEmptyProbeSnapshot(errorRenderCount));
+}
+
+function publishEmptyErrorSnapshot(session: ProbeReconcilerSession, renderCountBefore: number): void {
+    session.container.writeMounted(false);
+    session.container.writeChildren([]);
+    publishEmptySnapshot(session, renderCountBefore);
+}
+
+function captureRenderError(
+    session: ProbeReconcilerSession,
+    error: unknown,
+    renderCountBefore: number
+): void {
+    if (!isProbeRenderError(error)) {
+        throw error;
+    }
+
+    publishEmptyErrorSnapshot(session, renderCountBefore);
+    session.options.diagnostics.recordUncaughtError(error);
+}
+
+function updateRootElement(
+    session: ProbeReconcilerSession,
+    element: Readonly<React.ReactElement> | null
+): void {
+    renderer.flushSyncFromReconciler(function updateContainer() {
+        renderer.updateContainer(element, session.root, null, null);
+    });
+}
+
+function renderRootElement(
+    session: ProbeReconcilerSession,
+    element: Readonly<React.ReactElement> | null
+): void {
+    actNow(function renderElement() {
+        updateRootElement(session, element);
+        renderer.flushPassiveEffects();
+    });
+}
+
+function renderWithDiagnostics(
+    session: ProbeReconcilerSession,
+    element: Readonly<React.ReactElement> | null
+): void {
+    const renderCountBefore = session.state.readRenderCount();
+
+    session.container.writeMounted(element !== null);
+
+    try {
+        renderRootElement(session, element);
+    } catch (error) {
+        captureRenderError(session, error, renderCountBefore);
+
+        return;
+    }
+
+    validateContainerRefs(session.container);
+}
+
+function flushElement(session: ProbeReconcilerSession, element: Readonly<React.ReactElement> | null): void {
+    session.options.diagnostics.run(function renderElementWithDiagnostics() {
+        renderWithDiagnostics(session, element);
+    });
+}
+
+async function waitForIdleSession(session: ProbeReconcilerSession): Promise<void> {
+    await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
+        await Promise.resolve();
+        renderer.flushPassiveEffects();
+    });
+}
+
+async function waitForNextRenderSession(session: ProbeReconcilerSession): Promise<void> {
+    const expectedRenderCount = session.state.readNextRenderWaitStart() + 1;
+
+    session.state.writeNextRenderWaitStart(Math.max(
+        session.state.readNextRenderWaitStart(),
+        expectedRenderCount
+    ));
+
+    return waitForSession(session, function didRender() {
+        return session.state.readRenderCount() >= expectedRenderCount;
+    });
+}
+
+async function waitForRenderCountSession(session: ProbeReconcilerSession, count: number): Promise<void> {
+    return waitForSession(session, function didRenderCount() {
+        return session.state.readRenderCount() >= count;
+    });
+}
+
+export function createProbeReconcilerRoot(options: ProbeReconcilerRootOptions): ProbeReconcilerRoot {
+    const session = createProbeReconcilerSession(options);
+
+    flushElement(session, options.element);
 
     return Object.freeze({
         act(action: () => unknown) {
-            return actNow(function runAction() {
-                const result = action();
-
-                renderer.flushSyncWork();
-                renderer.flushPassiveEffects();
-
-                return result;
-            });
+            return actSession(session, action);
         },
         unmount() {
-            flushElement(null);
+            flushElement(session, null);
         },
         update(element: React.ReactElement) {
-            flushElement(element);
+            flushElement(session, element);
         },
         async waitForIdle() {
-            await Promise.resolve();
-            renderer.flushPassiveEffects();
+            await waitForIdleSession(session);
         },
         async waitForNextRender() {
-            const expectedRenderCount = nextRenderWaitStart + 1;
-
-            nextRenderWaitStart = Math.max(nextRenderWaitStart, expectedRenderCount);
-
-            return waitFor(function didRender() {
-                return renderCount >= expectedRenderCount;
-            });
+            return waitForNextRenderSession(session);
         },
         async waitForRenderCount(count: number) {
-            return waitFor(function didRenderCount() {
-                return renderCount >= count;
-            });
+            return waitForRenderCountSession(session, count);
         },
-        waitUntil: waitFor
+        async waitUntil(predicate: () => boolean) {
+            return waitForSession(session, predicate);
+        }
     });
 }

@@ -1,9 +1,9 @@
 import type React from 'react';
+import { createProbeDiagnostics } from './probe-diagnostics.ts';
 import { createProbeRenderElement, type ProbeFrameDepth } from './probe-frame.ts';
 import { createProbeList } from './probe-list.ts';
 import { createProbeListLocator, createProbeLocator } from './probe-locator.ts';
 import { createProbeNode, type SnapshotReader } from './probe-node.ts';
-import type { ProbeError, ProbeWarning } from './probe-public-types.ts';
 import { createProbeReconcilerRoot } from './probe-reconciler.ts';
 import type {
     RuntimeProbeList,
@@ -17,9 +17,6 @@ import {
     type ProbeSnapshot,
     type SnapshotNode
 } from './probe-snapshot.ts';
-
-const emptyErrors: readonly ProbeError[] = Object.freeze([]);
-const emptyWarnings: readonly ProbeWarning[] = Object.freeze([]);
 
 function nodeList(
     reader: SnapshotReader,
@@ -45,13 +42,20 @@ function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
 export function createProbeView(element: React.ReactElement, options: RuntimeProbeOptions = {}): RuntimeProbeView {
     let currentSnapshot = createEmptyProbeSnapshot(0);
     const depth: ProbeFrameDepth = options.depth ?? 1;
-    const reconcilerRoot = createProbeReconcilerRoot({
-        element: createProbeRenderElement(element, depth),
-        publish(snapshot) {
-            currentSnapshot = snapshot;
-        },
-        refs: options.refs,
-        strictMode: options.strictMode ?? true
+    const diagnostics = createProbeDiagnostics({
+        errorMode: options.errorMode ?? 'capture',
+        warningMode: options.warningMode ?? 'throw'
+    });
+    const reconcilerRoot = diagnostics.run(function createRootWithDiagnostics() {
+        return createProbeReconcilerRoot({
+            diagnostics,
+            element: createProbeRenderElement(element, depth),
+            publish(snapshot) {
+                currentSnapshot = snapshot;
+            },
+            refs: options.refs,
+            strictMode: options.strictMode ?? true
+        });
     });
     const state: SnapshotReader = {
         act(action: () => unknown) {
@@ -86,10 +90,10 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
             return currentSnapshot;
         },
         get errors() {
-            return emptyErrors;
+            return diagnostics.errors;
         },
         get hasWarnings() {
-            return false;
+            return diagnostics.hasWarnings;
         },
         get renderCount() {
             return currentSnapshot.renderCount;
@@ -108,7 +112,7 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
             return rootNode()?.textContent ?? '';
         },
         get warnings() {
-            return emptyWarnings;
+            return diagnostics.warnings;
         },
         find(selector: unknown) {
             return findAll(selector).first;

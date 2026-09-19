@@ -54,6 +54,7 @@ type ProbeTransformNode = (
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
 const contextType = Symbol.for('react.context');
+const probeRenderErrors = new WeakSet();
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
@@ -88,6 +89,10 @@ function isFunctionComponent(value: unknown): value is ProbeFunctionComponent {
 
 function isIterable(value: unknown): value is Iterable<unknown> {
     return isRecord(value) && typeof value[Symbol.iterator] === 'function';
+}
+
+function isThenable(value: unknown): boolean {
+    return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
 }
 
 function isProbeElement(element: React.ReactElement): element is ProbeElement {
@@ -208,6 +213,22 @@ function executeElement(element: ProbeElement): React.ReactNode {
     return executeWrappedElement(type, props, readElementRef(element));
 }
 
+function throwProbeRenderError(error: unknown): never {
+    if (isRecord(error) && !isThenable(error)) {
+        probeRenderErrors.add(error);
+    }
+
+    throw error;
+}
+
+function executeProbeFrameElement(element: ProbeElement): React.ReactNode {
+    try {
+        return executeElement(element);
+    } catch (error) {
+        return throwProbeRenderError(error);
+    }
+}
+
 function isEmptyRenderable(node: unknown): boolean {
     return node === null || node === undefined || typeof node === 'boolean';
 }
@@ -320,7 +341,7 @@ function transformNode(
 function ProbeFrame(props: ProbeFrameProps): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(props.element, undefined),
-        transformNode(executeElement(props.element), nextDepth(props.depth), props.createFrameElement)
+        transformNode(executeProbeFrameElement(props.element), nextDepth(props.depth), props.createFrameElement)
     );
 }
 
@@ -337,4 +358,8 @@ export function createProbeRenderElement(
     depth: ProbeFrameDepth
 ): React.ReactElement {
     return transformElement(createProbeElement(element), depth, transformNode, createFrameElement);
+}
+
+export function isProbeRenderError(error: unknown): boolean {
+    return isRecord(error) && probeRenderErrors.has(error);
 }
