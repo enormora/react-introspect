@@ -191,25 +191,28 @@ function createSelectorView(): HostView {
 }
 
 function createEdgeView(): ProbeView {
-    return probe(React.createElement(
-        React.Fragment,
-        null,
-        React.createElement(Panel, { title: 'Info' }),
-        React.createElement(MemoButton, {
-            disabled: false,
-            label: 'Memo',
-            onSave: noop
-        }),
-        [
+    return probe(
+        React.createElement(
+            React.Fragment,
             null,
-            false,
-            React.createElement('span', { key: 'array' }, 1)
-        ],
-        new Set([
-            React.createElement('em', { key: 'iterable' }, 'set')
-        ]),
-        { opaque: true } as never
-    ));
+            React.createElement(Panel, { title: 'Info' }),
+            React.createElement(MemoButton, {
+                disabled: false,
+                label: 'Memo',
+                onSave: noop
+            }),
+            [
+                null,
+                false,
+                React.createElement('span', { key: 'array' }, 1)
+            ],
+            new Set([
+                React.createElement('em', { key: 'iterable' }, 'set')
+            ]),
+            { opaque: true } as never
+        ),
+        { depth: 0 }
+    );
 }
 
 function assertEdgeNames(scope: EqualScope, view: ProbeView): void {
@@ -359,7 +362,7 @@ function assertButtonIdentity(
     scope.assert.equal(foundButton.type, Button);
     scope.assert.equal(foundButton.name, 'Button');
     scope.assert.equal(foundButton.props.label, 'Save');
-    scope.assert.equal(foundButton.visibility, 'notRendered');
+    scope.assert.equal(foundButton.visibility, 'visible');
 }
 
 export const testNode = suite('public API skeleton', [
@@ -384,10 +387,7 @@ export const testNode = suite('public API skeleton', [
             disabled: true,
             label: 'Save'
         });
-        scope.assert.deepEqual(foundButton.renderedChildren, {
-            reason: 'depth',
-            status: 'notRendered'
-        });
+        scope.assert.equal(foundButton.renderedChildren.status, 'rendered');
 
         return scope.assert.collect();
     }),

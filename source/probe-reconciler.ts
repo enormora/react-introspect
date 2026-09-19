@@ -1,7 +1,21 @@
 import * as timers from 'node:timers';
 import React from 'react';
 import createReconciler from 'react-reconciler';
-import { createEmptyProbeSnapshot, createProbeSnapshot, type ProbeSnapshot } from './probe-snapshot.ts';
+import {
+    probeComponentHostType,
+    probeComponentMetadata,
+    probeElementKeyMetadata,
+    probeEmptyHostType,
+    probeOpaqueHostType,
+    probeValueMetadata,
+    type ProbeComponentMetadata
+} from './probe-frame.ts';
+import {
+    createEmptyProbeSnapshot,
+    createProbeSnapshotFromSource,
+    type ProbeSnapshot,
+    type SnapshotSourceNode
+} from './probe-snapshot.ts';
 
 type ProbeHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -71,16 +85,41 @@ function createChildStore(): ProbeChildStore {
     });
 }
 
+function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
+    return Object.hasOwn(value, property);
+}
+
+function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
+    return typeof value === 'object' && value !== null || typeof value === 'function';
+}
+
+function isPublicHostPropKey(key: PropertyKey): boolean {
+    return key !== 'children' &&
+        key !== 'key' &&
+        key !== probeComponentMetadata &&
+        key !== probeElementKeyMetadata &&
+        key !== probeValueMetadata;
+}
+
 function publicProps(props: ProbeHostProps): ProbeHostProps {
     const result: Record<PropertyKey, unknown> = {};
 
     for (const key of Reflect.ownKeys(props)) {
-        if (key !== 'children' && key !== 'key') {
+        if (isPublicHostPropKey(key)) {
             result[key] = props[key];
         }
     }
 
     return Object.freeze(result);
+}
+
+function isProbeComponentMetadata(value: unknown): value is ProbeComponentMetadata {
+    return isRecord(value) &&
+        hasProperty(value, 'givenChildren') &&
+        hasProperty(value, 'key') &&
+        hasProperty(value, 'props') &&
+        hasProperty(value, 'renderedReason') &&
+        hasProperty(value, 'type');
 }
 
 function isTextInstance(child: ProbeHostChild): child is ProbeTextInstance {
@@ -136,28 +175,69 @@ function removeChild(parent: ProbeHostParent, child: ProbeHostChild): void {
     parentByChild.delete(child);
 }
 
-function toReactNode(child: ProbeHostChild): React.ReactNode {
-    if (isTextInstance(child)) {
-        return child.readText();
-    }
-
-    return React.createElement(
-        child.type,
-        child.readProps(),
-        ...child.readChildren().map(toReactNode)
-    );
+function readSpecialValue(instance: ProbeHostInstance): unknown {
+    return instance.readProps()[probeValueMetadata];
 }
 
-function rootNodeFromChildren(children: readonly React.ReactNode[]): React.ReactNode {
-    if (children.length === 0) {
-        return React.createElement(React.Fragment);
+function readHostKey(instance: ProbeHostInstance): string | null {
+    const key = instance.readProps()[probeElementKeyMetadata];
+
+    return typeof key === 'string' ? key : null;
+}
+
+function readComponentMetadata(instance: ProbeHostInstance): ProbeComponentMetadata {
+    const value = instance.readProps()[probeComponentMetadata];
+
+    if (!isProbeComponentMetadata(value)) {
+        return Object.freeze({
+            givenChildren: undefined,
+            key: null,
+            props: Object.freeze({}),
+            renderedReason: 'unsupported',
+            type: probeComponentHostType
+        });
     }
 
-    if (children.length === 1) {
-        return children[0];
+    return value;
+}
+
+function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
+    if (isTextInstance(child)) {
+        return { kind: 'text', value: child.readText() };
     }
 
-    return React.createElement(React.Fragment, null, ...children);
+    if (child.type === probeEmptyHostType || child.type === probeOpaqueHostType) {
+        return {
+            kind: child.type === probeEmptyHostType ? 'empty' : 'opaque',
+            value: readSpecialValue(child)
+        };
+    }
+
+    if (child.type === probeComponentHostType) {
+        const metadata = readComponentMetadata(child);
+
+        return {
+            children: child.readChildren().map(toSourceNode),
+            givenChildren: metadata.givenChildren,
+            givenChildrenKind: 'react',
+            key: metadata.key,
+            props: metadata.props,
+            renderedReason: metadata.renderedReason,
+            type: metadata.type
+        };
+    }
+
+    const children = child.readChildren().map(toSourceNode);
+
+    return {
+        children,
+        givenChildren: children,
+        givenChildrenKind: 'source',
+        key: readHostKey(child),
+        props: publicProps(child.readProps()),
+        renderedReason: undefined,
+        type: child.type
+    };
 }
 
 function toSnapshot(container: ProbeHostContainer): ProbeSnapshot {
@@ -165,14 +245,14 @@ function toSnapshot(container: ProbeHostContainer): ProbeSnapshot {
         return createEmptyProbeSnapshot(container.readNextRenderCount());
     }
 
-    const children = container.readChildren().map(toReactNode);
-    const node = rootNodeFromChildren(children);
-
-    return createProbeSnapshot(node, container.readNextRenderCount());
+    return createProbeSnapshotFromSource(
+        container.readChildren().map(toSourceNode),
+        container.readNextRenderCount()
+    );
 }
 
 function createHostInstance(type: string, props: ProbeHostProps): ProbeHostInstance {
-    let currentProps = publicProps(props);
+    let currentProps = props;
 
     return Object.freeze({
         ...createChildStore(),
@@ -181,7 +261,7 @@ function createHostInstance(type: string, props: ProbeHostProps): ProbeHostInsta
         },
         type,
         writeProps(nextProps: ProbeHostProps) {
-            currentProps = publicProps(nextProps);
+            currentProps = nextProps;
         }
     });
 }

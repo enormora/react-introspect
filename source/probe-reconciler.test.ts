@@ -79,11 +79,11 @@ function assertFullRender(scope: EqualScope, view: ProbeView<HostSchema>): void 
     const strong = requireValue(view.find('strong'));
 
     scope.assert.equal(view.renderCount, 1);
-    scope.assert.equal(view.root?.type, 'main');
+    scope.assert.equal(view.root?.type, Page);
     scope.assert.equal(view.textContent, 'Hello world');
     scope.assert.equal(main.props.title, 'world');
     scope.assert.equal(strong.textContent, 'world');
-    scope.assert.equal(main.formatTree(), 'main\n  #text\n  strong\n    #text');
+    scope.assert.equal(view.formatTree(), 'Page\n  main\n    #text\n    strong\n      #text');
 }
 
 function assertUpdatedView(scope: EqualScope, view: ProbeView<HostSchema>, staleRoot: ProbeNode): void {
@@ -187,7 +187,7 @@ function assertRootChildCounts(scope: EqualScope): void {
         }
     );
 
-    scope.assert.equal(emptyView.root?.type, React.Fragment);
+    scope.assert.equal(emptyView.root?.type, RendersNull);
     scope.assert.equal(emptyView.renderedChildren.length, 1);
     scope.assert.equal(emptyView.find('#empty')?.textContent, '');
     scope.assert.equal(fragmentView.root?.type, React.Fragment);

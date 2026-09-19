@@ -1,9 +1,10 @@
 import type React from 'react';
+import { createProbeRenderElement, type ProbeFrameDepth } from './probe-frame.ts';
 import { createProbeList } from './probe-list.ts';
 import { createProbeListLocator, createProbeLocator } from './probe-locator.ts';
 import { createProbeNode, type SnapshotReader } from './probe-node.ts';
 import type { ProbeError, ProbeWarning } from './probe-public-types.ts';
-import { createProbeReconcilerRoot, type ProbeReconcilerRoot } from './probe-reconciler.ts';
+import { createProbeReconcilerRoot } from './probe-reconciler.ts';
 import type {
     RuntimeProbeList,
     RuntimeProbeNode,
@@ -13,7 +14,6 @@ import type {
 import { nodeMatchesSelector, toSelector } from './probe-selector.ts';
 import {
     createEmptyProbeSnapshot,
-    createProbeSnapshot,
     type ProbeSnapshot,
     type SnapshotNode
 } from './probe-snapshot.ts';
@@ -44,10 +44,17 @@ function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
 
 export function createProbeView(element: React.ReactElement, options: RuntimeProbeOptions = {}): RuntimeProbeView {
     let currentSnapshot = createEmptyProbeSnapshot(0);
-    let reconcilerRoot: ProbeReconcilerRoot | null = null;
+    const depth: ProbeFrameDepth = options.depth ?? 1;
+    const reconcilerRoot = createProbeReconcilerRoot({
+        element: createProbeRenderElement(element, depth),
+        publish(snapshot) {
+            currentSnapshot = snapshot;
+        },
+        strictMode: options.strictMode ?? true
+    });
     const state: SnapshotReader = {
         act(action: () => unknown) {
-            return reconcilerRoot === null ? action() : reconcilerRoot.act(action);
+            return reconcilerRoot.act(action);
         },
         get currentSnapshot() {
             return currentSnapshot;
@@ -116,48 +123,24 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
             return createProbeListLocator(view, selector);
         },
         unmount() {
-            if (reconcilerRoot === null) {
-                currentSnapshot = createEmptyProbeSnapshot(currentSnapshot.renderCount + 1);
-
-                return;
-            }
-
             reconcilerRoot.unmount();
         },
         update(nextElement: React.ReactElement) {
-            if (reconcilerRoot === null) {
-                currentSnapshot = createProbeSnapshot(nextElement, currentSnapshot.renderCount + 1);
-
-                return;
-            }
-
-            reconcilerRoot.update(nextElement);
+            reconcilerRoot.update(createProbeRenderElement(nextElement, depth));
         },
         async waitForIdle() {
-            await (reconcilerRoot === null ? Promise.resolve() : reconcilerRoot.waitForIdle());
+            await reconcilerRoot.waitForIdle();
         },
         async waitForNextRender() {
-            await (reconcilerRoot === null ? Promise.resolve() : reconcilerRoot.waitForNextRender());
+            await reconcilerRoot.waitForNextRender();
         },
         async waitForRenderCount(count: number) {
-            await (reconcilerRoot === null ? Promise.resolve(count) : reconcilerRoot.waitForRenderCount(count));
+            await reconcilerRoot.waitForRenderCount(count);
         },
         async waitUntil(predicate: () => boolean) {
-            await (reconcilerRoot === null ? Promise.resolve(predicate()) : reconcilerRoot.waitUntil(predicate));
+            await reconcilerRoot.waitUntil(predicate);
         }
     });
-
-    if (options.depth === 'full') {
-        reconcilerRoot = createProbeReconcilerRoot({
-            element,
-            publish(snapshot) {
-                currentSnapshot = snapshot;
-            },
-            strictMode: options.strictMode ?? true
-        });
-    } else {
-        currentSnapshot = createProbeSnapshot(element, 1);
-    }
 
     return view;
 }
