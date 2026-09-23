@@ -6,7 +6,7 @@ import {
     probeEmptyHostType,
     probeOpaqueHostType,
     probeValueMetadata
-} from './probe-frame.ts';
+} from './probe-frame-contract.ts';
 import type { ProbeRefs } from './probe-public-types.ts';
 import { type ProbeRefHostTarget, resolveProbeRef, validateProbeRefs } from './probe-ref.ts';
 import {
@@ -57,6 +57,14 @@ const internalHostTypes = Object.freeze([
     probeEmptyHostType,
     probeOpaqueHostType
 ]);
+const probeComponentMetadataKeys = Object.freeze([
+    'error',
+    'givenChildren',
+    'key',
+    'props',
+    'renderedReason',
+    'type'
+]);
 const parentByChild = new WeakMap<ProbeHostChild, ProbeHostParent>();
 
 function createChildStore(): ProbeChildStore {
@@ -103,11 +111,9 @@ function publicProps(props: ProbeHostProps): ProbeHostProps {
 
 function isProbeComponentMetadata(value: unknown): value is ProbeComponentMetadata {
     return isRecord(value) &&
-        hasProperty(value, 'givenChildren') &&
-        hasProperty(value, 'key') &&
-        hasProperty(value, 'props') &&
-        hasProperty(value, 'renderedReason') &&
-        hasProperty(value, 'type');
+        probeComponentMetadataKeys.every(function hasMetadataKey(key) {
+            return hasProperty(value, key);
+        });
 }
 
 function isTextInstance(child: ProbeHostChild): child is ProbeTextInstance {
@@ -133,6 +139,7 @@ function readComponentMetadata(instance: ProbeHostInstance): ProbeComponentMetad
 
     if (!isProbeComponentMetadata(value)) {
         return Object.freeze({
+            error: undefined,
             givenChildren: undefined,
             key: null,
             props: Object.freeze({}),
@@ -220,6 +227,7 @@ function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
 
         return {
             children: child.readChildren().map(toSourceNode),
+            error: metadata.error,
             givenChildren: metadata.givenChildren,
             givenChildrenKind: 'react',
             key: metadata.key,
@@ -233,6 +241,7 @@ function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
 
     return {
         children,
+        error: undefined,
         givenChildren: children,
         givenChildrenKind: 'source',
         key: readHostKey(child),

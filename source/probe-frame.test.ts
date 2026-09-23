@@ -1,6 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { createProbeRenderElement, probeComponentHostType } from './probe-frame.ts';
+import { isProbeRenderError, probeComponentHostType, throwProbeRenderError } from './probe-frame-contract.ts';
+import { createProbeRenderElement } from './probe-frame.ts';
 import type { ProbeNode } from './probe-public-types.ts';
 import { probe } from './react-probe.entry-point.ts';
 
@@ -178,6 +179,14 @@ function assertThrows(scope: EqualScope, action: () => void, message: string): v
     throw new Error('Expected action to throw.');
 }
 
+function catchThrown(value: unknown): void {
+    try {
+        throwProbeRenderError(value);
+    } catch {
+        Object.freeze({});
+    }
+}
+
 function assertNotRendered(scope: EqualScope, node: ProbeNode): void {
     scope.assert.deepEqual(node.renderedChildren, {
         reason: 'depth',
@@ -338,6 +347,23 @@ export const testNode = suite('execution shallow function components', [
         });
 
         scope.assert.equal(view.find('opaque')?.state.reason, 'unsupported');
+
+        return scope.assert.collect();
+    }),
+    test('does not mark functions or thenables as Probe render errors', function verifyRenderErrorMarker(scope) {
+        const value = function value(): void {
+            return undefined;
+        };
+        const thenable = {
+            then() {
+                return undefined;
+            }
+        };
+
+        catchThrown(thenable);
+
+        scope.assert.equal(isProbeRenderError(value), false);
+        scope.assert.equal(isProbeRenderError(thenable), false);
 
         return scope.assert.collect();
     })

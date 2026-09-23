@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ProbeNotRenderedReason } from './probe-public-types.ts';
+import type { ProbeError, ProbeNotRenderedReason } from './probe-public-types.ts';
 
 export type ProbeSnapshot = {
     readonly nodes: readonly SnapshotNode[];
@@ -17,6 +17,7 @@ export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | Sna
 
 type SnapshotSourceElementBase = {
     readonly children: readonly SnapshotSourceNode[];
+    readonly error: ProbeError | undefined;
     readonly key: string | null;
     readonly props: SnapshotProps;
     readonly renderedReason: ProbeNotRenderedReason | undefined;
@@ -42,6 +43,7 @@ type SnapshotSourceOpaque = { readonly kind: 'opaque'; readonly value: unknown; 
 type SnapshotSourceText = { readonly kind: 'text'; readonly value: string; };
 
 export type SnapshotNode = {
+    readonly error: ProbeError | undefined;
     readonly givenChildren: readonly SnapshotNode[];
     readonly id: number;
     readonly key: string | null;
@@ -61,6 +63,7 @@ type SnapshotBuild = { readonly nextId: number; readonly nodes: readonly Snapsho
 type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: number; };
 
 type SnapshotNodeInput = {
+    readonly error: ProbeError | undefined;
     readonly givenChildren: readonly SnapshotNode[];
     readonly id: number;
     readonly key: string | null;
@@ -312,6 +315,7 @@ const snapshotOperations = {
         const childrenState = getElementChildrenState(type, childrenResult.nodes);
         const result = pushSnapshotNode(childrenResult.build, {
             givenChildren: childrenResult.nodes,
+            error: undefined,
             id: idAllocation.id,
             key: request.element.key ?? null,
             kind: getElementKind(type),
@@ -349,6 +353,7 @@ const snapshotOperations = {
 
         return pushSnapshotNode(renderedChildrenResult.build, {
             givenChildren: givenChildrenResult.nodes,
+            error: request.element.error,
             id: idAllocation.id,
             key: request.element.key,
             kind: getSourceElementKind(request.element),
@@ -401,6 +406,7 @@ const snapshotOperations = {
 
         return pushSnapshotNode(idAllocation.build, {
             givenChildren: Object.freeze([]),
+            error: undefined,
             id: idAllocation.id,
             key: null,
             kind: 'empty',
@@ -419,6 +425,7 @@ const snapshotOperations = {
 
         return pushSnapshotNode(idAllocation.build, {
             givenChildren: Object.freeze([]),
+            error: undefined,
             id: idAllocation.id,
             key: null,
             kind: 'opaque',
@@ -507,6 +514,7 @@ const snapshotOperations = {
 
         return pushSnapshotNode(idAllocation.build, {
             givenChildren: Object.freeze([]),
+            error: undefined,
             id: idAllocation.id,
             key: null,
             kind: 'text',
@@ -538,6 +546,7 @@ export function createProbeSnapshotFromSource(
         return createProbeSnapshotFromSource([
             {
                 children,
+                error: undefined,
                 givenChildren: [],
                 givenChildrenKind: 'source',
                 key: null,

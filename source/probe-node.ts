@@ -128,7 +128,7 @@ export function createProbeNode(
 
     return Object.freeze({
         get error() {
-            return undefined;
+            return node.error;
         },
         get givenChildren() {
             return createNodeList(node.givenChildren);

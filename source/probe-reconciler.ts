@@ -2,7 +2,7 @@ import * as timers from 'node:timers';
 import React from 'react';
 import createReconciler from 'react-reconciler';
 import type { ProbeDiagnostics } from './probe-diagnostics.ts';
-import { isProbeRenderError } from './probe-frame.ts';
+import { isProbeRenderError } from './probe-frame-contract.ts';
 import {
     appendChild,
     clearContainer,
@@ -16,7 +16,7 @@ import {
     type ProbeHostInstance,
     type ProbeHostProps,
     type ProbeTextInstance,
-    removeChild,
+    removeChild as removeHostChild,
     toSnapshot,
     validateContainerRefs
 } from './probe-host-tree.ts';
@@ -47,7 +47,6 @@ export type ProbeReconcilerRoot = {
 };
 
 const defaultEventPriority = 32;
-
 function noop(): void {
     return undefined;
 }
@@ -64,7 +63,15 @@ function getDefaultEventPriority(): number {
     return defaultEventPriority;
 }
 
-const renderer = createReconciler({
+function publishContainerSnapshot(container: ProbeHostContainer): void {
+    container.publish(toSnapshot(container));
+}
+
+function prepareForCommit(): null {
+    return null;
+}
+
+const probeReconcilerHostConfig = {
     NotPendingTransition: null,
     HostTransitionContext: {
         _currentValue: null,
@@ -114,13 +121,11 @@ const renderer = createReconciler({
     maySuspendCommitInSyncRender: alwaysFalse,
     maySuspendCommitOnUpdate: alwaysFalse,
     noTimeout: -1,
-    prepareForCommit: returnNull,
+    prepareForCommit,
     preparePortalMount: noop,
-    removeChild,
-    removeChildFromContainer: removeChild,
-    resetAfterCommit(container: ProbeHostContainer) {
-        container.publish(toSnapshot(container));
-    },
+    removeChild: removeHostChild.bind(undefined),
+    removeChildFromContainer: removeHostChild.bind(undefined),
+    resetAfterCommit: publishContainerSnapshot,
     resetFormInstance: noop,
     resolveEventTimeStamp: Date.now,
     resolveEventType: returnNull,
@@ -143,7 +148,9 @@ const renderer = createReconciler({
     suspendOnActiveViewTransition: alwaysFalse,
     trackSchedulerEvent: noop,
     waitForCommitToBeReady: returnNull
-});
+};
+
+const renderer = createReconciler(probeReconcilerHostConfig);
 
 function createReconcilerContainer(
     container: ProbeHostContainer,

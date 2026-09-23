@@ -1,6 +1,6 @@
 import type React from 'react';
 import { createProbeDiagnostics } from './probe-diagnostics.ts';
-import { createProbeRenderElement, type ProbeFrameDepth } from './probe-frame.ts';
+import { createProbeRenderElement } from './probe-frame.ts';
 import { createProbeList } from './probe-list.ts';
 import { createProbeListLocator, createProbeLocator } from './probe-locator.ts';
 import { createProbeNode, type SnapshotReader } from './probe-node.ts';
@@ -41,7 +41,7 @@ function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
 
 export function createProbeView(element: React.ReactElement, options: RuntimeProbeOptions = {}): RuntimeProbeView {
     let currentSnapshot = createEmptyProbeSnapshot(0);
-    const depth: ProbeFrameDepth = options.depth ?? 1;
+    const depth = options.depth ?? 1;
     const diagnostics = createProbeDiagnostics({
         errorMode: options.errorMode ?? 'capture',
         warningMode: options.warningMode ?? 'throw'

@@ -169,6 +169,30 @@ function assertKeyedInsertion(scope: EqualScope): void {
     );
 }
 
+function assertHostChildRemoval(scope: EqualScope): void {
+    const view = probe(
+        React.createElement(
+            'div',
+            null,
+            React.createElement('span', { key: 'first' }, 'first'),
+            React.createElement('em', { key: 'second' }, 'second')
+        ),
+        {
+            depth: 'full',
+            strictMode: false
+        }
+    );
+
+    view.update(React.createElement(
+        'div',
+        null,
+        React.createElement('span', { key: 'first' }, 'first')
+    ));
+
+    scope.assert.equal(view.find('em'), undefined);
+    scope.assert.equal(view.textContent, 'first');
+}
+
 function assertRootChildCounts(scope: EqualScope): void {
     const emptyView = probe(React.createElement(RendersNull), {
         depth: 'full',
@@ -193,6 +217,42 @@ function assertRootChildCounts(scope: EqualScope): void {
     scope.assert.equal(fragmentView.root?.type, React.Fragment);
     scope.assert.equal(fragmentView.renderedChildren.length, 2);
     scope.assert.equal(fragmentView.textContent, 'firstsecond');
+}
+
+function assertRootChildRemoval(scope: EqualScope): void {
+    const view = probe(
+        React.createElement(
+            React.Fragment,
+            null,
+            React.createElement('span', { key: 'first' }, 'first'),
+            React.createElement('span', { key: 'second' }, 'second')
+        ),
+        {
+            depth: 'full',
+            strictMode: false
+        }
+    );
+
+    view.update(React.createElement(
+        React.Fragment,
+        null,
+        React.createElement('span', { key: 'first' }, 'first')
+    ));
+
+    scope.assert.equal(view.findAll('span').length, 1);
+    scope.assert.equal(view.textContent, 'first');
+}
+
+function assertRootHostReplacement(scope: EqualScope): void {
+    const view = probe(React.createElement('span', null, 'first'), {
+        depth: 'full',
+        strictMode: false
+    });
+
+    view.update(React.createElement('em', null, 'second'));
+
+    scope.assert.equal(view.find('span'), undefined);
+    scope.assert.equal(view.find('em')?.textContent, 'second');
 }
 
 function assertSuspendedUpdateRollback(scope: EqualScope): void {
@@ -270,8 +330,23 @@ export const testNode = suite('custom reconciler host layer', [
 
         return scope.assert.collect();
     }),
+    test('removes committed host children', function verifyHostChildRemoval(scope) {
+        assertHostChildRemoval(scope);
+
+        return scope.assert.collect();
+    }),
     test('publishes empty and multi-child root snapshots', function verifyRootChildCounts(scope) {
         assertRootChildCounts(scope);
+
+        return scope.assert.collect();
+    }),
+    test('removes committed root children', function verifyRootChildRemoval(scope) {
+        assertRootChildRemoval(scope);
+
+        return scope.assert.collect();
+    }),
+    test('replaces the committed root host child', function verifyRootHostReplacement(scope) {
+        assertRootHostReplacement(scope);
 
         return scope.assert.collect();
     }),

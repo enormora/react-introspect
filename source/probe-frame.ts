@@ -1,28 +1,26 @@
 import React from 'react';
-import type { ProbeNotRenderedReason } from './probe-public-types.ts';
-
-export const probeComponentHostType = 'react-probe-internal-component';
-export const probeEmptyHostType = 'react-probe-internal-empty';
-export const probeOpaqueHostType = 'react-probe-internal-opaque';
-
-export const probeComponentMetadata = '__reactProbeComponentMetadata';
-export const probeElementKeyMetadata = '__reactProbeElementKeyMetadata';
-export const probeValueMetadata = '__reactProbeValueMetadata';
-
-export type ProbeFrameDepth = number | 'full';
-
-export type ProbeComponentMetadata = {
-    readonly givenChildren: unknown;
-    readonly key: string | null;
-    readonly props: Readonly<Record<PropertyKey, unknown>>;
-    readonly renderedReason: ProbeNotRenderedReason | undefined;
-    readonly type: unknown;
-};
+import { isClassComponent, readClassFrameType } from './probe-class-frame.ts';
+import {
+    createComponentHost,
+    createComponentMetadata,
+    createEmptyHost,
+    type ProbeElement,
+    probeElementKeyMetadata,
+    type ProbeFrameDepth,
+    nextDepth,
+    probeOpaqueHostType,
+    type ProbeTransformedNode,
+    readElementProps,
+    readElementRef,
+    throwProbeRenderError,
+    probeValueMetadata
+} from './probe-frame-contract.ts';
 
 type ProbeFrameProps = {
     readonly createFrameElement: ProbeFrameElementFactory;
     readonly depth: ProbeFrameDepth;
     readonly element: ProbeElement;
+    readonly transformNode: ProbeTransformNode;
 };
 
 type ProbeFrameType = {
@@ -37,13 +35,9 @@ type ProbeForwardRefType = ProbeFrameType & {
     readonly render: (props: Readonly<Record<PropertyKey, unknown>>, ref: unknown) => React.ReactNode;
 };
 
-type ProbeElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
-
 type ProbeFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
 
 type ProbeFrameElementFactory = (element: ProbeElement, depth: ProbeFrameDepth) => React.ReactElement;
-
-type ProbeTransformedNode = Readonly<React.ReactElement> | number | string | readonly ProbeTransformedNode[];
 
 type ProbeTransformNode = (
     node: unknown,
@@ -54,7 +48,6 @@ type ProbeTransformNode = (
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
 const contextType = Symbol.for('react.context');
-const probeRenderErrors = new WeakSet();
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
@@ -91,85 +84,16 @@ function isIterable(value: unknown): value is Iterable<unknown> {
     return isRecord(value) && typeof value[Symbol.iterator] === 'function';
 }
 
-function isThenable(value: unknown): boolean {
-    return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
-}
-
 function isProbeElement(element: React.ReactElement): element is ProbeElement {
     return isRecord(element.props);
-}
-
-function readElementProps(element: ProbeElement): Readonly<Record<PropertyKey, unknown>> {
-    return element.props;
 }
 
 function readElementChildren(element: ProbeElement): unknown {
     return readElementProps(element).children;
 }
 
-function readElementRef(element: ProbeElement): unknown {
-    return readElementProps(element).ref;
-}
-
-function isPublicPropKey(key: PropertyKey): boolean {
-    return key !== 'children' &&
-        key !== 'key' &&
-        key !== 'ref' &&
-        key !== probeElementKeyMetadata;
-}
-
-function publicProps(props: Readonly<Record<PropertyKey, unknown>>): Readonly<Record<PropertyKey, unknown>> {
-    const result: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        if (isPublicPropKey(key)) {
-            result[key] = props[key];
-        }
-    }
-
-    return Object.freeze(result);
-}
-
-function nextDepth(depth: ProbeFrameDepth): ProbeFrameDepth {
-    return depth === 'full' ? depth : Math.max(0, depth - 1);
-}
-
 function canExecute(depth: ProbeFrameDepth): boolean {
     return depth === 'full' || depth > 0;
-}
-
-function createComponentMetadata(
-    element: ProbeElement,
-    renderedReason: ProbeNotRenderedReason | undefined
-): ProbeComponentMetadata {
-    const props = readElementProps(element);
-
-    return Object.freeze({
-        givenChildren: props.children,
-        key: element.key,
-        props: publicProps(props),
-        renderedReason,
-        type: element.type
-    });
-}
-
-function createComponentHost(
-    metadata: ProbeComponentMetadata,
-    children: ProbeTransformedNode
-): React.ReactElement {
-    return React.createElement(
-        probeComponentHostType,
-        {
-            [probeComponentMetadata]: metadata
-        },
-        children
-    );
-}
-
-function createEmptyHost(value: unknown): React.ReactElement {
-    return React.createElement(probeEmptyHostType, {
-        [probeValueMetadata]: value
-    });
 }
 
 function createOpaqueHost(value: unknown): React.ReactElement {
@@ -206,19 +130,11 @@ function executeElement(element: ProbeElement): React.ReactNode {
     const { type } = element;
     const props = readElementProps(element);
 
-    if (isFunctionComponent(type)) {
+    if (isFunctionComponent(type) && !isClassComponent(type)) {
         return type(props);
     }
 
     return executeWrappedElement(type, props, readElementRef(element));
-}
-
-function throwProbeRenderError(error: unknown): never {
-    if (isRecord(error) && !isThenable(error)) {
-        probeRenderErrors.add(error);
-    }
-
-    throw error;
 }
 
 function executeProbeFrameElement(element: ProbeElement): React.ReactNode {
@@ -268,7 +184,14 @@ function transformComponentElement(
 ): React.ReactElement {
     const { type } = element;
 
-    if (canExecute(depth) && (isFunctionComponent(type) || isMemoType(type) || isForwardRefType(type))) {
+    if (
+        canExecute(depth) && (
+            isClassComponent(type) ||
+            isFunctionComponent(type) ||
+            isMemoType(type) ||
+            isForwardRefType(type)
+        )
+    ) {
         return frameFactory(element, depth);
     }
 
@@ -341,15 +264,26 @@ function transformNode(
 function ProbeFrame(props: ProbeFrameProps): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(props.element, undefined),
-        transformNode(executeProbeFrameElement(props.element), nextDepth(props.depth), props.createFrameElement)
+        props.transformNode(executeProbeFrameElement(props.element), nextDepth(props.depth), props.createFrameElement)
     );
 }
 
 function createFrameElement(element: ProbeElement, depth: ProbeFrameDepth): React.ReactElement {
+    if (isClassComponent(element.type)) {
+        return React.createElement(readClassFrameType(element.type), {
+            createFrameElement,
+            depth,
+            element,
+            transformNode,
+            type: element.type
+        });
+    }
+
     return React.createElement(ProbeFrame, {
         createFrameElement,
         depth,
-        element
+        element,
+        transformNode
     });
 }
 
@@ -358,8 +292,4 @@ export function createProbeRenderElement(
     depth: ProbeFrameDepth
 ): React.ReactElement {
     return transformElement(createProbeElement(element), depth, transformNode, createFrameElement);
-}
-
-export function isProbeRenderError(error: unknown): boolean {
-    return isRecord(error) && probeRenderErrors.has(error);
 }
