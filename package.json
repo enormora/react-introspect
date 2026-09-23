@@ -20,25 +20,6 @@
     "license": "MIT",
     "author": "Mathias Schreck <schreck.mathias@gmail.com>",
     "type": "module",
-    "exports": {
-        ".": {
-            "types": "./source/react-reflect.entry-point.ts",
-            "import": "./source/react-reflect.entry-point.ts"
-        }
-    },
-    "main": "source/react-reflect.entry-point.ts",
-    "types": "source/react-reflect.entry-point.ts",
-    "scripts": {
-        "compile": "just compile",
-        "lint": "just lint",
-        "lint:fix": "just lint-fix",
-        "publish:dry-run": "just publish-dry-run",
-        "test": "just test",
-        "test:package-smoke": "just test-package-smoke",
-        "test:types": "just test-types",
-        "test:unit": "just test-unit",
-        "test:unit:with-coverage": "just test-unit-with-coverage"
-    },
     "dependencies": {
         "@types/react": "19.3.0",
         "react-reconciler": "0.34.0",

@@ -3,7 +3,7 @@
     "entry": [
         "source/**/*.test.ts",
         "source/**/*.type-test.ts",
-        "source/**/*.entry-point.ts",
+        "source/**/*.entry-point.ts!",
         "tool-configurations/dependency-cruiser.config.js",
         "tool-configurations/eslint.config.js",
         "tool-configurations/overkill.config.ts",
