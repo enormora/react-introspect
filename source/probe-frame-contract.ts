@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ProbeError, ProbeNotRenderedReason } from './probe-public-types.ts';
+import { assertSupportedReactValue } from './probe-unsupported-react.ts';
 
 export const probeComponentHostType = 'react-probe-internal-component';
 export const probeEmptyHostType = 'react-probe-internal-empty';
@@ -73,6 +74,8 @@ export function createComponentMetadata(
     activityMode?: 'hidden' | 'visible'
 ): ProbeComponentMetadata {
     const props = readElementProps(element);
+
+    assertSupportedReactValue(props.children);
 
     return Object.freeze({
         activityMode,

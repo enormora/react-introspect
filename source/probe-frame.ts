@@ -15,6 +15,7 @@ import {
     readElementRef,
     throwProbeRenderError
 } from './probe-frame-contract.ts';
+import { createUnsupportedReactValueError, isReactPortalValue } from './probe-unsupported-react.ts';
 
 type ProbeFrameProps = {
     readonly createFrameElement: ProbeFrameElementFactory;
@@ -377,6 +378,10 @@ function transformNode(
     depth: ProbeFrameDepth,
     frameFactory: ProbeFrameElementFactory
 ): ProbeTransformedNode {
+    if (isReactPortalValue(node)) {
+        throw createUnsupportedReactValueError();
+    }
+
     const primitiveNode = transformPrimitiveNode(node);
 
     if (primitiveNode !== undefined) {
@@ -430,5 +435,9 @@ export function createProbeRenderElement(
     element: React.ReactElement,
     depth: ProbeFrameDepth
 ): React.ReactElement {
+    if (isReactPortalValue(element)) {
+        throw createUnsupportedReactValueError();
+    }
+
     return transformElement(createProbeElement(element), depth, transformNode, createFrameElement);
 }

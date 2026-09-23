@@ -57,6 +57,8 @@ export type ProbeReconcilerRoot = {
 };
 
 const defaultEventPriority = 32;
+const reactActEnvironmentKey = 'IS_REACT_ACT_ENVIRONMENT';
+
 function noop(): void {
     return undefined;
 }
@@ -187,12 +189,22 @@ function createReconcilerContainer(
 
 function actNow(action: () => unknown): unknown {
     const results = new Set<unknown>();
+    const hadActEnvironment = Object.hasOwn(globalThis, reactActEnvironmentKey);
+    const previousActEnvironment: unknown = Reflect.get(globalThis, reactActEnvironmentKey);
 
     Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
-    React.act(function runAction() {
-        results.add(action());
-    });
+    try {
+        React.act(function runAction() {
+            results.add(action());
+        });
+    } finally {
+        if (hadActEnvironment) {
+            Reflect.set(globalThis, reactActEnvironmentKey, previousActEnvironment);
+        } else {
+            Reflect.deleteProperty(globalThis, reactActEnvironmentKey);
+        }
+    }
 
     return results.values().next().value;
 }

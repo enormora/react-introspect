@@ -147,7 +147,7 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('keeps unresolved generated ids and cyclic props stable', function verifyIdNormalizerEdges(scope) {
+    test('keeps unresolved generated ids and cuts cyclic props', function verifyIdNormalizerEdges(scope) {
         const generatedId = '_react-probe-edge-r_0_';
         const normalized = normalizeSnapshotValue(
             createCyclicIdObject(generatedId),
@@ -160,7 +160,7 @@ export const testNode = suite('React 19 special surfaces', [
         ) as Record<PropertyKey, unknown>;
 
         scope.assert.equal(normalized.id, generatedId);
-        scope.assert.equal(normalized.self, normalized);
+        scope.assert.equal(normalized.self, '[Circular]');
 
         return scope.assert.collect();
     }),
