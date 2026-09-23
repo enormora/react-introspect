@@ -426,7 +426,6 @@ async function assertStaticWaits(scope: EqualScope): Promise<void> {
     const view = probe(React.createElement('main', null, 'static'));
 
     await view.waitForIdle();
-    await view.waitForNextRender();
     await view.waitForRenderCount(1);
     await view.waitUntil(alwaysTrue);
 
@@ -591,7 +590,6 @@ export const testNode = suite('public API skeleton', [
         });
 
         await view.waitForIdle();
-        await view.waitForNextRender();
         await view.waitForRenderCount(1);
         await view.waitUntil(alwaysTrue);
         await assertStaticWaits(scope);

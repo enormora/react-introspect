@@ -5,7 +5,7 @@ export const config = defineConfig({
         coverage: {
             execution: {
                 processModel: 'in-process',
-                scheduling: 'concurrent'
+                scheduling: 'serial'
             },
             testFamily: 'microtest',
             files: {
@@ -18,7 +18,7 @@ export const config = defineConfig({
         microtest: {
             execution: {
                 processModel: 'in-process',
-                scheduling: 'concurrent'
+                scheduling: 'serial'
             },
             testFamily: 'microtest',
             files: {

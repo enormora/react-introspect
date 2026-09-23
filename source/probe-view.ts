@@ -18,6 +18,8 @@ import {
     type SnapshotNode
 } from './probe-snapshot.ts';
 
+const defaultWaitTimeout = 1000;
+
 function nodeList(
     reader: SnapshotReader,
     snapshot: ProbeSnapshot,
@@ -54,7 +56,8 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
                 currentSnapshot = snapshot;
             },
             refs: options.refs,
-            strictMode: options.strictMode ?? true
+            strictMode: options.strictMode ?? true,
+            waitTimeout: options.waitTimeout ?? defaultWaitTimeout
         });
     });
     const state: SnapshotReader = {

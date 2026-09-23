@@ -34,6 +34,7 @@ type ProbeReconcilerRootOptions = {
     readonly publish: (snapshot: ProbeSnapshot) => void;
     readonly refs: ProbeRefs | undefined;
     readonly strictMode: boolean;
+    readonly waitTimeout: number;
 };
 
 export type ProbeReconcilerRoot = {
@@ -112,6 +113,8 @@ const probeReconcilerHostConfig = {
         return instance.readPublicInstance();
     },
     getRootHostContext,
+    hideInstance: noop,
+    hideTextInstance: noop,
     insertBefore,
     insertInContainerBefore: insertBefore,
     isPrimaryRenderer: false,
@@ -147,6 +150,8 @@ const probeReconcilerHostConfig = {
     suspendInstance: noop,
     suspendOnActiveViewTransition: alwaysFalse,
     trackSchedulerEvent: noop,
+    unhideInstance: noop,
+    unhideTextInstance: noop,
     waitForCommitToBeReady: returnNull
 };
 
@@ -184,10 +189,8 @@ function actNow(action: () => unknown): unknown {
 }
 
 type ProbeReconcilerState = {
-    readonly readNextRenderWaitStart: () => number;
     readonly readRenderCount: () => number;
     readonly readWaiters: () => readonly Waiter[];
-    readonly writeNextRenderWaitStart: (count: number) => void;
     readonly writeRenderCount: (count: number) => void;
     readonly writeWaiters: (waiters: readonly Waiter[]) => void;
 };
@@ -233,21 +236,14 @@ function createSessionContainer(
 }
 
 function createProbeReconcilerSession(options: ProbeReconcilerRootOptions): ProbeReconcilerSession {
-    let nextRenderWaitStart = 0;
     let renderCount = 0;
     let waiters: readonly Waiter[] = [];
     const state = Object.freeze({
-        readNextRenderWaitStart() {
-            return nextRenderWaitStart;
-        },
         readRenderCount() {
             return renderCount;
         },
         readWaiters() {
             return waiters;
-        },
-        writeNextRenderWaitStart(count: number) {
-            nextRenderWaitStart = count;
         },
         writeRenderCount(count: number) {
             renderCount = count;
@@ -280,15 +276,25 @@ function actSession(session: ProbeReconcilerSession, action: () => unknown): unk
     });
 }
 
+async function waitForIdleSession(session: ProbeReconcilerSession): Promise<void> {
+    await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
+        await Promise.resolve();
+        renderer.flushPassiveEffects();
+        settleWaiters(session.state);
+    });
+}
+
 async function waitForSession(session: ProbeReconcilerSession, predicate: () => boolean): Promise<void> {
     if (session.options.diagnostics.run(predicate)) {
         return;
     }
 
-    return new Promise<void>(function createWait(resolve) {
+    const waiting = new Promise<void>(function createWait(resolve) {
         const waiter: Waiter = {
             predicate,
-            resolve
+            resolve() {
+                resolve();
+            }
         };
 
         session.state.writeWaiters([
@@ -296,6 +302,12 @@ async function waitForSession(session: ProbeReconcilerSession, predicate: () => 
             waiter
         ]);
     });
+
+    await waitForIdleSession(session);
+
+    if (!session.options.diagnostics.run(predicate)) {
+        await waiting;
+    }
 }
 
 function publishEmptySnapshot(session: ProbeReconcilerSession, renderCountBefore: number): void {
@@ -321,6 +333,22 @@ function captureRenderError(
 
     publishEmptyErrorSnapshot(session, renderCountBefore);
     session.options.diagnostics.recordUncaughtError(error);
+}
+
+function captureMissingInitialCommit(session: ProbeReconcilerSession, renderCountBefore: number): void {
+    if (
+        renderCountBefore > 0 ||
+        session.state.readRenderCount() > renderCountBefore ||
+        session.options.diagnostics.errors.length > 0
+    ) {
+        return;
+    }
+
+    const message = 'React Probe cannot commit a suspended root. ' +
+        'Wrap lazy, async, or promise-using roots in React.Suspense.';
+
+    publishEmptyErrorSnapshot(session, renderCountBefore);
+    session.options.diagnostics.recordUncaughtError(new Error(message));
 }
 
 function updateRootElement(
@@ -359,6 +387,7 @@ function renderWithDiagnostics(
     }
 
     validateContainerRefs(session.container);
+    captureMissingInitialCommit(session, renderCountBefore);
 }
 
 function flushElement(session: ProbeReconcilerSession, element: Readonly<React.ReactElement> | null): void {
@@ -367,20 +396,8 @@ function flushElement(session: ProbeReconcilerSession, element: Readonly<React.R
     });
 }
 
-async function waitForIdleSession(session: ProbeReconcilerSession): Promise<void> {
-    await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-        await Promise.resolve();
-        renderer.flushPassiveEffects();
-    });
-}
-
 async function waitForNextRenderSession(session: ProbeReconcilerSession): Promise<void> {
-    const expectedRenderCount = session.state.readNextRenderWaitStart() + 1;
-
-    session.state.writeNextRenderWaitStart(Math.max(
-        session.state.readNextRenderWaitStart(),
-        expectedRenderCount
-    ));
+    const expectedRenderCount = session.state.readRenderCount() + 1;
 
     return waitForSession(session, function didRender() {
         return session.state.readRenderCount() >= expectedRenderCount;

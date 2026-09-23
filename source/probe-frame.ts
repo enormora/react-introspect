@@ -45,9 +45,29 @@ type ProbeTransformNode = (
     createFrameElement: ProbeFrameElementFactory
 ) => ProbeTransformedNode;
 
+type ProbeSuspenseTransformRequest = {
+    readonly createFrameElement: ProbeFrameElementFactory;
+    readonly depth: ProbeFrameDepth;
+    readonly element: ProbeElement;
+    readonly transformedChildren: ProbeTransformedNode;
+    readonly transformNode: ProbeTransformNode;
+};
+
+type ProbeThenable = {
+    readonly then: (
+        resolve: (value: unknown) => void,
+        reject: (reason: unknown) => void
+    ) => unknown;
+};
+
+type ProbeLazyInitializer = (payload: unknown) => unknown;
+
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
+const lazyType = Symbol.for('react.lazy');
 const contextType = Symbol.for('react.context');
+const lazyInitializerKey = '_init';
+const lazyPayloadKey = '_payload';
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
@@ -72,6 +92,24 @@ function isForwardRefType(value: unknown): value is ProbeForwardRefType {
         typeof value.render === 'function';
 }
 
+function isLazyInitializer(value: unknown): value is ProbeLazyInitializer {
+    return typeof value === 'function';
+}
+
+function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): ProbeLazyInitializer | undefined {
+    const initializer: unknown = Reflect.get(value, lazyInitializerKey);
+
+    return isLazyInitializer(initializer) ? initializer : undefined;
+}
+
+function isLazyType(value: unknown): value is ProbeFrameType {
+    return isRecord(value) &&
+        value.$$typeof === lazyType &&
+        hasProperty(value, lazyInitializerKey) &&
+        hasProperty(value, lazyPayloadKey) &&
+        readLazyInitializer(value) !== undefined;
+}
+
 function isContextType(value: unknown): value is React.Context<unknown> {
     return hasReactType(value, contextType);
 }
@@ -82,6 +120,10 @@ function isFunctionComponent(value: unknown): value is ProbeFunctionComponent {
 
 function isIterable(value: unknown): value is Iterable<unknown> {
     return isRecord(value) && typeof value[Symbol.iterator] === 'function';
+}
+
+function isThenable(value: unknown): value is ProbeThenable {
+    return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
 }
 
 function isProbeElement(element: React.ReactElement): element is ProbeElement {
@@ -110,17 +152,29 @@ function createProbeElement(element: React.ReactElement): ProbeElement {
     return element;
 }
 
+function readLazyType(type: ProbeFrameType): unknown {
+    return readLazyInitializer(type)?.(Reflect.get(type, lazyPayloadKey));
+}
+
+function unwrapThenableNode(node: React.ReactNode): React.ReactNode {
+    return isThenable(node) ? React.use(node) as React.ReactNode : node;
+}
+
 function executeWrappedElement(
     type: unknown,
     props: Readonly<Record<PropertyKey, unknown>>,
     ref: unknown
 ): React.ReactNode {
-    if (isMemoType(type) && isFunctionComponent(type.type)) {
-        return type.type(props);
+    if (isLazyType(type)) {
+        return executeWrappedElement(readLazyType(type), props, ref);
     }
 
-    if (isMemoType(type) && isForwardRefType(type.type)) {
-        return type.type.render(props, ref);
+    if (isMemoType(type)) {
+        return executeWrappedElement(type.type, props, ref);
+    }
+
+    if (isFunctionComponent(type) && !isClassComponent(type)) {
+        return type(props);
     }
 
     return isForwardRefType(type) ? type.render(props, ref) : createOpaqueHost(type);
@@ -139,7 +193,7 @@ function executeElement(element: ProbeElement): React.ReactNode {
 
 function executeProbeFrameElement(element: ProbeElement): React.ReactNode {
     try {
-        return executeElement(element);
+        return unwrapThenableNode(executeElement(element));
     } catch (error) {
         return throwProbeRenderError(error);
     }
@@ -162,6 +216,15 @@ function cloneElementWithChildren(
     }, children);
 }
 
+function cloneSuspenseElement(request: ProbeSuspenseTransformRequest): React.ReactElement {
+    const props = readElementProps(request.element);
+
+    return React.cloneElement(request.element, {
+        [probeElementKeyMetadata]: request.element.key,
+        fallback: request.transformNode(props.fallback, request.depth, request.createFrameElement)
+    }, request.transformedChildren);
+}
+
 function transformCollection(
     nodes: readonly unknown[],
     depth: ProbeFrameDepth,
@@ -177,21 +240,20 @@ function transformCollection(
     });
 }
 
+function isExecutableComponentType(type: unknown): boolean {
+    return isClassComponent(type) ||
+        isFunctionComponent(type) ||
+        isMemoType(type) ||
+        isForwardRefType(type) ||
+        isLazyType(type);
+}
+
 function transformComponentElement(
     element: ProbeElement,
     depth: ProbeFrameDepth,
     frameFactory: ProbeFrameElementFactory
 ): React.ReactElement {
-    const { type } = element;
-
-    if (
-        canExecute(depth) && (
-            isClassComponent(type) ||
-            isFunctionComponent(type) ||
-            isMemoType(type) ||
-            isForwardRefType(type)
-        )
-    ) {
+    if (canExecute(depth) && isExecutableComponentType(element.type)) {
         return frameFactory(element, depth);
     }
 
@@ -222,6 +284,21 @@ function transformRenderableElement(
     );
 }
 
+function transformSuspenseElement(
+    element: ProbeElement,
+    depth: ProbeFrameDepth,
+    transformChildNode: ProbeTransformNode,
+    frameFactory: ProbeFrameElementFactory
+): React.ReactElement {
+    return cloneSuspenseElement({
+        createFrameElement: frameFactory,
+        depth,
+        element,
+        transformedChildren: transformChildNode(readElementChildren(element), depth, frameFactory),
+        transformNode: transformChildNode
+    });
+}
+
 function transformElement(
     element: ProbeElement,
     depth: ProbeFrameDepth,
@@ -229,6 +306,10 @@ function transformElement(
     frameFactory: ProbeFrameElementFactory
 ): React.ReactElement {
     const { type } = element;
+
+    if (type === React.Suspense) {
+        return transformSuspenseElement(element, depth, transformChildNode, frameFactory);
+    }
 
     if (typeof type === 'string' || type === React.Fragment || isContextType(type)) {
         return transformRenderableElement(element, depth, transformChildNode, frameFactory);
@@ -264,7 +345,11 @@ function transformNode(
 function ProbeFrame(props: ProbeFrameProps): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(props.element, undefined),
-        props.transformNode(executeProbeFrameElement(props.element), nextDepth(props.depth), props.createFrameElement)
+        props.transformNode(
+            executeProbeFrameElement(props.element),
+            nextDepth(props.depth),
+            props.createFrameElement
+        )
     );
 }
 

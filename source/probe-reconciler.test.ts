@@ -101,9 +101,15 @@ function assertUnmountedView(scope: EqualScope, view: ProbeView<HostSchema>, sta
     scope.assert.equal(view.find('main'), undefined);
 }
 
-async function assertWaits(scope: EqualScope, view: ProbeView<HostSchema>): Promise<void> {
-    await view.waitForNextRender();
+async function assertDelayedWait(view: ProbeView<HostSchema>): Promise<void> {
+    const delayedRender = view.waitForRenderCount(3);
 
+    await view.waitForIdle();
+    view.update(React.createElement(Page, { title: 'delayed' }));
+    await delayedRender;
+}
+
+async function assertWaits(scope: EqualScope, view: ProbeView<HostSchema>): Promise<void> {
     const nextRender = view.waitForNextRender();
 
     view.update(React.createElement(Page, { title: 'next' }));
@@ -114,8 +120,9 @@ async function assertWaits(scope: EqualScope, view: ProbeView<HostSchema>): Prom
         return view.textContent === 'Hello next';
     });
     await view.waitForIdle();
+    await assertDelayedWait(view);
 
-    scope.assert.equal(view.textContent, 'Hello next');
+    scope.assert.equal(view.textContent, 'Hello delayed');
 }
 
 function assertEventUpdate(scope: EqualScope): void {
@@ -275,6 +282,21 @@ function assertSuspendedUpdateRollback(scope: EqualScope): void {
     scope.assert.equal(view.textContent, 'Hello stable');
 }
 
+function assertSuspendedInitialRoot(scope: EqualScope): void {
+    const view = probe(React.createElement(Suspends), {
+        depth: 'full',
+        errorMode: 'capture',
+        strictMode: false
+    });
+
+    scope.assert.equal(view.renderCount, 1);
+    scope.assert.equal(view.root, undefined);
+    scope.assert.equal(
+        view.errors.at(-1)?.message,
+        'React Probe cannot commit a suspended root. Wrap lazy, async, or promise-using roots in React.Suspense.'
+    );
+}
+
 export const testNode = suite('custom reconciler host layer', [
     test('publishes host and text output after a synchronous commit', function verifySyncRender(scope) {
         const view = probe<HostSchema>(React.createElement(Page, { title: 'world' }), {
@@ -354,6 +376,14 @@ export const testNode = suite('custom reconciler host layer', [
         'keeps the previous snapshot when a sync update suspends before commit',
         function verifySuspendedRollback(scope) {
             assertSuspendedUpdateRollback(scope);
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'reports a suspended initial root clearly',
+        function verifySuspendedInitialRoot(scope) {
+            assertSuspendedInitialRoot(scope);
 
             return scope.assert.collect();
         }

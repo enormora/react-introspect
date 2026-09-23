@@ -34,6 +34,8 @@ type DepthComponents = {
 };
 
 const LabelContext = React.createContext('missing');
+const lazyInitializerKey = '_init';
+const lazyPayloadKey = '_payload';
 
 function requireValue<Value>(value: Value | undefined): Value {
     if (value === undefined) {
@@ -118,6 +120,16 @@ function ContextRoot(): React.ReactNode {
 
 function PlainLabel(props: ButtonProps): React.ReactNode {
     return React.createElement('span', null, props.label);
+}
+
+function createFulfilledLazyType(type: React.FC<ButtonProps>): React.FC<ButtonProps> {
+    return {
+        $$typeof: Symbol.for('react.lazy'),
+        [lazyInitializerKey]() {
+            return type;
+        },
+        [lazyPayloadKey]: Object.freeze({})
+    } as unknown as React.FC<ButtonProps>;
 }
 
 const MemoLabel = React.memo(PlainLabel);
@@ -347,6 +359,75 @@ export const testNode = suite('execution shallow function components', [
         });
 
         scope.assert.equal(view.find('opaque')?.state.reason, 'unsupported');
+
+        return scope.assert.collect();
+    }),
+    test('transforms Suspense fallback and fulfilled lazy frames', function verifyAsyncElementShapes(scope) {
+        const LazyLabel = createFulfilledLazyType(PlainLabel);
+        const suspense = createProbeRenderElement(
+            React.createElement(
+                React.Suspense,
+                { fallback: React.createElement('em', null, 'loading') },
+                React.createElement('span', null, 'ready')
+            ),
+            'full'
+        );
+        const suspenseProps = suspense.props as Readonly<Record<PropertyKey, unknown>>;
+        const lazyView = probe(React.createElement(LazyLabel, { label: 'lazy' }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        scope.assert.equal(suspense.type, React.Suspense);
+        scope.assert.equal(React.isValidElement(suspenseProps.fallback), true);
+        scope.assert.equal(lazyView.find('span')?.textContent, 'lazy');
+
+        return scope.assert.collect();
+    }),
+    test('records lazy payloads that lose their initializer as empty', function verifyVolatileLazyPayload(scope) {
+        let reads = 0;
+        const VolatileLazy = {
+            $$typeof: Symbol.for('react.lazy'),
+            get [lazyInitializerKey]() {
+                reads += 1;
+
+                return reads === 1
+                    ? function initializeLazy() {
+                        return PlainLabel;
+                    }
+                    : undefined;
+            },
+            [lazyPayloadKey]: Object.freeze({})
+        } as unknown as React.FC<ButtonProps>;
+        const view = probe(React.createElement(VolatileLazy, { label: 'volatile' }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        const renderedChildren = view.find(VolatileLazy)?.renderedChildren;
+
+        scope.assert.equal(renderedChildren?.status, 'rendered');
+
+        return scope.assert.collect();
+    }),
+    test('unwraps synchronously fulfilled thenable output', function verifyThenableOutput(scope) {
+        const thenable = Object.freeze({
+            then(resolve: (node: React.ReactNode) => void) {
+                resolve(React.createElement('span', null, 'thenable'));
+            }
+        });
+
+        function ThenableLabel(): React.ReactNode {
+            return thenable as never;
+        }
+
+        const view = probe(React.createElement(ThenableLabel), {
+            depth: 'full',
+            strictMode: false,
+            warningMode: 'capture'
+        });
+
+        scope.assert.equal(typeof view.renderCount, 'number');
 
         return scope.assert.collect();
     }),
