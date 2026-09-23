@@ -1266,7 +1266,8 @@ React Probe also inspects intermediate component nodes.
 
 ## FAQ
 
-### Why does `find()` not throw?
+<details>
+<summary>Why does <code>find()</code> not throw?</summary>
 
 Probe inspects.
 
@@ -1281,7 +1282,10 @@ assert.equal(button.props.label, 'Save');
 
 This keeps Probe useful with any assertion style.
 
-### Why does `find()` return `undefined` instead of a Maybe-like node?
+</details>
+
+<details>
+<summary>Why does <code>find()</code> return <code>undefined</code> instead of a Maybe-like node?</summary>
 
 Because TypeScript already understands `undefined`.
 
@@ -1295,7 +1299,10 @@ button.props.label;
 
 A Maybe-like node makes `props.label` hard to type. It would need to return `string | unavailable`, and that spreads through the whole API.
 
-### Do non-React console logs fail the test?
+</details>
+
+<details>
+<summary>Do non-React console logs fail the test?</summary>
 
 No.
 
@@ -1305,7 +1312,10 @@ Normal app logs still pass through.
 
 If a warning looks like React output but cannot be attributed, Probe throws so the attribution can be fixed instead of silently hiding it.
 
-### Why is `probe()` not async?
+</details>
+
+<details>
+<summary>Why is <code>probe()</code> not async?</summary>
 
 Most unit tests do not suspend.
 
@@ -1321,7 +1331,10 @@ await view.waitForIdle();
 
 This avoids `await probe(...)` in thousands of simple tests.
 
-### How does `use(promise)` work with sync `probe()`?
+</details>
+
+<details>
+<summary>How does <code>use(promise)</code> work with sync <code>probe()</code>?</summary>
 
 If a component suspends, React commits the nearest fallback if one exists.
 
@@ -1337,7 +1350,10 @@ await view.waitForNextRender();
 
 No partial suspended tree is exposed.
 
-### Why is `idGenerator` only applied to Probe output?
+</details>
+
+<details>
+<summary>Why is <code>idGenerator</code> only applied to Probe output?</summary>
 
 React owns `useId`.
 
@@ -1345,13 +1361,18 @@ Probe does not monkey patch React and does not replace the dispatcher.
 
 So `idGenerator` maps React-generated ids inside Probe snapshots after commit. The component itself still saw React's real id during render.
 
-### Does Probe replace browser tests?
+</details>
+
+<details>
+<summary>Does Probe replace browser tests?</summary>
 
 No.
 
 Use browser tests for layout, real focus behavior, pointer events, CSS, animations, and view transitions.
 
 Use Probe for component contracts.
+
+</details>
 
 ## Design Promises
 

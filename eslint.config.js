@@ -46,6 +46,15 @@ export default [
         }
     },
     {
+        files: [ 'readme.md' ],
+        rules: {
+            'markdown/no-html': [
+                'error',
+                { allowed: [ 'code', 'details', 'summary' ] }
+            ]
+        }
+    },
+    {
         files: [ '**/*.test.ts' ],
         rules: {
             'max-lines': 'off'
