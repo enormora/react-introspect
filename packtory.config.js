@@ -27,9 +27,30 @@ export const config = {
             enabled: true,
             declarations: 'all'
         },
+        noDuplicatedFiles: {
+            enabled: true
+        },
         requiredFiles: {
             enabled: true,
             files: [ 'LICENSE', 'readme.md', 'banner.svg', 'logo.svg' ]
+        },
+        maxBundleSize: {
+            enabled: true
+        },
+        noUnusedBundleDependencies: {
+            enabled: true
+        },
+        noDevDependencyImports: {
+            enabled: true
+        },
+        uniqueTargetPaths: {
+            enabled: true
+        },
+        noSideEffects: {
+            enabled: false
+        },
+        noUnexposedExecutables: {
+            enabled: true
         }
     },
     commonPackageSettings: {
