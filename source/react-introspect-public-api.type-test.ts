@@ -2,28 +2,28 @@ import React from 'react';
 import { expect } from 'tstyche';
 import type {
     GivenChildren,
-    ReflectError,
-    ReflectList,
-    ReflectListLocator,
-    ReflectLocator,
-    ReflectNode,
-    ReflectNodeState,
-    ReflectOptions,
-    ReflectRefMatcher,
-    ReflectRefRule,
-    ReflectRefTarget,
-    ReflectSelector,
-    ReflectView,
-    ReflectWarning,
+    IntrospectionError,
+    IntrospectionList,
+    IntrospectionListLocator,
+    IntrospectionLocator,
+    IntrospectionNode,
+    IntrospectionNodeState,
+    IntrospectionOptions,
+    IntrospectionRefMatcher,
+    IntrospectionRefRule,
+    IntrospectionRefTarget,
+    IntrospectionSelector,
+    IntrospectionView,
+    IntrospectionWarning,
     RenderedChildren
-} from './reflect-public-types.ts';
+} from './introspect-public-types.ts';
 import {
     createFakeRefNode,
     matchRefs
-} from './reflect-ref.ts';
+} from './introspect-ref.ts';
 import {
-    reflect
-} from './react-reflect.entry-point.ts';
+    introspect
+} from './react-introspect.entry-point.ts';
 
 type ButtonProps = {
     readonly disabled: boolean;
@@ -49,7 +49,7 @@ function Button(props: React.PropsWithChildren<ButtonProps>): React.ReactNode {
 
     return null;
 }
-const view = reflect(React.createElement(Button, {
+const view = introspect(React.createElement(Button, {
     disabled: true,
     label: 'Save',
     onSave() {
@@ -58,8 +58,8 @@ const view = reflect(React.createElement(Button, {
 }));
 const button = view.find(Button);
 
-expect(view).type.toBeAssignableTo<ReflectView>();
-expect({ depth: 1, warningMode: 'throw' } as const).type.toBeAssignableTo<ReflectOptions>();
+expect(view).type.toBeAssignableTo<IntrospectionView>();
+expect({ depth: 1, warningMode: 'throw' } as const).type.toBeAssignableTo<IntrospectionOptions>();
 expect({
     refs: {
         input: createFakeRefNode({
@@ -70,15 +70,15 @@ expect({
     }
 })
     .type
-    .toBeAssignableTo<ReflectOptions>();
-expect({ message: 'warning', cause: undefined }).type.toBeAssignableTo<ReflectWarning>();
-expect({ cause: undefined, handled: false, message: 'error' }).type.toBeAssignableTo<ReflectError>();
+    .toBeAssignableTo<IntrospectionOptions>();
+expect({ message: 'warning', cause: undefined }).type.toBeAssignableTo<IntrospectionWarning>();
+expect({ cause: undefined, handled: false, message: 'error' }).type.toBeAssignableTo<IntrospectionError>();
 expect({ activityMode: undefined, reason: undefined, rendered: true, visible: true })
     .type
-    .toBeAssignableTo<ReflectNodeState>();
+    .toBeAssignableTo<IntrospectionNodeState>();
 
 if (button !== undefined) {
-    expect(button).type.toBeAssignableTo<ReflectNode<ButtonPublicProps, typeof Button>>();
+    expect(button).type.toBeAssignableTo<IntrospectionNode<ButtonPublicProps, typeof Button>>();
     expect(button.props.label).type.toBe<string>();
     expect(button.props.disabled).type.toBe<boolean>();
     expect(button.props.onSave()).type.toBe<number>();
@@ -89,10 +89,10 @@ if (button !== undefined) {
         readonly disabled: boolean;
         readonly label: string;
     }>();
-    expect(button.find(Button)).type.toBe<ReflectNode<ButtonPublicProps, typeof Button> | undefined>();
-    expect(button.findAll(Button)).type.toBeAssignableTo<ReflectList<ButtonPublicProps, typeof Button>>();
+    expect(button.find(Button)).type.toBe<IntrospectionNode<ButtonPublicProps, typeof Button> | undefined>();
+    expect(button.findAll(Button)).type.toBeAssignableTo<IntrospectionList<ButtonPublicProps, typeof Button>>();
     expect(button.findClosest(Button)).type.toBe<
-        ReflectNode<ButtonPublicProps, typeof Button> | undefined
+        IntrospectionNode<ButtonPublicProps, typeof Button> | undefined
     >();
 
     button.pickProps([ 'label' ]);
@@ -100,7 +100,7 @@ if (button !== undefined) {
 
     // @ts-expect-error: Type '"missing"' is not assignable to type '"label" | "disabled" | "onSave"'.
     button.pickProps([ 'missing' ]);
-    // @ts-expect-error: Property 'children' does not exist on type 'ReflectWithoutKeys<ButtonProps & { children?: ReactNode; }, "children">'.
+    // @ts-expect-error: Property 'children' does not exist on type 'IntrospectionWithoutKeys<ButtonProps & { children?: ReactNode; }, "children">'.
     String(button.props.children);
 }
 
@@ -111,15 +111,15 @@ expect(view.find({
     type: Button
 }))
     .type
-    .toBe<ReflectNode<ButtonPublicProps, typeof Button> | undefined>();
+    .toBe<IntrospectionNode<ButtonPublicProps, typeof Button> | undefined>();
 
 const buttonLocator = view.locate(Button);
 const buttonListLocator = view.locateAll(Button);
 
-expect(buttonLocator).type.toBeAssignableTo<ReflectLocator<ButtonPublicProps, typeof Button>>();
+expect(buttonLocator).type.toBeAssignableTo<IntrospectionLocator<ButtonPublicProps, typeof Button>>();
 expect(buttonLocator.callProp('onSave')).type.toBe<number>();
 expect(buttonListLocator).type.toBeAssignableTo<
-    ReflectListLocator<ButtonPublicProps, typeof Button>
+    IntrospectionListLocator<ButtonPublicProps, typeof Button>
 >();
 
 if (buttonLocator.node !== undefined) {
@@ -130,7 +130,7 @@ if (buttonListLocator.first !== undefined) {
     expect(buttonListLocator.first.props.onSave()).type.toBe<number>();
 }
 
-const hostView = reflect<HostSchema>(React.createElement('button'), {});
+const hostView = introspect<HostSchema>(React.createElement('button'), {});
 const hostButton = hostView.find('button');
 
 if (hostButton !== undefined) {
@@ -159,24 +159,24 @@ expect({
     props: { disabled: true },
     textContent: /save/i,
     type: 'button' as const,
-    where(node: ReflectNode<HostSchema['button'], 'button', HostSchema>) {
+    where(node: IntrospectionNode<HostSchema['button'], 'button', HostSchema>) {
         return node.name === 'button';
     }
 })
     .type
-    .toBeAssignableTo<ReflectSelector<HostSchema, HostSchema['button'], 'button'>>();
+    .toBeAssignableTo<IntrospectionSelector<HostSchema, HostSchema['button'], 'button'>>();
 
 const fakeInput = createFakeRefNode({
     focus() {
         return 1;
     }
 });
-const buttonRefRule: ReflectRefRule<HostSchema, 'button'> = {
+const buttonRefRule: IntrospectionRefRule<HostSchema, 'button'> = {
     node: fakeInput,
     props: { type: 'submit' },
     type: 'button',
     where(target) {
-        expect(target).type.toBeAssignableTo<ReflectRefTarget<HostSchema['button'], 'button'>>();
+        expect(target).type.toBeAssignableTo<IntrospectionRefTarget<HostSchema['button'], 'button'>>();
 
         return target.props.disabled;
     }
@@ -190,10 +190,10 @@ const refMatcher = matchRefs<HostSchema>([
 ]);
 
 expect(fakeInput.focus()).type.toBe<1>();
-expect(buttonRefRule).type.toBeAssignableTo<ReflectRefRule<HostSchema, 'button'>>();
-expect(refMatcher).type.toBeAssignableTo<ReflectRefMatcher<HostSchema>>();
-expect({ refs: refMatcher }).type.toBeAssignableTo<ReflectOptions<HostSchema>>();
+expect(buttonRefRule).type.toBeAssignableTo<IntrospectionRefRule<HostSchema, 'button'>>();
+expect(refMatcher).type.toBeAssignableTo<IntrospectionRefMatcher<HostSchema>>();
+expect({ refs: refMatcher }).type.toBeAssignableTo<IntrospectionOptions<HostSchema>>();
 
 if (refMatcher.rules[0] !== undefined) {
-    expect(refMatcher.rules[0]).type.toBeAssignableTo<ReflectRefRule<HostSchema>>();
+    expect(refMatcher.rules[0]).type.toBeAssignableTo<IntrospectionRefRule<HostSchema>>();
 }

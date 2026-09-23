@@ -1,69 +1,73 @@
 import {
-    reflectComponentHostType,
-    type ReflectComponentMetadata,
-    reflectComponentMetadata,
-    reflectElementKeyMetadata,
-    reflectEmptyHostType,
-    reflectOpaqueHostType,
-    reflectValueMetadata
-} from './reflect-frame-contract.ts';
-import type { ReflectIdNormalization } from './reflect-id-normalization.ts';
-import type { ReflectRefs } from './reflect-public-types.ts';
-import { type ReflectRefHostTarget, resolveReflectRef, validateReflectRefs } from './reflect-ref.ts';
+    introspectionComponentHostType,
+    type IntrospectionComponentMetadata,
+    introspectionComponentMetadata,
+    introspectionElementKeyMetadata,
+    introspectionEmptyHostType,
+    introspectionOpaqueHostType,
+    introspectionValueMetadata
+} from './introspect-frame-contract.ts';
+import type { IntrospectionIdNormalization } from './introspect-id-normalization.ts';
+import type { IntrospectionRefs } from './introspect-public-types.ts';
 import {
-    createEmptyReflectSnapshot,
-    type ReflectSnapshot,
+    type IntrospectionRefHostTarget,
+    resolveIntrospectionRef,
+    validateIntrospectionRefs
+} from './introspect-ref.ts';
+import {
+    createEmptyIntrospectionSnapshot,
+    type IntrospectionSnapshot,
     type SnapshotSourceNode
-} from './reflect-snapshot-contract.ts';
-import { createReflectSnapshotFromSource } from './reflect-snapshot.ts';
+} from './introspect-snapshot-contract.ts';
+import { createIntrospectionSnapshotFromSource } from './introspect-snapshot.ts';
 
-export type ReflectHostProps = Readonly<Record<PropertyKey, unknown>>;
+export type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
-export type ReflectHostParent = ReflectHostContainer | ReflectHostInstance;
+export type IntrospectionHostParent = IntrospectionHostContainer | IntrospectionHostInstance;
 
-export type ReflectHostChild = ReflectHostInstance | ReflectTextInstance;
+export type IntrospectionHostChild = IntrospectionHostInstance | IntrospectionTextInstance;
 
-type ReflectChildStore = {
-    readonly readChildren: () => readonly ReflectHostChild[];
-    readonly writeChildren: (children: readonly ReflectHostChild[]) => void;
+type IntrospectionChildStore = {
+    readonly readChildren: () => readonly IntrospectionHostChild[];
+    readonly writeChildren: (children: readonly IntrospectionHostChild[]) => void;
 };
 
-export type ReflectHostContainer = {
-    readonly readIdNormalization: () => ReflectIdNormalization;
-    readonly readRefs: () => ReflectRefs | undefined;
-    readonly publish: (snapshot: ReflectSnapshot) => void;
+export type IntrospectionHostContainer = {
+    readonly readIdNormalization: () => IntrospectionIdNormalization;
+    readonly readRefs: () => IntrospectionRefs | undefined;
+    readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
     readonly readMounted: () => boolean;
     readonly writeMounted: (mounted: boolean) => void;
-} & ReflectChildStore;
+} & IntrospectionChildStore;
 
-export type ReflectHostInstance = {
-    readonly readProps: () => ReflectHostProps;
+export type IntrospectionHostInstance = {
+    readonly readProps: () => IntrospectionHostProps;
     readonly readPublicInstance: () => unknown;
     readonly readVisibility: () => 'hidden' | 'visible';
-    readonly refreshPublicInstance: (props: ReflectHostProps) => void;
+    readonly refreshPublicInstance: (props: IntrospectionHostProps) => void;
     readonly type: string;
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
-    readonly writeProps: (props: ReflectHostProps) => void;
-} & ReflectChildStore;
+    readonly writeProps: (props: IntrospectionHostProps) => void;
+} & IntrospectionChildStore;
 
-export type ReflectTextInstance = {
+export type IntrospectionTextInstance = {
     readonly readText: () => string;
     readonly readVisibility: () => 'hidden' | 'visible';
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
     readonly writeText: (text: string) => void;
 };
 
-export type ReflectHostContext = {
-    readonly refs: ReflectRefs | undefined;
+export type IntrospectionHostContext = {
+    readonly refs: IntrospectionRefs | undefined;
 };
 
 const internalHostTypes = Object.freeze([
-    reflectComponentHostType,
-    reflectEmptyHostType,
-    reflectOpaqueHostType
+    introspectionComponentHostType,
+    introspectionEmptyHostType,
+    introspectionOpaqueHostType
 ]);
-const reflectComponentMetadataKeys = Object.freeze([
+const introspectionComponentMetadataKeys = Object.freeze([
     'activityMode',
     'error',
     'givenChildren',
@@ -72,16 +76,16 @@ const reflectComponentMetadataKeys = Object.freeze([
     'renderedReason',
     'type'
 ]);
-const parentByChild = new WeakMap<ReflectHostChild, ReflectHostParent>();
+const parentByChild = new WeakMap<IntrospectionHostChild, IntrospectionHostParent>();
 
-function createChildStore(): ReflectChildStore {
-    let currentChildren: readonly ReflectHostChild[] = [];
+function createChildStore(): IntrospectionChildStore {
+    let currentChildren: readonly IntrospectionHostChild[] = [];
 
     return Object.freeze({
         readChildren() {
             return currentChildren;
         },
-        writeChildren(children: readonly ReflectHostChild[]) {
+        writeChildren(children: readonly IntrospectionHostChild[]) {
             currentChildren = children;
         }
     });
@@ -99,12 +103,12 @@ function isPublicHostPropKey(key: PropertyKey): boolean {
     return key !== 'children' &&
         key !== 'key' &&
         key !== 'ref' &&
-        key !== reflectComponentMetadata &&
-        key !== reflectElementKeyMetadata &&
-        key !== reflectValueMetadata;
+        key !== introspectionComponentMetadata &&
+        key !== introspectionElementKeyMetadata &&
+        key !== introspectionValueMetadata;
 }
 
-function publicProps(props: ReflectHostProps): ReflectHostProps {
+function publicProps(props: IntrospectionHostProps): IntrospectionHostProps {
     const result: Record<PropertyKey, unknown> = {};
 
     for (const key of Reflect.ownKeys(props)) {
@@ -116,35 +120,35 @@ function publicProps(props: ReflectHostProps): ReflectHostProps {
     return Object.freeze(result);
 }
 
-function isReflectComponentMetadata(value: unknown): value is ReflectComponentMetadata {
+function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
     return isRecord(value) &&
-        reflectComponentMetadataKeys.every(function hasMetadataKey(key) {
+        introspectionComponentMetadataKeys.every(function hasMetadataKey(key) {
             return hasProperty(value, key);
         });
 }
 
-function isTextInstance(child: ReflectHostChild): child is ReflectTextInstance {
+function isTextInstance(child: IntrospectionHostChild): child is IntrospectionTextInstance {
     return !Reflect.has(child, 'type');
 }
 
-function readSpecialValue(instance: ReflectHostInstance): unknown {
-    return instance.readProps()[reflectValueMetadata];
+function readSpecialValue(instance: IntrospectionHostInstance): unknown {
+    return instance.readProps()[introspectionValueMetadata];
 }
 
-function readHostKeyFromProps(props: ReflectHostProps): string | null {
-    const key = props[reflectElementKeyMetadata];
+function readHostKeyFromProps(props: IntrospectionHostProps): string | null {
+    const key = props[introspectionElementKeyMetadata];
 
     return typeof key === 'string' ? key : null;
 }
 
-function readHostKey(instance: ReflectHostInstance): string | null {
+function readHostKey(instance: IntrospectionHostInstance): string | null {
     return readHostKeyFromProps(instance.readProps());
 }
 
-function readComponentMetadata(instance: ReflectHostInstance): ReflectComponentMetadata {
-    const value = instance.readProps()[reflectComponentMetadata];
+function readComponentMetadata(instance: IntrospectionHostInstance): IntrospectionComponentMetadata {
+    const value = instance.readProps()[introspectionComponentMetadata];
 
-    if (!isReflectComponentMetadata(value)) {
+    if (!isIntrospectionComponentMetadata(value)) {
         return Object.freeze({
             activityMode: undefined,
             error: undefined,
@@ -152,18 +156,18 @@ function readComponentMetadata(instance: ReflectHostInstance): ReflectComponentM
             key: null,
             props: Object.freeze({}),
             renderedReason: 'unsupported',
-            type: reflectComponentHostType
+            type: introspectionComponentHostType
         });
     }
 
     return value;
 }
 
-function isReflectInternalHostType(type: string): boolean {
+function isIntrospectionInternalHostType(type: string): boolean {
     return internalHostTypes.includes(type);
 }
 
-function toRefTarget(type: string, props: ReflectHostProps): ReflectRefHostTarget {
+function toRefTarget(type: string, props: IntrospectionHostProps): IntrospectionRefHostTarget {
     return Object.freeze({
         key: readHostKeyFromProps(props),
         name: type,
@@ -173,25 +177,25 @@ function toRefTarget(type: string, props: ReflectHostProps): ReflectRefHostTarge
 }
 
 function resolvePublicInstance(
-    refs: ReflectRefs | undefined,
+    refs: IntrospectionRefs | undefined,
     type: string,
-    props: ReflectHostProps
+    props: IntrospectionHostProps
 ): unknown {
-    if (isReflectInternalHostType(type)) {
+    if (isIntrospectionInternalHostType(type)) {
         return null;
     }
 
-    return resolveReflectRef(refs, toRefTarget(type, props));
+    return resolveIntrospectionRef(refs, toRefTarget(type, props));
 }
 
-function collectRefTargets(child: ReflectHostChild): readonly ReflectRefHostTarget[] {
+function collectRefTargets(child: IntrospectionHostChild): readonly IntrospectionRefHostTarget[] {
     if (isTextInstance(child)) {
         return Object.freeze([]);
     }
 
     const childTargets = child.readChildren().flatMap(collectRefTargets);
 
-    if (isReflectInternalHostType(child.type)) {
+    if (isIntrospectionInternalHostType(child.type)) {
         return childTargets;
     }
 
@@ -201,7 +205,7 @@ function collectRefTargets(child: ReflectHostChild): readonly ReflectRefHostTarg
     ]);
 }
 
-function detachChild(child: ReflectHostChild): void {
+function detachChild(child: IntrospectionHostChild): void {
     const parent = parentByChild.get(child);
 
     if (parent === undefined) {
@@ -218,20 +222,20 @@ function detachChild(child: ReflectHostChild): void {
     parentByChild.delete(child);
 }
 
-function toSourceNode(child: ReflectHostChild): SnapshotSourceNode {
+function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
     if (isTextInstance(child)) {
         return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
     }
 
-    if (child.type === reflectEmptyHostType || child.type === reflectOpaqueHostType) {
+    if (child.type === introspectionEmptyHostType || child.type === introspectionOpaqueHostType) {
         return {
-            kind: child.type === reflectEmptyHostType ? 'empty' : 'opaque',
+            kind: child.type === introspectionEmptyHostType ? 'empty' : 'opaque',
             value: readSpecialValue(child),
             visibility: child.readVisibility()
         };
     }
 
-    if (child.type === reflectComponentHostType) {
+    if (child.type === introspectionComponentHostType) {
         const metadata = readComponentMetadata(child);
 
         return {
@@ -264,7 +268,7 @@ function toSourceNode(child: ReflectHostChild): SnapshotSourceNode {
     };
 }
 
-export function appendChild(parent: ReflectHostParent, child: ReflectHostChild): void {
+export function appendChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
     detachChild(child);
 
     const children = parent.readChildren();
@@ -276,16 +280,16 @@ export function appendChild(parent: ReflectHostParent, child: ReflectHostChild):
     parentByChild.set(child, parent);
 }
 
-export function clearContainer(container: ReflectHostContainer): void {
+export function clearContainer(container: IntrospectionHostContainer): void {
     container.writeChildren([]);
 }
 
 export function createHostContainer(
-    publish: (snapshot: ReflectSnapshot) => void,
+    publish: (snapshot: IntrospectionSnapshot) => void,
     readNextRenderCount: () => number,
-    idNormalization: ReflectIdNormalization,
-    refs: ReflectRefs | undefined
-): ReflectHostContainer {
+    idNormalization: IntrospectionIdNormalization,
+    refs: IntrospectionRefs | undefined
+): IntrospectionHostContainer {
     let mounted = true;
 
     return Object.freeze({
@@ -309,10 +313,10 @@ export function createHostContainer(
 
 export function createHostInstance(
     type: string,
-    props: ReflectHostProps,
+    props: IntrospectionHostProps,
     _root: unknown,
-    context: ReflectHostContext
-): ReflectHostInstance {
+    context: IntrospectionHostContext
+): IntrospectionHostInstance {
     let currentProps = props;
     let currentPublicInstance = resolvePublicInstance(context.refs, type, props);
     let currentVisibility: 'hidden' | 'visible' = 'visible';
@@ -328,20 +332,20 @@ export function createHostInstance(
         readVisibility() {
             return currentVisibility;
         },
-        refreshPublicInstance(nextProps: ReflectHostProps) {
+        refreshPublicInstance(nextProps: IntrospectionHostProps) {
             currentPublicInstance = resolvePublicInstance(context.refs, type, nextProps);
         },
         type,
         writeVisibility(visibility: 'hidden' | 'visible') {
             currentVisibility = visibility;
         },
-        writeProps(nextProps: ReflectHostProps) {
+        writeProps(nextProps: IntrospectionHostProps) {
             currentProps = nextProps;
         }
     });
 }
 
-export function createTextInstance(text: string): ReflectTextInstance {
+export function createTextInstance(text: string): IntrospectionTextInstance {
     let currentText = text;
     let currentVisibility: 'hidden' | 'visible' = 'visible';
 
@@ -361,18 +365,18 @@ export function createTextInstance(text: string): ReflectTextInstance {
     });
 }
 
-export function getChildHostContext(context: ReflectHostContext): ReflectHostContext {
+export function getChildHostContext(context: IntrospectionHostContext): IntrospectionHostContext {
     return context;
 }
 
-export function getRootHostContext(container: ReflectHostContainer): ReflectHostContext {
+export function getRootHostContext(container: IntrospectionHostContainer): IntrospectionHostContext {
     return Object.freeze({ refs: container.readRefs() });
 }
 
 export function insertBefore(
-    parent: ReflectHostParent,
-    child: ReflectHostChild,
-    beforeChild: ReflectHostChild
+    parent: IntrospectionHostParent,
+    child: IntrospectionHostChild,
+    beforeChild: IntrospectionHostChild
 ): void {
     detachChild(child);
 
@@ -382,7 +386,7 @@ export function insertBefore(
     parentByChild.set(child, parent);
 }
 
-export function removeChild(parent: ReflectHostParent, child: ReflectHostChild): void {
+export function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
     const children = parent.readChildren();
     const index = children.indexOf(child);
 
@@ -393,36 +397,36 @@ export function removeChild(parent: ReflectHostParent, child: ReflectHostChild):
     parentByChild.delete(child);
 }
 
-export function toSnapshot(container: ReflectHostContainer): ReflectSnapshot {
+export function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot {
     if (!container.readMounted()) {
-        return createEmptyReflectSnapshot(container.readNextRenderCount());
+        return createEmptyIntrospectionSnapshot(container.readNextRenderCount());
     }
 
-    return createReflectSnapshotFromSource(
+    return createIntrospectionSnapshotFromSource(
         container.readChildren().map(toSourceNode),
         container.readNextRenderCount(),
         container.readIdNormalization()
     );
 }
 
-export function hideInstance(instance: ReflectHostInstance): void {
+export function hideInstance(instance: IntrospectionHostInstance): void {
     instance.writeVisibility('hidden');
 }
 
-export function hideTextInstance(instance: ReflectTextInstance): void {
+export function hideTextInstance(instance: IntrospectionTextInstance): void {
     instance.writeVisibility('hidden');
 }
 
-export function unhideInstance(instance: ReflectHostInstance): void {
+export function unhideInstance(instance: IntrospectionHostInstance): void {
     instance.writeVisibility('visible');
 }
 
-export function unhideTextInstance(instance: ReflectTextInstance): void {
+export function unhideTextInstance(instance: IntrospectionTextInstance): void {
     instance.writeVisibility('visible');
 }
 
-export function validateContainerRefs(container: ReflectHostContainer): void {
-    validateReflectRefs(
+export function validateContainerRefs(container: IntrospectionHostContainer): void {
+    validateIntrospectionRefs(
         container.readRefs(),
         container.readChildren().flatMap(collectRefTargets)
     );

@@ -1,7 +1,7 @@
 import React from 'react';
-import { createUnsupportedReactValueError, isReactPortalValue } from './reflect-unsupported-react.ts';
+import { createUnsupportedReactValueError, isReactPortalValue } from './introspect-unsupported-react.ts';
 
-export type ReflectIdNormalization = {
+export type IntrospectionIdNormalization = {
     readonly generator: ((generatedId: string) => string) | undefined;
     readonly prefix: string;
 };
@@ -11,7 +11,7 @@ type SnapshotValueNormalizationState = {
 };
 
 type IdReplacementState = {
-    readonly normalization: ReflectIdNormalization;
+    readonly normalization: IntrospectionIdNormalization;
     readonly pattern: RegExp;
     readonly replacements: IdReplacementMap;
 };
@@ -141,7 +141,7 @@ const snapshotValueNormalizer = {
     }
 };
 
-export function createIdNormalizer(idNormalization: ReflectIdNormalization): (value: string) => string {
+export function createIdNormalizer(idNormalization: IntrospectionIdNormalization): (value: string) => string {
     const state: IdReplacementState = {
         normalization: idNormalization,
         pattern: createReactIdPattern(idNormalization.prefix),

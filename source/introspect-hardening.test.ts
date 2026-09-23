@@ -1,8 +1,8 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { normalizeSnapshotValue } from './reflect-id-normalization.ts';
-import type { ReflectNode } from './reflect-public-types.ts';
-import { reflect } from './react-reflect.entry-point.ts';
+import { normalizeSnapshotValue } from './introspect-id-normalization.ts';
+import type { IntrospectionNode } from './introspect-public-types.ts';
+import { introspect } from './react-introspect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -51,7 +51,7 @@ function assertThrowsPortalError(scope: EqualScope, action: () => void): void {
     } catch (error) {
         scope.assert.equal(
             error instanceof Error ? error.message : String(error),
-            'React Reflect cannot represent portal output yet.'
+            'React Introspect cannot represent portal output yet.'
         );
 
         return;
@@ -113,7 +113,7 @@ function PortalArrayChildRoot(): React.ReactNode {
     }, createPortalArray());
 }
 
-function readElementProp(node: ReflectNode): ElementProp {
+function readElementProp(node: IntrospectionNode): ElementProp {
     const { icon } = node.props as Readonly<Record<PropertyKey, unknown>>;
 
     if (!isRecord(icon)) {
@@ -123,7 +123,7 @@ function readElementProp(node: ReflectNode): ElementProp {
     return icon as ElementProp;
 }
 
-function assertNormalizedElementProp(scope: EqualScope, leaf: ReflectNode): void {
+function assertNormalizedElementProp(scope: EqualScope, leaf: IntrospectionNode): void {
     const icon = readElementProp(leaf);
 
     scope.assert.equal(icon.type, Icon);
@@ -136,20 +136,20 @@ function assertNormalizedElementProp(scope: EqualScope, leaf: ReflectNode): void
     });
 }
 
-function assertPublicSerialization(scope: EqualScope, leaf: ReflectNode): void {
+function assertPublicSerialization(scope: EqualScope, leaf: IntrospectionNode): void {
     const serialized = JSON.stringify(leaf);
 
     scope.assert.equal(typeof serialized, 'string');
     scope.assert.match(requireValue(serialized), /"name":"Leaf"/u);
     scope.assert.equal(requireValue(serialized).includes('__reactReflect'), false);
-    scope.assert.equal(requireValue(serialized).includes('react-reflect-internal'), false);
+    scope.assert.equal(requireValue(serialized).includes('react-introspect-internal'), false);
     scope.assert.equal(requireValue(serialized).includes('$$typeof'), false);
     scope.assert.equal(requireValue(serialized).includes('_owner'), false);
     scope.assert.equal(requireValue(serialized).includes('_store'), false);
 }
 
-function assertPublicOutputIsReflectOwned(scope: EqualScope): void {
-    const leaf = requireValue(reflect(React.createElement(ElementPropRoot)).find(Leaf));
+function assertPublicOutputIsIntrospectionOwned(scope: EqualScope): void {
+    const leaf = requireValue(introspect(React.createElement(ElementPropRoot)).find(Leaf));
 
     assertNormalizedElementProp(scope, leaf);
     assertPublicSerialization(scope, leaf);
@@ -206,7 +206,7 @@ function assertBrowserGlobalsAreNotRequired(scope: EqualScope): void {
     const restoreBrowserGlobals = installThrowingBrowserGlobals();
 
     try {
-        const view = reflect(React.createElement('main', null, 'server-safe'));
+        const view = introspect(React.createElement('main', null, 'server-safe'));
 
         scope.assert.equal(view.textContent, 'server-safe');
     } finally {
@@ -219,7 +219,7 @@ function assertActEnvironmentRestored(scope: EqualScope): void {
     const previousActEnvironment: unknown = Reflect.get(globalThis, actEnvironmentKey);
 
     try {
-        reflect(React.createElement('main', null, 'clean'));
+        introspect(React.createElement('main', null, 'clean'));
 
         scope.assert.equal(Object.hasOwn(globalThis, actEnvironmentKey), hadActEnvironment);
         scope.assert.equal(Reflect.get(globalThis, actEnvironmentKey), previousActEnvironment);
@@ -238,7 +238,7 @@ function assertExistingActEnvironmentRestored(scope: EqualScope): void {
 
     try {
         Reflect.set(globalThis, actEnvironmentKey, 'existing');
-        reflect(React.createElement('main', null, 'clean'));
+        introspect(React.createElement('main', null, 'clean'));
 
         scope.assert.equal(Reflect.get(globalThis, actEnvironmentKey), 'existing');
     } finally {
@@ -253,7 +253,7 @@ function assertExistingActEnvironmentRestored(scope: EqualScope): void {
 export const testNode = suite('unsupported React concepts and hardening', [
     test('fails clearly for portal roots', function verifyPortalRoot(scope) {
         assertThrowsPortalError(scope, function renderPortalRoot() {
-            reflect(createPortalValue(React.createElement('span', null, 'root')));
+            introspect(createPortalValue(React.createElement('span', null, 'root')));
         });
         assertPortalNormalizationFails(scope);
 
@@ -261,7 +261,7 @@ export const testNode = suite('unsupported React concepts and hardening', [
     }),
     test('fails clearly for portal render output', function verifyPortalOutput(scope) {
         assertThrowsPortalError(scope, function renderPortalOutput() {
-            reflect(React.createElement(PortalOutput), {
+            introspect(React.createElement(PortalOutput), {
                 depth: 'full',
                 strictMode: false
             });
@@ -271,7 +271,7 @@ export const testNode = suite('unsupported React concepts and hardening', [
     }),
     test('fails clearly for portal children captured in snapshots', function verifyPortalChildren(scope) {
         assertThrowsPortalError(scope, function renderPortalChild() {
-            reflect(React.createElement(PortalArrayChildRoot), {
+            introspect(React.createElement(PortalArrayChildRoot), {
                 strictMode: false
             });
         });
@@ -279,7 +279,7 @@ export const testNode = suite('unsupported React concepts and hardening', [
         return scope.assert.collect();
     }),
     test('keeps public output acyclic and free of raw React internals', function verifyPublicOutput(scope) {
-        assertPublicOutputIsReflectOwned(scope);
+        assertPublicOutputIsIntrospectionOwned(scope);
         assertCircularArrayNormalization(scope);
 
         return scope.assert.collect();

@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { ReflectNode, ReflectView } from './reflect-public-types.ts';
-import { reflect } from './react-reflect.entry-point.ts';
+import type { IntrospectionNode, IntrospectionView } from './introspect-public-types.ts';
+import { introspect } from './react-introspect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -74,7 +74,7 @@ function Suspends(): React.ReactNode {
     throw new SuspenseThenableError();
 }
 
-function assertFullRender(scope: EqualScope, view: ReflectView<HostSchema>): void {
+function assertFullRender(scope: EqualScope, view: IntrospectionView<HostSchema>): void {
     const main = requireValue(view.find('main'));
     const strong = requireValue(view.find('strong'));
 
@@ -86,14 +86,18 @@ function assertFullRender(scope: EqualScope, view: ReflectView<HostSchema>): voi
     scope.assert.equal(view.formatTree(), 'Page\n  main\n    #text\n    strong\n      #text');
 }
 
-function assertUpdatedView(scope: EqualScope, view: ReflectView<HostSchema>, staleRoot: ReflectNode): void {
+function assertUpdatedView(scope: EqualScope, view: IntrospectionView<HostSchema>, staleRoot: IntrospectionNode): void {
     scope.assert.equal(staleRoot.isStale, true);
     scope.assert.equal(view.renderCount, 2);
     scope.assert.equal(view.textContent, 'Hello updated');
     scope.assert.equal(view.find('main')?.props.title, 'updated');
 }
 
-function assertUnmountedView(scope: EqualScope, view: ReflectView<HostSchema>, staleRoot: ReflectNode): void {
+function assertUnmountedView(
+    scope: EqualScope,
+    view: IntrospectionView<HostSchema>,
+    staleRoot: IntrospectionNode
+): void {
     scope.assert.equal(staleRoot.isStale, true);
     scope.assert.equal(view.renderCount, 2);
     scope.assert.equal(view.root, undefined);
@@ -101,7 +105,7 @@ function assertUnmountedView(scope: EqualScope, view: ReflectView<HostSchema>, s
     scope.assert.equal(view.find('main'), undefined);
 }
 
-async function assertDelayedWait(view: ReflectView<HostSchema>): Promise<void> {
+async function assertDelayedWait(view: IntrospectionView<HostSchema>): Promise<void> {
     const delayedRender = view.waitForRenderCount(3);
 
     await view.waitForIdle();
@@ -109,7 +113,7 @@ async function assertDelayedWait(view: ReflectView<HostSchema>): Promise<void> {
     await delayedRender;
 }
 
-async function assertWaits(scope: EqualScope, view: ReflectView<HostSchema>): Promise<void> {
+async function assertWaits(scope: EqualScope, view: IntrospectionView<HostSchema>): Promise<void> {
     const nextRender = view.waitForNextRender();
 
     view.update(React.createElement(Page, { title: 'next' }));
@@ -126,7 +130,7 @@ async function assertWaits(scope: EqualScope, view: ReflectView<HostSchema>): Pr
 }
 
 function assertEventUpdate(scope: EqualScope): void {
-    const view = reflect(React.createElement(Clicker), {
+    const view = introspect(React.createElement(Clicker), {
         depth: 'full',
         strictMode: false
     });
@@ -140,7 +144,7 @@ function assertEventUpdate(scope: EqualScope): void {
 }
 
 function assertKeyedInsertion(scope: EqualScope): void {
-    const view = reflect(
+    const view = introspect(
         React.createElement(
             'main',
             null,
@@ -177,7 +181,7 @@ function assertKeyedInsertion(scope: EqualScope): void {
 }
 
 function assertHostChildRemoval(scope: EqualScope): void {
-    const view = reflect(
+    const view = introspect(
         React.createElement(
             'div',
             null,
@@ -201,11 +205,11 @@ function assertHostChildRemoval(scope: EqualScope): void {
 }
 
 function assertRootChildCounts(scope: EqualScope): void {
-    const emptyView = reflect(React.createElement(RendersNull), {
+    const emptyView = introspect(React.createElement(RendersNull), {
         depth: 'full',
         strictMode: false
     });
-    const fragmentView = reflect(
+    const fragmentView = introspect(
         React.createElement(
             React.Fragment,
             null,
@@ -227,7 +231,7 @@ function assertRootChildCounts(scope: EqualScope): void {
 }
 
 function assertRootChildRemoval(scope: EqualScope): void {
-    const view = reflect(
+    const view = introspect(
         React.createElement(
             React.Fragment,
             null,
@@ -251,7 +255,7 @@ function assertRootChildRemoval(scope: EqualScope): void {
 }
 
 function assertRootHostReplacement(scope: EqualScope): void {
-    const view = reflect(React.createElement('span', null, 'first'), {
+    const view = introspect(React.createElement('span', null, 'first'), {
         depth: 'full',
         strictMode: false
     });
@@ -263,7 +267,7 @@ function assertRootHostReplacement(scope: EqualScope): void {
 }
 
 function assertSuspendedUpdateRollback(scope: EqualScope): void {
-    const view = reflect(React.createElement(Page, { title: 'stable' }), {
+    const view = introspect(React.createElement(Page, { title: 'stable' }), {
         depth: 'full',
         strictMode: false,
         waitTimeout: 10
@@ -283,7 +287,7 @@ function assertSuspendedUpdateRollback(scope: EqualScope): void {
 }
 
 function assertSuspendedInitialRoot(scope: EqualScope): void {
-    const view = reflect(React.createElement(Suspends), {
+    const view = introspect(React.createElement(Suspends), {
         depth: 'full',
         errorMode: 'capture',
         strictMode: false
@@ -293,13 +297,13 @@ function assertSuspendedInitialRoot(scope: EqualScope): void {
     scope.assert.equal(view.root, undefined);
     scope.assert.equal(
         view.errors.at(-1)?.message,
-        'React Reflect cannot commit a suspended root. Wrap lazy, async, or promise-using roots in React.Suspense.'
+        'React Introspect cannot commit a suspended root. Wrap lazy, async, or promise-using roots in React.Suspense.'
     );
 }
 
 export const testNode = suite('custom reconciler host layer', [
     test('publishes host and text output after a synchronous commit', function verifySyncRender(scope) {
-        const view = reflect<HostSchema>(React.createElement(Page, { title: 'world' }), {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'world' }), {
             depth: 'full'
         });
 
@@ -308,7 +312,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('updates committed host snapshots', function verifyUpdate(scope) {
-        const view = reflect<HostSchema>(React.createElement(Page, { title: 'initial' }), {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'initial' }), {
             depth: 'full',
             strictMode: false
         });
@@ -320,7 +324,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('unmounts the committed root', function verifyUnmount(scope) {
-        const view = reflect<HostSchema>(React.createElement(Page, { title: 'mounted' }), {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'mounted' }), {
             depth: 'full',
             strictMode: false
         });
@@ -332,7 +336,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('waits for committed renders and idle work', async function verifyWaits(scope) {
-        const view = reflect<HostSchema>(React.createElement(Page, { title: 'first' }), {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'first' }), {
             depth: 'full',
             strictMode: false,
             waitTimeout: 50

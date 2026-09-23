@@ -1,10 +1,10 @@
-![React Reflect](./banner.svg)
+![React Introspect](./banner.svg)
 
-# React Reflect
+# React Introspect
 
 Simple component tests. No DOM. No globals. No compiler plugin. No browser.
 
-React Reflect is for unit testing React components by their render surface.
+React Introspect is for unit testing React components by their render surface.
 
 You can ask:
 
@@ -39,7 +39,7 @@ You do not see what `Child` renders unless you opt in.
 ```tsx
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { reflect } from 'react-reflect';
+import { introspect } from 'react-introspect';
 
 type SaveButtonProps = {
     label: string;
@@ -63,7 +63,7 @@ const Toolbar: React.FC<{ saving: boolean; onSave(): void; }> = (props) => {
 test('passes props and events to children', () => {
     let saves = 0;
 
-    const view = reflect(
+    const view = introspect(
         <Toolbar
             saving={true}
             onSave={() => {
@@ -91,7 +91,7 @@ test('passes props and events to children', () => {
 Go deeper when you want to inspect a child component's output:
 
 ```tsx
-const view = reflect(<Toolbar saving={false} onSave={() => {}} />, {
+const view = introspect(<Toolbar saving={false} onSave={() => {}} />, {
     depth: 2
 });
 
@@ -103,10 +103,10 @@ assert.equal(button.textContent, 'Save');
 
 ## API By Example
 
-### `reflect(element, options)`
+### `introspect(element, options)`
 
 ```tsx
-const view = reflect(<ProfileCard user={user} />, {
+const view = introspect(<ProfileCard user={user} />, {
     depth: 1,
     idPrefix: 'profile-test-'
 });
@@ -114,16 +114,16 @@ const view = reflect(<ProfileCard user={user} />, {
 
 Options:
 
-| Option        | Default     | What it does                                                    |
-| ------------- | ----------- | --------------------------------------------------------------- |
-| `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.           |
-| `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.     |
-| `idPrefix`    | generated   | Prefix passed to React for `useId`.                             |
-| `idGenerator` | none        | Rewrites React-generated ids in Reflect snapshots after commit. |
-| `refs`        | none        | Injects fake host ref nodes.                                    |
-| `waitTimeout` | `1000`      | Default timeout for wait APIs.                                  |
-| `strictMode`  | `true`      | Wraps the Reflect root in `React.StrictMode`.                   |
-| `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.        |
+| Option        | Default     | What it does                                                             |
+| ------------- | ----------- | ------------------------------------------------------------------------ |
+| `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.                    |
+| `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.              |
+| `idPrefix`    | generated   | Prefix passed to React for `useId`.                                      |
+| `idGenerator` | none        | Rewrites React-generated ids in React Introspect snapshots after commit. |
+| `refs`        | none        | Injects fake host ref nodes.                                             |
+| `waitTimeout` | `1000`      | Default timeout for wait APIs.                                           |
+| `strictMode`  | `true`      | Wraps the React Introspect root in `React.StrictMode`.                   |
+| `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.                 |
 
 View properties are lazy views of the latest committed snapshot.
 
@@ -134,7 +134,7 @@ Node properties read the snapshot that produced that node. Query again after upd
 Returns the root node, or `undefined` after unmount.
 
 ```tsx
-const view = reflect(<ProfileCard user={user} />);
+const view = introspect(<ProfileCard user={user} />);
 
 assert.equal(view.root?.type, ProfileCard);
 ```
@@ -146,7 +146,7 @@ Returns direct rendered children of the root.
 Use it when directness matters.
 
 ```tsx
-const view = reflect(<Page />);
+const view = introspect(<Page />);
 
 assert.deepEqual(
     [ ...view.renderedChildren ].map((node) => node.type),
@@ -203,7 +203,7 @@ view.find({
 
 ### `view.findAll(typeOrSelector)`
 
-Returns a `ReflectList`.
+Returns an `IntrospectionList`.
 
 ```tsx
 const items = view.findAll('li');
@@ -218,7 +218,7 @@ assert.equal(view.findAll(Button).first, undefined);
 assert.equal(view.findAll(Tab).at(42), undefined);
 ```
 
-`ReflectList` is iterable:
+`IntrospectionList` is iterable:
 
 ```tsx
 for (const item of view.findAll(MenuItem)) {
@@ -438,7 +438,7 @@ Reasons:
 
 Returns concatenated text.
 
-Reflect does not trim or collapse whitespace.
+React Introspect does not trim or collapse whitespace.
 
 ```tsx
 const Label = () => {
@@ -449,7 +449,7 @@ const Label = () => {
     );
 };
 
-const view = reflect(<Label />);
+const view = introspect(<Label />);
 
 assert.equal(view.textContent, 'Save changes');
 ```
@@ -508,7 +508,7 @@ assert.equal(panel.state.activityMode, 'hidden');
 Shape:
 
 ```ts
-type ReflectNodeState = {
+type IntrospectionNodeState = {
     rendered: boolean;
     visible: boolean;
     activityMode?: 'visible' | 'hidden';
@@ -521,7 +521,7 @@ type ReflectNodeState = {
 Returns the error associated with this node, or `undefined`.
 
 ```tsx
-const view = reflect(
+const view = introspect(
     <Boundary>
         <Crashes />
     </Boundary>,
@@ -620,7 +620,7 @@ view.unmount();
 
 assert.equal(view.root, undefined);
 
-const nextView = reflect(<ProfileCard user={user} />);
+const nextView = introspect(<ProfileCard user={user} />);
 ```
 
 ### `view.errors`
@@ -630,7 +630,7 @@ Returns all committed error records.
 Use `.at(-1)` for the latest one.
 
 ```tsx
-const view = reflect(<Crashes />);
+const view = introspect(<Crashes />);
 
 const error = view.errors.at(-1);
 
@@ -640,22 +640,22 @@ assert.match(error.message, /boom/);
 assert.equal(view.errors.length, 1);
 ```
 
-Use `errorMode: 'throw'` when a thrown render error should escape `reflect()`.
+Use `errorMode: 'throw'` when a thrown render error should escape `introspect()`.
 
 ```tsx
 assert.throws(() => {
-    reflect(<Crashes />, { errorMode: 'throw' });
+    introspect(<Crashes />, { errorMode: 'throw' });
 }, /boom/);
 ```
 
 ### `view.warnings` and `view.hasWarnings`
 
-Reflect throws on warnings by default.
+React Introspect throws on warnings by default.
 
 Use `warningMode: 'capture'` when you want to assert them.
 
 ```tsx
-const view = reflect(<List items={items} />, {
+const view = introspect(<List items={items} />, {
     warningMode: 'capture'
 });
 
@@ -663,13 +663,13 @@ assert.equal(view.hasWarnings, false);
 assert.deepEqual(view.warnings, []);
 ```
 
-Warnings include React recoverable errors and React warnings printed through `console.warn` or `console.error` while Reflect owns the React work.
+Warnings include React recoverable errors and React warnings printed through `console.warn` or `console.error` while React Introspect owns the React work.
 
 Non-React logs still pass through.
 
 ```tsx
 assert.throws(() => {
-    reflect(<ListWithoutKeys items={items} />);
+    introspect(<ListWithoutKeys items={items} />);
 }, /React warning/);
 ```
 
@@ -705,7 +705,7 @@ await view.waitForRenderCount(target);
 
 ### `view.waitForIdle()`
 
-Waits until React work known to Reflect is flushed.
+Waits until React work known to React Introspect is flushed.
 
 ```tsx
 const button = view.find(Button);
@@ -735,7 +735,7 @@ await view.waitUntil(() => {
 Use host tag shorthand for the common case.
 
 ```tsx
-import { createFakeRefNode } from 'react-reflect';
+import { createFakeRefNode } from 'react-introspect';
 
 const inputNode = createFakeRefNode({
     focusCalled: false,
@@ -744,7 +744,7 @@ const inputNode = createFakeRefNode({
     }
 });
 
-reflect(<SearchBox autoFocus={true} />, {
+introspect(<SearchBox autoFocus={true} />, {
     refs: {
         input: inputNode
     }
@@ -755,18 +755,18 @@ assert.equal(inputNode.focusCalled, true);
 
 Object keys are host tag names.
 
-If a shorthand matches zero refs or more than one ref, Reflect should throw a clear error.
+If a shorthand matches zero refs or more than one ref, React Introspect should throw a clear error.
 
 Use `matchRefs()` when you need selectors.
 
 ```tsx
-import { createFakeRefNode, matchRefs } from 'react-reflect';
+import { createFakeRefNode, matchRefs } from 'react-introspect';
 
 const emailInput = createFakeRefNode({ focus() {} });
 const passwordInput = createFakeRefNode({ focus() {} });
 const submitButton = createFakeRefNode({ click() {} });
 
-reflect(<SignupForm />, {
+introspect(<SignupForm />, {
     refs: matchRefs([
         {
             type: 'input',
@@ -790,7 +790,7 @@ reflect(<SignupForm />, {
 Use a factory for repeated refs.
 
 ```tsx
-reflect(<FieldList />, {
+introspect(<FieldList />, {
     refs: matchRefs([
         {
             type: 'input',
@@ -814,7 +814,7 @@ const Panel = () => {
     return <Card theme={theme} />;
 };
 
-const view = reflect(
+const view = introspect(
     <ThemeContext.Provider value='dark'>
         <Panel />
     </ThemeContext.Provider>,
@@ -831,7 +831,7 @@ assert.equal(card.props.theme, 'dark');
 
 Render props are user code.
 
-Reflect does not call them unless the component under test calls them.
+React Introspect does not call them unless the component under test calls them.
 
 ```tsx
 const List = (props: {
@@ -841,7 +841,7 @@ const List = (props: {
     return props.items.map((item) => props.children(item));
 };
 
-const view = reflect(
+const view = introspect(
     <List items={[ 'a', 'b' ]}>
         {(item) => <Row item={item} />}
     </List>
@@ -867,7 +867,7 @@ class Counter extends React.Component<{ label: string; }, { count: number; }> {
     }
 }
 
-const view = reflect(<Counter label='Clicks' />, { depth: 2 });
+const view = introspect(<Counter label='Clicks' />, { depth: 2 });
 
 const counter = view.find(CounterView);
 
@@ -885,7 +885,7 @@ assert.equal(updated.props.count, 1);
 Below the selected depth, a class component is still just a leaf.
 
 ```tsx
-const view = reflect(<Toolbar />, { depth: 1 });
+const view = introspect(<Toolbar />, { depth: 1 });
 
 const legacyButton = view.find(LegacyButton);
 
@@ -896,7 +896,7 @@ assert.equal(legacyButton.renderedChildren.status, 'notRendered');
 
 ### Error boundaries
 
-Reflect supports error boundaries as real component boundaries.
+React Introspect supports error boundaries as real component boundaries.
 
 ```tsx
 class Boundary extends React.Component<React.PropsWithChildren, { failed: boolean; }> {
@@ -915,7 +915,7 @@ class Boundary extends React.Component<React.PropsWithChildren, { failed: boolea
     }
 }
 
-const view = reflect(
+const view = introspect(
     <Boundary>
         <Crashes />
     </Boundary>,
@@ -939,7 +939,7 @@ assert.equal(view.errors.length, 1);
 Uncaught errors stay inspectable on the view.
 
 ```tsx
-const view = reflect(<Crashes />);
+const view = introspect(<Crashes />);
 
 const error = view.errors.at(-1);
 
@@ -955,7 +955,7 @@ If a lazy component is not executed because of depth, it is just a component lea
 ```tsx
 const LazyDetails = React.lazy(loadDetails);
 
-const view = reflect(<Page />, { depth: 1 });
+const view = introspect(<Page />, { depth: 1 });
 
 const details = view.find(LazyDetails);
 
@@ -963,10 +963,10 @@ assert.ok(details);
 assert.equal(details.renderedChildren.status, 'notRendered');
 ```
 
-If Reflect needs to execute a lazy component, wait for it through Suspense.
+If React Introspect needs to execute a lazy component, wait for it through Suspense.
 
 ```tsx
-const view = reflect(<PageWithSuspense />, {
+const view = introspect(<PageWithSuspense />, {
     depth: 2
 });
 
@@ -990,7 +990,7 @@ const Profile = () => {
     return <UserCard user={user} />;
 };
 
-const view = reflect(<Profile />);
+const view = introspect(<Profile />);
 
 await view.waitForIdle();
 
@@ -1009,7 +1009,7 @@ const userPromise = new Promise<User>((resolve) => {
     resolveUser = resolve;
 });
 
-const view = reflect(<Profile userPromise={userPromise} />);
+const view = introspect(<Profile userPromise={userPromise} />);
 
 assert.equal(view.findAll(Loading).length, 1);
 
@@ -1027,7 +1027,7 @@ assert.equal(card.props.user.name, 'Ada');
 
 Async components are server-style React.
 
-Reflect treats them like Suspense work.
+React Introspect treats them like Suspense work.
 
 ```tsx
 async function Profile(props: { id: string; }) {
@@ -1036,7 +1036,7 @@ async function Profile(props: { id: string; }) {
     return <UserCard user={user} />;
 }
 
-const view = reflect(<Profile id='1' />);
+const view = introspect(<Profile id='1' />);
 
 await view.waitForIdle();
 
@@ -1046,16 +1046,16 @@ assert.ok(card);
 assert.equal(card.props.user.id, '1');
 ```
 
-If the React version or runtime does not support async components here, Reflect should fail with a clear unsupported error.
+If the React version or runtime does not support async components here, React Introspect should fail with a clear unsupported error.
 
 ### View transitions
 
-Reflect does not run browser view transitions.
+React Introspect does not run browser view transitions.
 
 It can still test the render surface around React's transition components.
 
 ```tsx
-const view = reflect(<Gallery />);
+const view = introspect(<Gallery />);
 
 const thumbnail = view.find(Thumbnail);
 
@@ -1072,10 +1072,10 @@ Use browser tests for animation and CSS transition behavior.
 
 ### `<Activity />`
 
-When the React version supports `Activity`, Reflect treats it as a React wrapper.
+When the React version supports `Activity`, React Introspect treats it as a React wrapper.
 
 ```tsx
-const view = reflect(<SettingsPage />);
+const view = introspect(<SettingsPage />);
 
 const activity = view.find(React.Activity);
 
@@ -1095,7 +1095,7 @@ assert.equal(panel.visibility, 'hidden');
 
 ### `cache` and `cacheSignal`
 
-Reflect uses a fresh React root per view.
+React Introspect uses a fresh React root per view.
 
 That keeps cache state local to the test.
 
@@ -1110,7 +1110,7 @@ const Profile = (props: { id: string; }) => {
     return <UserCard user={user} />;
 };
 
-const view = reflect(<Profile id='1' />);
+const view = introspect(<Profile id='1' />);
 
 await view.waitForIdle();
 
@@ -1133,7 +1133,7 @@ assert.equal(requestWasAborted, true);
 Use `idPrefix` for real React ids with a stable prefix.
 
 ```tsx
-const view = reflect(<SignupForm />, {
+const view = introspect(<SignupForm />, {
     idPrefix: 'signup-'
 });
 
@@ -1146,12 +1146,12 @@ assert.ok(email);
 assert.match(email.props.id, /^signup-/);
 ```
 
-Use `idGenerator` when you want nice deterministic ids in Reflect output.
+Use `idGenerator` when you want nice deterministic ids in React Introspect output.
 
 ```tsx
 const ids = [ 'field-a', 'field-b' ];
 
-const view = reflect(<SignupForm />, {
+const view = introspect(<SignupForm />, {
     idGenerator() {
         return ids.shift() ?? 'field-extra';
     }
@@ -1168,13 +1168,13 @@ assert.equal(secondInput.props.id, 'field-b');
 
 ### Use without JSX
 
-Reflect accepts normal React elements. JSX is optional.
+React Introspect accepts normal React elements. JSX is optional.
 
 ```ts
 import React from 'react';
-import { reflect } from 'react-reflect';
+import { introspect } from 'react-introspect';
 
-const view = reflect(
+const view = introspect(
     React.createElement(Menu, {
         selectedId: 'settings'
     })
@@ -1188,7 +1188,7 @@ assert.equal(list.props.selectedId, 'settings');
 
 ## Unsupported React Concepts
 
-Reflect should fail loudly for these until support is designed.
+React Introspect should fail loudly for these until support is designed.
 
 ### Portals
 
@@ -1202,7 +1202,7 @@ const Modal = () => {
 };
 
 assert.throws(() => {
-    reflect(<Modal />);
+    introspect(<Modal />);
 }, /portal/i);
 ```
 
@@ -1218,14 +1218,14 @@ Executing an unresolved lazy root needs Suspense.
 const LazyPage = React.lazy(loadPage);
 
 assert.throws(() => {
-    reflect(<LazyPage />);
+    introspect(<LazyPage />);
 }, /suspense|lazy/i);
 ```
 
 Wrap it when you want to test the loading and loaded states.
 
 ```tsx
-const view = reflect(
+const view = introspect(
     <React.Suspense fallback={<Spinner />}>
         <LazyPage />
     </React.Suspense>
@@ -1242,7 +1242,7 @@ assert.equal(view.findAll(Spinner).length, 1);
 
 Use it when you want to test what a user can see or do.
 
-React Reflect is for smaller unit tests where the component contract is:
+React Introspect is for smaller unit tests where the component contract is:
 
 - rendered child components
 - props passed to them
@@ -1256,20 +1256,20 @@ React Reflect is for smaller unit tests where the component contract is:
 
 It also tends to push tests toward host output.
 
-React Reflect is shallow by default and component-first.
+React Introspect is shallow by default and component-first.
 
 ### `test-renderer`
 
 [`test-renderer`](https://github.com/mdjastrzebski/test-renderer) is useful for host elements.
 
-React Reflect also inspects intermediate component nodes.
+React Introspect also inspects intermediate component nodes.
 
 ## FAQ
 
 <details>
 <summary>Why does <code>find()</code> not throw?</summary>
 
-Reflect inspects.
+React Introspect inspects.
 
 Your assertion library asserts.
 
@@ -1280,7 +1280,7 @@ assert.ok(button);
 assert.equal(button.props.label, 'Save');
 ```
 
-This keeps Reflect useful with any assertion style.
+This keeps Introspection useful with any assertion style.
 
 </details>
 
@@ -1306,44 +1306,44 @@ A Maybe-like node makes `props.label` hard to type. It would need to return `str
 
 No.
 
-Reflect only collects React diagnostics it can attribute to Reflect-owned work.
+React Introspect only collects React diagnostics it can attribute to Introspection-owned work.
 
 Normal app logs still pass through.
 
-If a warning looks like React output but cannot be attributed, Reflect throws so the attribution can be fixed instead of silently hiding it.
+If a warning looks like React output but cannot be attributed, React Introspect throws so the attribution can be fixed instead of silently hiding it.
 
 </details>
 
 <details>
-<summary>Why is <code>reflect()</code> not async?</summary>
+<summary>Why is <code>introspect()</code> not async?</summary>
 
 Most unit tests do not suspend.
 
-`reflect()` returns the first committed view synchronously.
+`introspect()` returns the first committed view synchronously.
 
 If React work is async, wait on the view:
 
 ```tsx
-const view = reflect(<Profile userPromise={promise} />);
+const view = introspect(<Profile userPromise={promise} />);
 
 await view.waitForIdle();
 ```
 
-This avoids `await reflect(...)` in thousands of simple tests.
+This avoids `await introspect(...)` in thousands of simple tests.
 
 </details>
 
 <details>
-<summary>How does <code>use(promise)</code> work with sync <code>reflect()</code>?</summary>
+<summary>How does <code>use(promise)</code> work with sync <code>introspect()</code>?</summary>
 
 If a component suspends, React commits the nearest fallback if one exists.
 
-Reflect publishes only committed snapshots.
+React Introspect publishes only committed snapshots.
 
 When the promise resolves, React schedules another render.
 
 ```tsx
-const view = reflect(<Profile userPromise={promise} />);
+const view = introspect(<Profile userPromise={promise} />);
 
 await view.waitForNextRender();
 ```
@@ -1353,24 +1353,24 @@ No partial suspended tree is exposed.
 </details>
 
 <details>
-<summary>Why is <code>idGenerator</code> only applied to Reflect output?</summary>
+<summary>Why is <code>idGenerator</code> only applied to React Introspect output?</summary>
 
 React owns `useId`.
 
-Reflect does not monkey patch React and does not replace the dispatcher.
+React Introspect does not monkey patch React and does not replace the dispatcher.
 
-So `idGenerator` maps React-generated ids inside Reflect snapshots after commit. The component itself still saw React's real id during render.
+So `idGenerator` maps React-generated ids inside React Introspect snapshots after commit. The component itself still saw React's real id during render.
 
 </details>
 
 <details>
-<summary>Does Reflect replace browser tests?</summary>
+<summary>Does Introspection replace browser tests?</summary>
 
 No.
 
 Use browser tests for layout, real focus behavior, pointer events, CSS, animations, and view transitions.
 
-Use Reflect for component contracts.
+Use React Introspect for component contracts.
 
 </details>
 

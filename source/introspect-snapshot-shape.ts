@@ -5,7 +5,7 @@ import type {
     SnapshotNodeKind,
     SnapshotProps,
     SnapshotSourceElement
-} from './reflect-snapshot-contract.ts';
+} from './introspect-snapshot-contract.ts';
 
 const reactWrapperNames = new Map<unknown, string>([
     [ Symbol.for('react.activity'), 'Activity' ],

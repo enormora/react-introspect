@@ -1,8 +1,8 @@
 import type React from 'react';
-import type { ReflectIdNormalization } from './reflect-id-normalization.ts';
-import type { ReflectError, ReflectNotRenderedReason } from './reflect-public-types.ts';
+import type { IntrospectionIdNormalization } from './introspect-id-normalization.ts';
+import type { IntrospectionError, IntrospectionNotRenderedReason } from './introspect-public-types.ts';
 
-export type ReflectSnapshot = {
+export type IntrospectionSnapshot = {
     readonly nodes: readonly SnapshotNode[];
     readonly renderCount: number;
     readonly root: SnapshotNode | undefined;
@@ -21,10 +21,10 @@ export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | Sna
 type SnapshotSourceElementBase = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly children: readonly SnapshotSourceNode[];
-    readonly error: ReflectError | undefined;
+    readonly error: IntrospectionError | undefined;
     readonly key: string | null;
     readonly props: SnapshotProps;
-    readonly renderedReason: ReflectNotRenderedReason | undefined;
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly type: unknown;
     readonly visibility: SnapshotVisibility;
 };
@@ -61,7 +61,7 @@ type SnapshotSourceText = {
 
 export type SnapshotNode = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
-    readonly error: ReflectError | undefined;
+    readonly error: IntrospectionError | undefined;
     readonly givenChildren: readonly SnapshotNode[];
     readonly id: number;
     readonly key: string | null;
@@ -71,7 +71,7 @@ export type SnapshotNode = {
     readonly path: string;
     readonly props: SnapshotProps;
     readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: ReflectNotRenderedReason | undefined;
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly textContent: string;
     readonly type: unknown;
     readonly visibility: SnapshotVisibility;
@@ -87,7 +87,7 @@ export type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: num
 
 export type SnapshotNodeInput = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
-    readonly error: ReflectError | undefined;
+    readonly error: IntrospectionError | undefined;
     readonly givenChildren: readonly SnapshotNode[];
     readonly id: number;
     readonly key: string | null;
@@ -97,7 +97,7 @@ export type SnapshotNodeInput = {
     readonly path: string;
     readonly props: SnapshotProps;
     readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: ReflectNotRenderedReason | undefined;
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly textContent: string;
     readonly type: unknown;
     readonly visibility: SnapshotVisibility;
@@ -105,7 +105,7 @@ export type SnapshotNodeInput = {
 
 export type SnapshotNodeRequest = {
     readonly build: SnapshotBuild;
-    readonly idNormalization: ReflectIdNormalization;
+    readonly idNormalization: IntrospectionIdNormalization;
     readonly index: number;
     readonly inheritedVisibility: SnapshotVisibility;
     readonly node: unknown;
@@ -124,7 +124,7 @@ export type SourceElementNodeRequest = SnapshotNodeRequest & {
 export type ChildSnapshotsRequest = {
     readonly build: SnapshotBuild;
     readonly children: unknown;
-    readonly idNormalization: ReflectIdNormalization;
+    readonly idNormalization: IntrospectionIdNormalization;
     readonly inheritedVisibility: SnapshotVisibility;
     readonly parentId: number | undefined;
     readonly parentPath: string;
@@ -133,7 +133,7 @@ export type ChildSnapshotsRequest = {
 export type SourceChildSnapshotsRequest = {
     readonly build: SnapshotBuild;
     readonly children: readonly SnapshotSourceNode[];
-    readonly idNormalization: ReflectIdNormalization;
+    readonly idNormalization: IntrospectionIdNormalization;
     readonly inheritedVisibility: SnapshotVisibility;
     readonly parentId: number | undefined;
     readonly parentPath: string;
@@ -146,7 +146,7 @@ export type SourceSnapshotNodeRequest = SnapshotNodeRequest & {
 export type SourceElementChildrenRequest = {
     readonly build: SnapshotBuild;
     readonly element: SnapshotSourceElement;
-    readonly idNormalization: ReflectIdNormalization;
+    readonly idNormalization: IntrospectionIdNormalization;
     readonly inheritedVisibility: SnapshotVisibility;
     readonly parentId: number;
     readonly parentPath: string;
@@ -168,11 +168,11 @@ export type ChildSnapshotsResult = {
 
 export type ElementChildrenState = {
     readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: ReflectNotRenderedReason | undefined;
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly textContent: string;
 };
 
-export function createEmptyReflectSnapshot(renderCount: number): ReflectSnapshot {
+export function createEmptyIntrospectionSnapshot(renderCount: number): IntrospectionSnapshot {
     return Object.freeze({
         nodes: Object.freeze([]),
         renderCount,

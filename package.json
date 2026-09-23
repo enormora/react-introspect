@@ -1,7 +1,7 @@
 {
-    "name": "react-reflect",
+    "name": "react-introspect",
     "version": "0.0.0-dev",
-    "description": "Host-agnostic React component reflection for unit tests",
+    "description": "Host-agnostic React component introspection for unit tests",
     "keywords": [
         "react",
         "test",
@@ -9,13 +9,13 @@
         "components",
         "shallow-rendering"
     ],
-    "homepage": "https://github.com/enormora/react-reflect#readme",
+    "homepage": "https://github.com/enormora/react-introspect#readme",
     "bugs": {
-        "url": "https://github.com/enormora/react-reflect/issues"
+        "url": "https://github.com/enormora/react-introspect/issues"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/enormora/react-reflect.git"
+        "url": "git+https://github.com/enormora/react-introspect.git"
     },
     "license": "MIT",
     "author": "Mathias Schreck <schreck.mathias@gmail.com>",

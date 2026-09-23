@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { ReflectSnapshot, SnapshotNode } from './reflect-snapshot-contract.ts';
-import { reflect } from './react-reflect.entry-point.ts';
+import type { IntrospectionSnapshot, SnapshotNode } from './introspect-snapshot-contract.ts';
+import { introspect } from './react-introspect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -102,8 +102,10 @@ function createMixedTree(): React.ReactElement {
     );
 }
 
-function createMixedSnapshot(): ReflectSnapshot {
-    const view = reflect(createMixedTree(), { depth: 0 }) as unknown as { readonly currentSnapshot: ReflectSnapshot; };
+function createMixedSnapshot(): IntrospectionSnapshot {
+    const view = introspect(createMixedTree(), { depth: 0 }) as unknown as {
+        readonly currentSnapshot: IntrospectionSnapshot;
+    };
 
     return view.currentSnapshot;
 }
@@ -130,7 +132,7 @@ function assertSnapshotShape(scope: EqualScope, nodes: readonly SnapshotNode[]):
 }
 
 function assertGivenAndRenderedChildren(scope: EqualScope): void {
-    const view = reflect(createMixedTree(), { depth: 0 });
+    const view = introspect(createMixedTree(), { depth: 0 });
     const section = requireValue(view.find('section'));
     const widget = requireValue(view.find(Widget));
 
@@ -144,7 +146,7 @@ function assertGivenAndRenderedChildren(scope: EqualScope): void {
 }
 
 function assertSelectorSemantics(scope: EqualScope): void {
-    const view = reflect(createMixedTree(), { depth: 0 });
+    const view = introspect(createMixedTree(), { depth: 0 });
     const section = requireValue(view.find('section'));
 
     scope.assert.equal(view.find({ key: 'host' })?.path, section.path);
@@ -190,8 +192,8 @@ function assertSelectorSemantics(scope: EqualScope): void {
     );
 }
 
-function assertReflectList(scope: EqualScope): void {
-    const view = reflect(createMixedTree(), { depth: 0 });
+function assertIntrospectionList(scope: EqualScope): void {
+    const view = introspect(createMixedTree(), { depth: 0 });
     const renderedText = view.findAll('#text');
 
     scope.assert.equal(renderedText.length, 2);
@@ -209,7 +211,7 @@ function assertReflectList(scope: EqualScope): void {
 }
 
 function assertAcyclicPublicOutput(scope: EqualScope): void {
-    const view = reflect(createMixedTree(), { depth: 0 });
+    const view = introspect(createMixedTree(), { depth: 0 });
     const serializedRoot = JSON.stringify(view.root);
 
     scope.assert.equal(typeof serializedRoot, 'string');
@@ -235,8 +237,8 @@ export const testNode = suite('snapshot tree model', [
 
         return scope.assert.collect();
     }),
-    test('provides stable list behavior over matching nodes', function verifyReflectList(scope) {
-        assertReflectList(scope);
+    test('provides stable list behavior over matching nodes', function verifyIntrospectionList(scope) {
+        assertIntrospectionList(scope);
 
         return scope.assert.collect();
     }),

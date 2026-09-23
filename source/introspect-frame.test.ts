@@ -1,9 +1,13 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { isReflectRenderError, reflectComponentHostType, throwReflectRenderError } from './reflect-frame-contract.ts';
-import { createReflectRenderElement } from './reflect-frame.ts';
-import type { ReflectNode } from './reflect-public-types.ts';
-import { reflect } from './react-reflect.entry-point.ts';
+import {
+    isIntrospectionRenderError,
+    introspectionComponentHostType,
+    throwIntrospectionRenderError
+} from './introspect-frame-contract.ts';
+import { createIntrospectionRenderElement } from './introspect-frame.ts';
+import type { IntrospectionNode } from './introspect-public-types.ts';
+import { introspect } from './react-introspect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -193,13 +197,13 @@ function assertThrows(scope: EqualScope, action: () => void, message: string): v
 
 function catchThrown(value: unknown): void {
     try {
-        throwReflectRenderError(value);
+        throwIntrospectionRenderError(value);
     } catch {
         Object.freeze({});
     }
 }
 
-function assertNotRendered(scope: EqualScope, node: ReflectNode): void {
+function assertNotRendered(scope: EqualScope, node: IntrospectionNode): void {
     scope.assert.deepEqual(node.renderedChildren, {
         reason: 'depth',
         status: 'notRendered'
@@ -209,7 +213,7 @@ function assertNotRendered(scope: EqualScope, node: ReflectNode): void {
 export const testNode = suite('execution shallow function components', [
     test('keeps child components visible but unexecuted at depth 1', function verifyDepthOne(scope) {
         const { Button, counts, Parent, Shell } = createDepthComponents();
-        const view = reflect(React.createElement(Parent), {
+        const view = introspect(React.createElement(Parent), {
             strictMode: false
         });
         const shell = requireValue(view.find(Shell));
@@ -225,7 +229,7 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('executes one deeper component at depth 2', function verifyDepthTwo(scope) {
         const { Button, counts, Parent, Shell } = createDepthComponents();
-        const view = reflect(React.createElement(Parent), {
+        const view = introspect(React.createElement(Parent), {
             depth: 2,
             strictMode: false
         });
@@ -242,7 +246,7 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('executes all function boundaries at full depth', function verifyFullDepth(scope) {
         const { counts, Parent } = createDepthComponents();
-        const view = reflect(React.createElement(Parent), {
+        const view = introspect(React.createElement(Parent), {
             depth: 'full',
             strictMode: false
         });
@@ -255,7 +259,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('keeps hooks legal and updates through event props', function verifyHookUpdates(scope) {
-        const view = reflect(React.createElement(Counter), {
+        const view = introspect(React.createElement(Counter), {
             strictMode: false
         });
         const button = requireValue(view.find('button'));
@@ -268,7 +272,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('transforms context providers and consumers', function verifyContext(scope) {
-        const view = reflect(React.createElement(ContextRoot), {
+        const view = introspect(React.createElement(ContextRoot), {
             depth: 'full',
             strictMode: false
         });
@@ -278,7 +282,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('executes memo and forwardRef components', function verifyReactWrappers(scope) {
-        const view = reflect(React.createElement(Wrapper), {
+        const view = introspect(React.createElement(Wrapper), {
             depth: 'full',
             strictMode: false
         });
@@ -290,7 +294,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('normalizes non-string primitive output', function verifyPrimitiveOutput(scope) {
-        const view = reflect(React.createElement(BigIntValue), {
+        const view = introspect(React.createElement(BigIntValue), {
             strictMode: false
         });
 
@@ -299,7 +303,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('normalizes rich given children on component leaves', function verifyGivenChildEdges(scope) {
-        const view = reflect(React.createElement(GivenChildrenRoot), {
+        const view = introspect(React.createElement(GivenChildrenRoot), {
             strictMode: false
         });
         const leaf = requireValue(view.find(GivenLeaf));
@@ -328,17 +332,17 @@ export const testNode = suite('execution shallow function components', [
         assertThrows(
             scope,
             function renderInvalidElement() {
-                createReflectRenderElement(invalidElement, 1);
+                createIntrospectionRenderElement(invalidElement, 1);
             },
-            'Reflect expected React element props to be an object.'
+            'Introspection expected React element props to be an object.'
         );
 
         return scope.assert.collect();
     }),
     test(
-        'marks user host nodes that collide with Reflect internals unsupported',
+        'marks user host nodes that collide with Introspection internals unsupported',
         function verifyInternalHostCollision(scope) {
-            const view = reflect(React.createElement(reflectComponentHostType), {
+            const view = introspect(React.createElement(introspectionComponentHostType), {
                 depth: 'full',
                 strictMode: false
             });
@@ -354,7 +358,7 @@ export const testNode = suite('execution shallow function components', [
         }
     ),
     test('records unsupported memo payloads as opaque output', function verifyUnsupportedMemoPayload(scope) {
-        const view = reflect(React.createElement(OpaqueMemo as never), {
+        const view = introspect(React.createElement(OpaqueMemo as never), {
             strictMode: false
         });
 
@@ -364,7 +368,7 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('transforms Suspense fallback and fulfilled lazy frames', function verifyAsyncElementShapes(scope) {
         const LazyLabel = createFulfilledLazyType(PlainLabel);
-        const suspense = createReflectRenderElement(
+        const suspense = createIntrospectionRenderElement(
             React.createElement(
                 React.Suspense,
                 { fallback: React.createElement('em', null, 'loading') },
@@ -373,7 +377,7 @@ export const testNode = suite('execution shallow function components', [
             'full'
         );
         const suspenseProps = suspense.props as Readonly<Record<PropertyKey, unknown>>;
-        const lazyView = reflect(React.createElement(LazyLabel, { label: 'lazy' }), {
+        const lazyView = introspect(React.createElement(LazyLabel, { label: 'lazy' }), {
             depth: 'full',
             strictMode: false
         });
@@ -399,7 +403,7 @@ export const testNode = suite('execution shallow function components', [
             },
             [lazyPayloadKey]: Object.freeze({})
         } as unknown as React.FC<ButtonProps>;
-        const view = reflect(React.createElement(VolatileLazy, { label: 'volatile' }), {
+        const view = introspect(React.createElement(VolatileLazy, { label: 'volatile' }), {
             depth: 'full',
             strictMode: false
         });
@@ -421,7 +425,7 @@ export const testNode = suite('execution shallow function components', [
             return thenable as never;
         }
 
-        const view = reflect(React.createElement(ThenableLabel), {
+        const view = introspect(React.createElement(ThenableLabel), {
             depth: 'full',
             strictMode: false,
             warningMode: 'capture'
@@ -431,21 +435,24 @@ export const testNode = suite('execution shallow function components', [
 
         return scope.assert.collect();
     }),
-    test('does not mark functions or thenables as Reflect render errors', function verifyRenderErrorMarker(scope) {
-        const value = function value(): void {
-            return undefined;
-        };
-        const thenable = {
-            then() {
+    test(
+        'does not mark functions or thenables as Introspection render errors',
+        function verifyRenderErrorMarker(scope) {
+            const value = function value(): void {
                 return undefined;
-            }
-        };
+            };
+            const thenable = {
+                then() {
+                    return undefined;
+                }
+            };
 
-        catchThrown(thenable);
+            catchThrown(thenable);
 
-        scope.assert.equal(isReflectRenderError(value), false);
-        scope.assert.equal(isReflectRenderError(thenable), false);
+            scope.assert.equal(isIntrospectionRenderError(value), false);
+            scope.assert.equal(isIntrospectionRenderError(thenable), false);
 
-        return scope.assert.collect();
-    })
+            return scope.assert.collect();
+        }
+    )
 ]);

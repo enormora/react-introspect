@@ -1,7 +1,7 @@
-import type { RuntimeReflectList, RuntimeReflectNode } from './reflect-runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from './reflect-selector.ts';
+import type { RuntimeIntrospectionList, RuntimeIntrospectionNode } from './introspect-runtime-types.ts';
+import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
 
-export function createReflectList(nodes: readonly RuntimeReflectNode[]): RuntimeReflectList {
+export function createIntrospectionList(nodes: readonly RuntimeIntrospectionNode[]): RuntimeIntrospectionList {
     const listNodes = Object.freeze(nodes.slice());
 
     return Object.freeze({
@@ -23,7 +23,7 @@ export function createReflectList(nodes: readonly RuntimeReflectNode[]): Runtime
         filterBy(selector: unknown) {
             const normalizedSelector = toSelector(selector);
 
-            return createReflectList(listNodes.filter(function isMatch(node) {
+            return createIntrospectionList(listNodes.filter(function isMatch(node) {
                 return nodeMatchesSelector(node, normalizedSelector);
             }));
         }

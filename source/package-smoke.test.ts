@@ -28,7 +28,7 @@ type PackageManifest = {
 type PackageExports = {
     readonly createFakeRefNode: () => unknown;
     readonly matchRefs: () => unknown;
-    readonly reflect: (element: unknown) => SmokeView;
+    readonly introspect: (element: unknown) => SmokeView;
 };
 
 type ReactModule = {
@@ -45,7 +45,7 @@ const packageFolder = path.join(projectFolder, 'target/package-smoke');
 const consumerFolder = path.join(projectFolder, 'target/package-smoke-consumer');
 const jsonIndentation = 4;
 const consumerPackageJson = {
-    name: 'react-reflect-smoke-consumer',
+    name: 'react-introspect-smoke-consumer',
     private: true,
     type: 'module'
 };
@@ -81,32 +81,32 @@ async function readPackageManifest(): Promise<PackageManifest> {
 async function assertManifest(scope: EqualScope): Promise<void> {
     const manifest = await readPackageManifest();
 
-    scope.assert.equal(manifest.name, 'react-reflect');
+    scope.assert.equal(manifest.name, 'react-introspect');
     scope.assert.equal(manifest.type, 'module');
-    scope.assert.equal(manifest.bugs.url, 'https://github.com/enormora/react-reflect/issues');
-    scope.assert.equal(manifest.homepage, 'https://github.com/enormora/react-reflect#readme');
-    scope.assert.equal(manifest.exports['.'].import, './react-reflect.entry-point.js');
-    scope.assert.equal(manifest.exports['.'].types, './react-reflect.entry-point.d.ts');
+    scope.assert.equal(manifest.bugs.url, 'https://github.com/enormora/react-introspect/issues');
+    scope.assert.equal(manifest.homepage, 'https://github.com/enormora/react-introspect#readme');
+    scope.assert.equal(manifest.exports['.'].import, './react-introspect.entry-point.js');
+    scope.assert.equal(manifest.exports['.'].types, './react-introspect.entry-point.d.ts');
 }
 
 async function assertRuntimeImport(scope: EqualScope): Promise<void> {
     const packageExports = await import(
-        pathToFileURL(path.join(packageFolder, 'react-reflect.entry-point.js')).href
+        pathToFileURL(path.join(packageFolder, 'react-introspect.entry-point.js')).href
     ) as PackageExports;
     const React = await import('react') as ReactModule;
 
     scope.assert.equal(typeof packageExports.createFakeRefNode, 'function');
     scope.assert.equal(typeof packageExports.matchRefs, 'function');
-    scope.assert.equal(typeof packageExports.reflect, 'function');
+    scope.assert.equal(typeof packageExports.introspect, 'function');
 
-    const view = packageExports.reflect(React.createElement('main', null, 'Smoke'));
+    const view = packageExports.introspect(React.createElement('main', null, 'Smoke'));
 
     scope.assert.equal(view.find('main')?.textContent, 'Smoke');
 }
 
 async function writeConsumerProject(): Promise<void> {
     const nodeModulesFolder = path.join(consumerFolder, 'node_modules');
-    const packageLink = path.join(nodeModulesFolder, 'react-reflect');
+    const packageLink = path.join(nodeModulesFolder, 'react-introspect');
 
     await fs.rm(consumerFolder, { force: true, recursive: true });
     await fs.mkdir(nodeModulesFolder, { recursive: true });
@@ -138,14 +138,14 @@ async function writeConsumerProject(): Promise<void> {
         path.join(consumerFolder, 'smoke.ts'),
         [
             "import React from 'react';",
-            "import { createFakeRefNode, matchRefs, reflect } from 'react-reflect';",
-            "import type { ReflectView } from 'react-reflect';",
+            "import { createFakeRefNode, matchRefs, introspect } from 'react-introspect';",
+            "import type { IntrospectionView } from 'react-introspect';",
             '',
             'function Button(props: { readonly label: string; readonly onSave: () => void; }): React.ReactNode {',
             "    return React.createElement('button', { onClick: props.onSave }, props.label);",
             '}',
             '',
-            'const view: ReflectView = reflect(',
+            'const view: IntrospectionView = introspect(',
             "    React.createElement(Button, { label: 'Save', onSave() {} }),",
             '    { depth: 2 }',
             ');',
@@ -165,7 +165,7 @@ async function packPackage(): Promise<void> {
 
     await runProjectCommand('packtory', [
         'pack',
-        'react-reflect',
+        'react-introspect',
         '--format',
         'folder',
         '--out',

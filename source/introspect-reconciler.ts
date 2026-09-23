@@ -1,8 +1,8 @@
 import * as timers from 'node:timers';
 import React from 'react';
 import createReconciler from 'react-reconciler';
-import type { ReflectDiagnostics } from './reflect-diagnostics.ts';
-import { isReflectRenderError } from './reflect-frame-contract.ts';
+import type { IntrospectionDiagnostics } from './introspect-diagnostics.ts';
+import { isIntrospectionRenderError } from './introspect-frame-contract.ts';
 import {
     appendChild,
     clearContainer,
@@ -14,39 +14,39 @@ import {
     hideInstance,
     hideTextInstance,
     insertBefore,
-    type ReflectHostContainer,
-    type ReflectHostInstance,
-    type ReflectHostProps,
-    type ReflectTextInstance,
+    type IntrospectionHostContainer,
+    type IntrospectionHostInstance,
+    type IntrospectionHostProps,
+    type IntrospectionTextInstance,
     removeChild as removeHostChild,
     toSnapshot,
     unhideInstance,
     unhideTextInstance,
     validateContainerRefs
-} from './reflect-host-tree.ts';
-import type { ReflectRefs } from './reflect-public-types.ts';
+} from './introspect-host-tree.ts';
+import type { IntrospectionRefs } from './introspect-public-types.ts';
 import {
-    createEmptyReflectSnapshot,
-    type ReflectSnapshot
-} from './reflect-snapshot-contract.ts';
+    createEmptyIntrospectionSnapshot,
+    type IntrospectionSnapshot
+} from './introspect-snapshot-contract.ts';
 
 type Waiter = {
     readonly predicate: () => boolean;
     readonly resolve: () => void;
 };
 
-type ReflectReconcilerRootOptions = {
-    readonly diagnostics: ReflectDiagnostics;
+type IntrospectionReconcilerRootOptions = {
+    readonly diagnostics: IntrospectionDiagnostics;
     readonly element: React.ReactElement;
     readonly idGenerator: ((generatedId: string) => string) | undefined;
     readonly idPrefix: string;
-    readonly publish: (snapshot: ReflectSnapshot) => void;
-    readonly refs: ReflectRefs | undefined;
+    readonly publish: (snapshot: IntrospectionSnapshot) => void;
+    readonly refs: IntrospectionRefs | undefined;
     readonly strictMode: boolean;
     readonly waitTimeout: number;
 };
 
-export type ReflectReconcilerRoot = {
+export type IntrospectionReconcilerRoot = {
     readonly act: (action: () => unknown) => unknown;
     readonly unmount: () => void;
     readonly update: (element: React.ReactElement) => void;
@@ -75,7 +75,7 @@ function getDefaultEventPriority(): number {
     return defaultEventPriority;
 }
 
-function publishContainerSnapshot(container: ReflectHostContainer): void {
+function publishContainerSnapshot(container: IntrospectionHostContainer): void {
     container.publish(toSnapshot(container));
 }
 
@@ -83,7 +83,7 @@ function prepareForCommit(): null {
     return null;
 }
 
-const reflectReconcilerHostConfig = {
+const introspectionReconcilerHostConfig = {
     NotPendingTransition: null,
     HostTransitionContext: {
         _currentValue: null,
@@ -102,14 +102,14 @@ const reflectReconcilerHostConfig = {
     clearContainer,
     clearSuspenseBoundary: noop,
     commitMount: noop,
-    commitTextUpdate(instance: ReflectTextInstance, _oldText: string, newText: string) {
+    commitTextUpdate(instance: IntrospectionTextInstance, _oldText: string, newText: string) {
         instance.writeText(newText);
     },
     commitUpdate(
-        instance: ReflectHostInstance,
+        instance: IntrospectionHostInstance,
         _type: string,
-        _oldProps: ReflectHostProps,
-        newProps: ReflectHostProps
+        _oldProps: IntrospectionHostProps,
+        newProps: IntrospectionHostProps
     ) {
         instance.writeProps(newProps);
         instance.refreshPublicInstance(newProps);
@@ -120,7 +120,7 @@ const reflectReconcilerHostConfig = {
     finalizeInitialChildren: alwaysFalse,
     getChildHostContext,
     getCurrentUpdatePriority: getDefaultEventPriority,
-    getPublicInstance(instance: ReflectHostInstance) {
+    getPublicInstance(instance: IntrospectionHostInstance) {
         return instance.readPublicInstance();
     },
     getRootHostContext,
@@ -166,11 +166,11 @@ const reflectReconcilerHostConfig = {
     waitForCommitToBeReady: returnNull
 };
 
-const renderer = createReconciler(reflectReconcilerHostConfig);
+const renderer = createReconciler(introspectionReconcilerHostConfig);
 
 function createReconcilerContainer(
-    container: ReflectHostContainer,
-    diagnostics: ReflectDiagnostics,
+    container: IntrospectionHostContainer,
+    diagnostics: IntrospectionDiagnostics,
     strictMode: boolean
 ): Record<string, unknown> {
     return renderer.createContainer(
@@ -209,21 +209,21 @@ function actNow(action: () => unknown): unknown {
     return results.values().next().value;
 }
 
-type ReflectReconcilerState = {
+type IntrospectionReconcilerState = {
     readonly readRenderCount: () => number;
     readonly readWaiters: () => readonly Waiter[];
     readonly writeRenderCount: (count: number) => void;
     readonly writeWaiters: (waiters: readonly Waiter[]) => void;
 };
 
-type ReflectReconcilerSession = {
-    readonly container: ReflectHostContainer;
-    readonly options: ReflectReconcilerRootOptions;
+type IntrospectionReconcilerSession = {
+    readonly container: IntrospectionHostContainer;
+    readonly options: IntrospectionReconcilerRootOptions;
     readonly root: Readonly<Record<string, unknown>>;
-    readonly state: ReflectReconcilerState;
+    readonly state: IntrospectionReconcilerState;
 };
 
-function settleWaiters(sessionState: ReflectReconcilerState): void {
+function settleWaiters(sessionState: IntrospectionReconcilerState): void {
     const settledWaiters = sessionState.readWaiters().filter(function isSettled(waiter) {
         return waiter.predicate();
     });
@@ -240,9 +240,9 @@ function settleWaiters(sessionState: ReflectReconcilerState): void {
 }
 
 function createSessionContainer(
-    options: ReflectReconcilerRootOptions,
-    state: ReflectReconcilerState
-): ReflectHostContainer {
+    options: IntrospectionReconcilerRootOptions,
+    state: IntrospectionReconcilerState
+): IntrospectionHostContainer {
     return createHostContainer(
         function publishSnapshot(snapshot) {
             state.writeRenderCount(snapshot.renderCount);
@@ -260,7 +260,9 @@ function createSessionContainer(
     );
 }
 
-function createReflectReconcilerSession(options: ReflectReconcilerRootOptions): ReflectReconcilerSession {
+function createIntrospectionReconcilerSession(
+    options: IntrospectionReconcilerRootOptions
+): IntrospectionReconcilerSession {
     let renderCount = 0;
     let waiters: readonly Waiter[] = [];
     const state = Object.freeze({
@@ -288,7 +290,7 @@ function createReflectReconcilerSession(options: ReflectReconcilerRootOptions): 
     });
 }
 
-function actSession(session: ReflectReconcilerSession, action: () => unknown): unknown {
+function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
     return session.options.diagnostics.run(function actWithDiagnostics() {
         return actNow(function runAction() {
             const result = action();
@@ -301,7 +303,7 @@ function actSession(session: ReflectReconcilerSession, action: () => unknown): u
     });
 }
 
-async function waitForIdleSession(session: ReflectReconcilerSession): Promise<void> {
+async function waitForIdleSession(session: IntrospectionReconcilerSession): Promise<void> {
     await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
         await Promise.resolve();
         renderer.flushPassiveEffects();
@@ -309,7 +311,7 @@ async function waitForIdleSession(session: ReflectReconcilerSession): Promise<vo
     });
 }
 
-async function waitForSession(session: ReflectReconcilerSession, predicate: () => boolean): Promise<void> {
+async function waitForSession(session: IntrospectionReconcilerSession, predicate: () => boolean): Promise<void> {
     if (session.options.diagnostics.run(predicate)) {
         return;
     }
@@ -335,24 +337,24 @@ async function waitForSession(session: ReflectReconcilerSession, predicate: () =
     }
 }
 
-function publishEmptySnapshot(session: ReflectReconcilerSession, renderCountBefore: number): void {
+function publishEmptySnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
     const errorRenderCount = Math.max(session.state.readRenderCount(), renderCountBefore + 1);
 
-    session.options.publish(createEmptyReflectSnapshot(errorRenderCount));
+    session.options.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
 }
 
-function publishEmptyErrorSnapshot(session: ReflectReconcilerSession, renderCountBefore: number): void {
+function publishEmptyErrorSnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
     session.container.writeMounted(false);
     session.container.writeChildren([]);
     publishEmptySnapshot(session, renderCountBefore);
 }
 
 function captureRenderError(
-    session: ReflectReconcilerSession,
+    session: IntrospectionReconcilerSession,
     error: unknown,
     renderCountBefore: number
 ): void {
-    if (!isReflectRenderError(error)) {
+    if (!isIntrospectionRenderError(error)) {
         throw error;
     }
 
@@ -360,7 +362,7 @@ function captureRenderError(
     session.options.diagnostics.recordUncaughtError(error);
 }
 
-function captureMissingInitialCommit(session: ReflectReconcilerSession, renderCountBefore: number): void {
+function captureMissingInitialCommit(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
     if (
         renderCountBefore > 0 ||
         session.state.readRenderCount() > renderCountBefore ||
@@ -369,7 +371,7 @@ function captureMissingInitialCommit(session: ReflectReconcilerSession, renderCo
         return;
     }
 
-    const message = 'React Reflect cannot commit a suspended root. ' +
+    const message = 'React Introspect cannot commit a suspended root. ' +
         'Wrap lazy, async, or promise-using roots in React.Suspense.';
 
     publishEmptyErrorSnapshot(session, renderCountBefore);
@@ -377,7 +379,7 @@ function captureMissingInitialCommit(session: ReflectReconcilerSession, renderCo
 }
 
 function updateRootElement(
-    session: ReflectReconcilerSession,
+    session: IntrospectionReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
     renderer.flushSyncFromReconciler(function updateContainer() {
@@ -386,7 +388,7 @@ function updateRootElement(
 }
 
 function renderRootElement(
-    session: ReflectReconcilerSession,
+    session: IntrospectionReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
     actNow(function renderElement() {
@@ -396,7 +398,7 @@ function renderRootElement(
 }
 
 function renderWithDiagnostics(
-    session: ReflectReconcilerSession,
+    session: IntrospectionReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
     const renderCountBefore = session.state.readRenderCount();
@@ -415,13 +417,13 @@ function renderWithDiagnostics(
     captureMissingInitialCommit(session, renderCountBefore);
 }
 
-function flushElement(session: ReflectReconcilerSession, element: Readonly<React.ReactElement> | null): void {
+function flushElement(session: IntrospectionReconcilerSession, element: Readonly<React.ReactElement> | null): void {
     session.options.diagnostics.run(function renderElementWithDiagnostics() {
         renderWithDiagnostics(session, element);
     });
 }
 
-async function waitForNextRenderSession(session: ReflectReconcilerSession): Promise<void> {
+async function waitForNextRenderSession(session: IntrospectionReconcilerSession): Promise<void> {
     const expectedRenderCount = session.state.readRenderCount() + 1;
 
     return waitForSession(session, function didRender() {
@@ -429,14 +431,16 @@ async function waitForNextRenderSession(session: ReflectReconcilerSession): Prom
     });
 }
 
-async function waitForRenderCountSession(session: ReflectReconcilerSession, count: number): Promise<void> {
+async function waitForRenderCountSession(session: IntrospectionReconcilerSession, count: number): Promise<void> {
     return waitForSession(session, function didRenderCount() {
         return session.state.readRenderCount() >= count;
     });
 }
 
-export function createReflectReconcilerRoot(options: ReflectReconcilerRootOptions): ReflectReconcilerRoot {
-    const session = createReflectReconcilerSession(options);
+export function createIntrospectionReconcilerRoot(
+    options: IntrospectionReconcilerRootOptions
+): IntrospectionReconcilerRoot {
+    const session = createIntrospectionReconcilerSession(options);
 
     flushElement(session, options.element);
 

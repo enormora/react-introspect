@@ -1,22 +1,22 @@
 import type React from 'react';
-import { createReflectDiagnostics } from './reflect-diagnostics.ts';
-import { createReflectRenderElement } from './reflect-frame.ts';
-import { createReflectList } from './reflect-list.ts';
-import { createReflectListLocator, createReflectLocator } from './reflect-locator.ts';
-import { createReflectNode, type SnapshotReader } from './reflect-node.ts';
-import { createReflectReconcilerRoot } from './reflect-reconciler.ts';
+import { createIntrospectionDiagnostics } from './introspect-diagnostics.ts';
+import { createIntrospectionRenderElement } from './introspect-frame.ts';
+import { createIntrospectionList } from './introspect-list.ts';
+import { createIntrospectionListLocator, createIntrospectionLocator } from './introspect-locator.ts';
+import { createIntrospectionNode, type SnapshotReader } from './introspect-node.ts';
+import { createIntrospectionReconcilerRoot } from './introspect-reconciler.ts';
 import type {
-    RuntimeReflectList,
-    RuntimeReflectNode,
-    RuntimeReflectOptions,
-    RuntimeReflectView
-} from './reflect-runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from './reflect-selector.ts';
+    RuntimeIntrospectionList,
+    RuntimeIntrospectionNode,
+    RuntimeIntrospectionOptions,
+    RuntimeIntrospectionView
+} from './introspect-runtime-types.ts';
+import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
 import {
-    createEmptyReflectSnapshot,
-    type ReflectSnapshot,
+    createEmptyIntrospectionSnapshot,
+    type IntrospectionSnapshot,
     type SnapshotNode
-} from './reflect-snapshot-contract.ts';
+} from './introspect-snapshot-contract.ts';
 
 const defaultWaitTimeout = 1000;
 const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
@@ -25,21 +25,21 @@ const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
     return function createIdPrefix() {
         nextIdPrefixIndex += 1;
 
-        return `react-reflect-${nextIdPrefixIndex}-`;
+        return `react-introspect-${nextIdPrefixIndex}-`;
     };
 })();
 
 function nodeList(
     reader: SnapshotReader,
-    snapshot: ReflectSnapshot,
+    snapshot: IntrospectionSnapshot,
     nodes: readonly SnapshotNode[]
-): RuntimeReflectList {
-    return createReflectList(nodes.map(function createNode(node) {
-        return createReflectNode(reader, snapshot, node);
+): RuntimeIntrospectionList {
+    return createIntrospectionList(nodes.map(function createNode(node) {
+        return createIntrospectionNode(reader, snapshot, node);
     }));
 }
 
-function snapshotTreeNodes(snapshot: ReflectSnapshot): readonly SnapshotNode[] {
+function snapshotTreeNodes(snapshot: IntrospectionSnapshot): readonly SnapshotNode[] {
     function collect(node: SnapshotNode): readonly SnapshotNode[] {
         return [
             node,
@@ -50,21 +50,21 @@ function snapshotTreeNodes(snapshot: ReflectSnapshot): readonly SnapshotNode[] {
     return snapshot.root === undefined ? Object.freeze([]) : collect(snapshot.root);
 }
 
-export function createReflectView(
+export function createIntrospectionView(
     element: React.ReactElement,
-    options: RuntimeReflectOptions = {}
-): RuntimeReflectView {
-    let currentSnapshot = createEmptyReflectSnapshot(0);
+    options: RuntimeIntrospectionOptions = {}
+): RuntimeIntrospectionView {
+    let currentSnapshot = createEmptyIntrospectionSnapshot(0);
     const depth = options.depth ?? 1;
     const idPrefix = options.idPrefix ?? createDefaultIdPrefix();
-    const diagnostics = createReflectDiagnostics({
+    const diagnostics = createIntrospectionDiagnostics({
         errorMode: options.errorMode ?? 'capture',
         warningMode: options.warningMode ?? 'throw'
     });
     const reconcilerRoot = diagnostics.run(function createRootWithDiagnostics() {
-        return createReflectReconcilerRoot({
+        return createIntrospectionReconcilerRoot({
             diagnostics,
-            element: createReflectRenderElement(element, depth),
+            element: createIntrospectionRenderElement(element, depth),
             idGenerator: options.idGenerator,
             idPrefix,
             publish(snapshot) {
@@ -84,26 +84,26 @@ export function createReflectView(
         }
     };
 
-    function rootNode(): RuntimeReflectNode | undefined {
+    function rootNode(): RuntimeIntrospectionNode | undefined {
         const { root } = currentSnapshot;
 
-        return root === undefined ? undefined : createReflectNode(state, currentSnapshot, root);
+        return root === undefined ? undefined : createIntrospectionNode(state, currentSnapshot, root);
     }
 
-    function findAll(selector: unknown): RuntimeReflectList {
+    function findAll(selector: unknown): RuntimeIntrospectionList {
         const normalizedSelector = toSelector(selector);
         const nodes = snapshotTreeNodes(currentSnapshot)
             .map(function createNode(node) {
-                return createReflectNode(state, currentSnapshot, node);
+                return createIntrospectionNode(state, currentSnapshot, node);
             })
             .filter(function isMatch(node) {
                 return nodeMatchesSelector(node, normalizedSelector);
             });
 
-        return createReflectList(nodes);
+        return createIntrospectionList(nodes);
     }
 
-    const view: RuntimeReflectView = Object.freeze({
+    const view: RuntimeIntrospectionView = Object.freeze({
         get currentSnapshot() {
             return currentSnapshot;
         },
@@ -120,7 +120,7 @@ export function createReflectView(
             const { root } = currentSnapshot;
 
             return root === undefined
-                ? createReflectList([])
+                ? createIntrospectionList([])
                 : nodeList(state, currentSnapshot, root.renderedChildren);
         },
         get root() {
@@ -140,16 +140,16 @@ export function createReflectView(
             return rootNode()?.formatTree() ?? '';
         },
         locate(selector: unknown) {
-            return createReflectLocator(view, selector);
+            return createIntrospectionLocator(view, selector);
         },
         locateAll(selector: unknown) {
-            return createReflectListLocator(view, selector);
+            return createIntrospectionListLocator(view, selector);
         },
         unmount() {
             reconcilerRoot.unmount();
         },
         update(nextElement: React.ReactElement) {
-            reconcilerRoot.update(createReflectRenderElement(nextElement, depth));
+            reconcilerRoot.update(createIntrospectionRenderElement(nextElement, depth));
         },
         async waitForIdle() {
             await reconcilerRoot.waitForIdle();

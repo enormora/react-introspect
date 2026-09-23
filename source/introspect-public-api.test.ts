@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { ReflectNode, ReflectView } from './reflect-public-types.ts';
-import { reflect } from './react-reflect.entry-point.ts';
+import type { IntrospectionNode, IntrospectionView } from './introspect-public-types.ts';
+import { introspect } from './react-introspect.entry-point.ts';
 
 type ButtonProps = {
     readonly disabled: boolean;
@@ -39,9 +39,9 @@ type EqualScope = {
     };
 };
 
-type HostView = ReflectView<HostSchema>;
+type HostView = IntrospectionView<HostSchema>;
 
-type HostButton = ReflectNode<HostSchema['button'], 'button', HostSchema>;
+type HostButton = IntrospectionNode<HostSchema['button'], 'button', HostSchema>;
 
 type UnsafeEventTarget = {
     readonly callProp: (property: PropertyKey) => unknown;
@@ -52,7 +52,7 @@ type PropCallState = {
     readonly hostView: HostView;
     readonly readClickValue: () => string;
     readonly readSaveCalls: () => number;
-    readonly view: ReflectView;
+    readonly view: IntrospectionView;
 };
 
 type ButtonIdentity = {
@@ -153,7 +153,7 @@ function assertHostView(
     scope: EqualScope,
     view: HostView,
     button: HostButton,
-    strong: ReflectNode
+    strong: IntrospectionNode
 ): void {
     scope.assert.equal(button.textContent, 'Save now');
     scope.assert.equal(strong.textContent, 'now');
@@ -196,7 +196,7 @@ function assertSelectorMisses(scope: EqualScope, view: HostView): void {
 }
 
 function createSelectorView(): HostView {
-    return reflect<HostSchema>(React.createElement(
+    return introspect<HostSchema>(React.createElement(
         'form',
         { id: 'settings' },
         React.createElement(
@@ -212,8 +212,8 @@ function createSelectorView(): HostView {
     ));
 }
 
-function createEdgeView(): ReflectView {
-    return reflect(
+function createEdgeView(): IntrospectionView {
+    return introspect(
         React.createElement(
             React.Fragment,
             null,
@@ -237,7 +237,7 @@ function createEdgeView(): ReflectView {
     );
 }
 
-function assertEdgeNames(scope: EqualScope, view: ReflectView): void {
+function assertEdgeNames(scope: EqualScope, view: IntrospectionView): void {
     scope.assert.equal(view.root?.name, 'Fragment');
     scope.assert.equal(view.find(Panel)?.name, 'DisplayPanel');
     scope.assert.equal(view.find(MemoButton)?.name, 'Component');
@@ -245,7 +245,7 @@ function assertEdgeNames(scope: EqualScope, view: ReflectView): void {
     scope.assert.equal(view.find('em')?.textContent, 'set');
 }
 
-function assertOpaqueEdge(scope: EqualScope, view: ReflectView): void {
+function assertOpaqueEdge(scope: EqualScope, view: IntrospectionView): void {
     const opaque = requireValue(view.find('opaque'));
 
     scope.assert.deepEqual(opaque.renderedChildren, {
@@ -258,7 +258,7 @@ function unsafeTarget(target: unknown): UnsafeEventTarget {
     return target as UnsafeEventTarget;
 }
 
-function assertPropErrors(scope: EqualScope, button: unknown, hostButton: unknown, view: ReflectView): void {
+function assertPropErrors(scope: EqualScope, button: unknown, hostButton: unknown, view: IntrospectionView): void {
     assertThrows(scope, function callMissingProp() {
         unsafeTarget(button).callProp('missing');
     }, 'Prop missing is not callable.');
@@ -279,14 +279,14 @@ function assertPropErrors(scope: EqualScope, button: unknown, hostButton: unknow
 function createPropCallState(): PropCallState {
     let saveCalls = 0;
     let clickValue = '';
-    const view = reflect(React.createElement(Button, {
+    const view = introspect(React.createElement(Button, {
         disabled: false,
         label: 'Save',
         onSave() {
             saveCalls += 1;
         }
     }));
-    const hostView = reflect<HostSchema>(React.createElement('button', {
+    const hostView = introspect<HostSchema>(React.createElement('button', {
         onClick(value: string) {
             clickValue = value;
         },
@@ -330,7 +330,7 @@ function performPropCalls(state: PropCallState): void {
 }
 
 function assertLocatorActUpdate(scope: EqualScope): void {
-    const view = reflect(React.createElement(StatefulAction), {
+    const view = introspect(React.createElement(StatefulAction), {
         strictMode: false
     });
     const action = view.locate(ActionButton);
@@ -359,7 +359,7 @@ function assertPropCallState(scope: EqualScope, state: PropCallState): void {
 
 function assertEventNameMapping(scope: EqualScope): void {
     const calls: string[] = [];
-    const view = reflect(React.createElement(EventRecorder, {
+    const view = introspect(React.createElement(EventRecorder, {
         onChange(value: string) {
             calls.push(`change:${value}`);
         },
@@ -388,20 +388,20 @@ function assertEventNameMapping(scope: EqualScope): void {
     ]);
 }
 
-function assertInitialListLocator(scope: EqualScope, items: ReturnType<ReflectView['locateAll']>): void {
+function assertInitialListLocator(scope: EqualScope, items: ReturnType<IntrospectionView['locateAll']>): void {
     scope.assert.equal(items.length, 1);
     scope.assert.equal(items.first?.textContent, 'one');
     scope.assert.equal(items.at(0)?.textContent, 'one');
     scope.assert.equal(Array.from(items).length, 1);
 }
 
-function assertUpdatedListLocator(scope: EqualScope, items: ReturnType<ReflectView['locateAll']>): void {
+function assertUpdatedListLocator(scope: EqualScope, items: ReturnType<IntrospectionView['locateAll']>): void {
     scope.assert.equal(items.length, 2);
     scope.assert.equal(items.last?.textContent, 'two');
     scope.assert.equal(items.at(1)?.textContent, 'two');
 }
 
-function assertUnmountedView(scope: EqualScope, view: ReflectView, root: ReflectView['root']): void {
+function assertUnmountedView(scope: EqualScope, view: IntrospectionView, root: IntrospectionView['root']): void {
     const staleRoot = requireValue(root);
 
     scope.assert.equal(staleRoot.isStale, true);
@@ -412,8 +412,8 @@ function assertUnmountedView(scope: EqualScope, view: ReflectView, root: Reflect
     scope.assert.equal(view.formatTree(), '');
 }
 
-function assertViewDiagnostics(scope: EqualScope, view: ReflectView): void {
-    const currentView = view as ReflectView & { readonly currentSnapshot: { readonly renderCount: number; }; };
+function assertViewDiagnostics(scope: EqualScope, view: IntrospectionView): void {
+    const currentView = view as IntrospectionView & { readonly currentSnapshot: { readonly renderCount: number; }; };
 
     scope.assert.deepEqual(view.errors, []);
     scope.assert.deepEqual(view.warnings, []);
@@ -423,7 +423,7 @@ function assertViewDiagnostics(scope: EqualScope, view: ReflectView): void {
 }
 
 async function assertStaticWaits(scope: EqualScope): Promise<void> {
-    const view = reflect(React.createElement('main', null, 'static'));
+    const view = introspect(React.createElement('main', null, 'static'));
 
     await view.waitForIdle();
     await view.waitForRenderCount(1);
@@ -447,7 +447,7 @@ function assertButtonIdentity(
 
 export const testNode = suite('public API skeleton', [
     test('captures an immutable shallow component node', function verifyShallowComponentNode(scope) {
-        const view = reflect(React.createElement(Button, {
+        const view = introspect(React.createElement(Button, {
             disabled: true,
             label: 'Save',
             onSave: noop
@@ -472,7 +472,7 @@ export const testNode = suite('public API skeleton', [
         return scope.assert.collect();
     }),
     test('normalizes host children and text content', function verifyHostSnapshots(scope) {
-        const view = reflect<HostSchema>(React.createElement(
+        const view = introspect<HostSchema>(React.createElement(
             'button',
             { disabled: false, type: 'submit' },
             'Save ',
@@ -530,7 +530,7 @@ export const testNode = suite('public API skeleton', [
         return scope.assert.collect();
     }),
     test('keeps old node handles stale after updates', function verifyStaleness(scope) {
-        const view = reflect(React.createElement(Button, {
+        const view = introspect(React.createElement(Button, {
             disabled: false,
             label: 'Save',
             onSave: noop
@@ -554,7 +554,7 @@ export const testNode = suite('public API skeleton', [
         return scope.assert.collect();
     }),
     test('exposes live list locators', function verifyListLocator(scope) {
-        const view = reflect(React.createElement('ol', null, React.createElement('li', null, 'one')));
+        const view = introspect(React.createElement('ol', null, React.createElement('li', null, 'one')));
         const items = view.locateAll('li');
 
         assertInitialListLocator(scope, items);
@@ -571,7 +571,7 @@ export const testNode = suite('public API skeleton', [
         return scope.assert.collect();
     }),
     test('unmounts the live root', function verifyUnmount(scope) {
-        const view = reflect(React.createElement('main', null, 'content'));
+        const view = introspect(React.createElement('main', null, 'content'));
         const { root } = view;
 
         view.unmount();
@@ -581,7 +581,7 @@ export const testNode = suite('public API skeleton', [
         return scope.assert.collect();
     }),
     test('exposes inert diagnostics and waits', async function verifyViewSupport(scope) {
-        const view = reflect(React.createElement('main', null, 'content'), {
+        const view = introspect(React.createElement('main', null, 'content'), {
             depth: 'full',
             errorMode: 'capture',
             strictMode: true,

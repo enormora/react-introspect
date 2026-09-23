@@ -1,67 +1,70 @@
 import React from 'react';
-import { isClassComponent, readClassFrameType } from './reflect-class-frame.ts';
+import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
 import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
     nextDepth,
-    type ReflectElement,
-    reflectElementKeyMetadata,
-    type ReflectFrameDepth,
-    reflectOpaqueHostType,
-    type ReflectTransformedNode,
-    reflectValueMetadata,
+    type IntrospectionElement,
+    introspectionElementKeyMetadata,
+    type IntrospectionFrameDepth,
+    introspectionOpaqueHostType,
+    type IntrospectionTransformedNode,
+    introspectionValueMetadata,
     readElementProps,
     readElementRef,
-    throwReflectRenderError
-} from './reflect-frame-contract.ts';
-import { createUnsupportedReactValueError, isReactPortalValue } from './reflect-unsupported-react.ts';
+    throwIntrospectionRenderError
+} from './introspect-frame-contract.ts';
+import { createUnsupportedReactValueError, isReactPortalValue } from './introspect-unsupported-react.ts';
 
-type ReflectFrameProps = {
-    readonly createFrameElement: ReflectFrameElementFactory;
-    readonly depth: ReflectFrameDepth;
-    readonly element: ReflectElement;
-    readonly transformNode: ReflectTransformNode;
+type IntrospectionFrameProps = {
+    readonly createFrameElement: IntrospectionFrameElementFactory;
+    readonly depth: IntrospectionFrameDepth;
+    readonly element: IntrospectionElement;
+    readonly transformNode: IntrospectionTransformNode;
 };
 
-type ReflectFrameType = {
+type IntrospectionFrameType = {
     readonly $$typeof: symbol;
 };
 
-type ReflectMemoType = ReflectFrameType & {
+type IntrospectionMemoType = IntrospectionFrameType & {
     readonly type: unknown;
 };
 
-type ReflectForwardRefType = ReflectFrameType & {
+type IntrospectionForwardRefType = IntrospectionFrameType & {
     readonly render: (props: Readonly<Record<PropertyKey, unknown>>, ref: unknown) => React.ReactNode;
 };
 
-type ReflectFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
+type IntrospectionFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
 
-type ReflectFrameElementFactory = (element: ReflectElement, depth: ReflectFrameDepth) => React.ReactElement;
+type IntrospectionFrameElementFactory = (
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth
+) => React.ReactElement;
 
-type ReflectTransformNode = (
+type IntrospectionTransformNode = (
     node: unknown,
-    depth: ReflectFrameDepth,
-    createFrameElement: ReflectFrameElementFactory
-) => ReflectTransformedNode;
+    depth: IntrospectionFrameDepth,
+    createFrameElement: IntrospectionFrameElementFactory
+) => IntrospectionTransformedNode;
 
-type ReflectSuspenseTransformRequest = {
-    readonly createFrameElement: ReflectFrameElementFactory;
-    readonly depth: ReflectFrameDepth;
-    readonly element: ReflectElement;
-    readonly transformedChildren: ReflectTransformedNode;
-    readonly transformNode: ReflectTransformNode;
+type IntrospectionSuspenseTransformRequest = {
+    readonly createFrameElement: IntrospectionFrameElementFactory;
+    readonly depth: IntrospectionFrameDepth;
+    readonly element: IntrospectionElement;
+    readonly transformedChildren: IntrospectionTransformedNode;
+    readonly transformNode: IntrospectionTransformNode;
 };
 
-type ReflectThenable = {
+type IntrospectionThenable = {
     readonly then: (
         resolve: (value: unknown) => void,
         reject: (reason: unknown) => void
     ) => unknown;
 };
 
-type ReflectLazyInitializer = (payload: unknown) => unknown;
+type IntrospectionLazyInitializer = (payload: unknown) => unknown;
 
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
@@ -80,32 +83,32 @@ function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: Pr
     return Object.hasOwn(value, property);
 }
 
-function hasReactType(value: unknown, type: symbol): value is ReflectFrameType {
+function hasReactType(value: unknown, type: symbol): value is IntrospectionFrameType {
     return isRecord(value) && value.$$typeof === type;
 }
 
-function isMemoType(value: unknown): value is ReflectMemoType {
+function isMemoType(value: unknown): value is IntrospectionMemoType {
     return hasReactType(value, memoType) && hasProperty(value, 'type');
 }
 
-function isForwardRefType(value: unknown): value is ReflectForwardRefType {
+function isForwardRefType(value: unknown): value is IntrospectionForwardRefType {
     return isRecord(value) &&
         value.$$typeof === forwardRefType &&
         hasProperty(value, 'render') &&
         typeof value.render === 'function';
 }
 
-function isLazyInitializer(value: unknown): value is ReflectLazyInitializer {
+function isLazyInitializer(value: unknown): value is IntrospectionLazyInitializer {
     return typeof value === 'function';
 }
 
-function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): ReflectLazyInitializer | undefined {
+function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): IntrospectionLazyInitializer | undefined {
     const initializer: unknown = Reflect.get(value, lazyInitializerKey);
 
     return isLazyInitializer(initializer) ? initializer : undefined;
 }
 
-function isLazyType(value: unknown): value is ReflectFrameType {
+function isLazyType(value: unknown): value is IntrospectionFrameType {
     return isRecord(value) &&
         value.$$typeof === lazyType &&
         hasProperty(value, lazyInitializerKey) &&
@@ -117,7 +120,7 @@ function isContextType(value: unknown): value is React.Context<unknown> {
     return hasReactType(value, contextType);
 }
 
-function isFunctionComponent(value: unknown): value is ReflectFunctionComponent {
+function isFunctionComponent(value: unknown): value is IntrospectionFunctionComponent {
     return typeof value === 'function';
 }
 
@@ -125,41 +128,41 @@ function isIterable(value: unknown): value is Iterable<unknown> {
     return isRecord(value) && typeof value[Symbol.iterator] === 'function';
 }
 
-function isThenable(value: unknown): value is ReflectThenable {
+function isThenable(value: unknown): value is IntrospectionThenable {
     return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
 }
 
-function isReflectElement(element: React.ReactElement): element is ReflectElement {
+function isIntrospectionElement(element: React.ReactElement): element is IntrospectionElement {
     return isRecord(element.props);
 }
 
-function readElementChildren(element: ReflectElement): unknown {
+function readElementChildren(element: IntrospectionElement): unknown {
     return readElementProps(element).children;
 }
 
-function readActivityMode(element: ReflectElement): 'hidden' | 'visible' {
+function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
     return readElementProps(element).mode === 'hidden' ? 'hidden' : 'visible';
 }
 
-function canExecute(depth: ReflectFrameDepth): boolean {
+function canExecute(depth: IntrospectionFrameDepth): boolean {
     return depth === 'full' || depth > 0;
 }
 
 function createOpaqueHost(value: unknown): React.ReactElement {
-    return React.createElement(reflectOpaqueHostType, {
-        [reflectValueMetadata]: value
+    return React.createElement(introspectionOpaqueHostType, {
+        [introspectionValueMetadata]: value
     });
 }
 
-function createReflectElement(element: React.ReactElement): ReflectElement {
-    if (!isReflectElement(element)) {
-        throw new TypeError('Reflect expected React element props to be an object.');
+function createIntrospectionElement(element: React.ReactElement): IntrospectionElement {
+    if (!isIntrospectionElement(element)) {
+        throw new TypeError('Introspection expected React element props to be an object.');
     }
 
     return element;
 }
 
-function readLazyType(type: ReflectFrameType): unknown {
+function readLazyType(type: IntrospectionFrameType): unknown {
     return readLazyInitializer(type)?.(Reflect.get(type, lazyPayloadKey));
 }
 
@@ -187,7 +190,7 @@ function executeWrappedElement(
     return isForwardRefType(type) ? type.render(props, ref) : createOpaqueHost(type);
 }
 
-function executeElement(element: ReflectElement): React.ReactNode {
+function executeElement(element: IntrospectionElement): React.ReactNode {
     const { type } = element;
     const props = readElementProps(element);
 
@@ -198,11 +201,11 @@ function executeElement(element: ReflectElement): React.ReactNode {
     return executeWrappedElement(type, props, readElementRef(element));
 }
 
-function executeReflectFrameElement(element: ReflectElement): React.ReactNode {
+function executeIntrospectionFrameElement(element: IntrospectionElement): React.ReactNode {
     try {
         return unwrapThenableNode(executeElement(element));
     } catch (error) {
-        return throwReflectRenderError(error);
+        return throwIntrospectionRenderError(error);
     }
 }
 
@@ -211,42 +214,45 @@ function isEmptyRenderable(node: unknown): boolean {
 }
 
 function cloneElementWithChildren(
-    element: ReflectElement,
-    children: ReflectTransformedNode
+    element: IntrospectionElement,
+    children: IntrospectionTransformedNode
 ): React.ReactElement {
     if (element.type === React.Fragment) {
         return React.createElement(React.Fragment, null, children);
     }
 
     return React.cloneElement(element, {
-        [reflectElementKeyMetadata]: element.key
+        [introspectionElementKeyMetadata]: element.key
     }, children);
 }
 
-function cloneSuspenseElement(request: ReflectSuspenseTransformRequest): React.ReactElement {
+function cloneSuspenseElement(request: IntrospectionSuspenseTransformRequest): React.ReactElement {
     const props = readElementProps(request.element);
 
     return React.cloneElement(request.element, {
-        [reflectElementKeyMetadata]: request.element.key,
+        [introspectionElementKeyMetadata]: request.element.key,
         fallback: request.transformNode(props.fallback, request.depth, request.createFrameElement)
     }, request.transformedChildren);
 }
 
-function cloneWrapperElement(element: ReflectElement, children: ReflectTransformedNode): React.ReactElement {
+function cloneWrapperElement(
+    element: IntrospectionElement,
+    children: IntrospectionTransformedNode
+): React.ReactElement {
     return React.cloneElement(element, {}, children);
 }
 
 function transformCollection(
     nodes: readonly unknown[],
-    depth: ReflectFrameDepth,
-    transformChildNode: ReflectTransformNode,
-    frameFactory: ReflectFrameElementFactory
-): readonly ReflectTransformedNode[] {
+    depth: IntrospectionFrameDepth,
+    transformChildNode: IntrospectionTransformNode,
+    frameFactory: IntrospectionFrameElementFactory
+): readonly IntrospectionTransformedNode[] {
     return nodes.map(function transformChild(node, index) {
         const transformedNode = transformChildNode(node, depth, frameFactory);
 
         return React.isValidElement(transformedNode)
-            ? React.cloneElement(transformedNode, { key: transformedNode.key ?? `reflect-${index}` })
+            ? React.cloneElement(transformedNode, { key: transformedNode.key ?? `introspect-${index}` })
             : transformedNode;
     });
 }
@@ -272,9 +278,9 @@ function isRenderableElementType(type: unknown): boolean {
 }
 
 function transformComponentElement(
-    element: ReflectElement,
-    depth: ReflectFrameDepth,
-    frameFactory: ReflectFrameElementFactory
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    frameFactory: IntrospectionFrameElementFactory
 ): React.ReactElement {
     if (canExecute(depth) && isExecutableComponentType(element.type)) {
         return frameFactory(element, depth);
@@ -283,7 +289,7 @@ function transformComponentElement(
     return createComponentHost(createComponentMetadata(element, 'depth'), createEmptyHost(undefined));
 }
 
-function transformPrimitiveNode(node: unknown): ReflectTransformedNode | undefined {
+function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | undefined {
     if (isEmptyRenderable(node)) {
         return createEmptyHost(node);
     }
@@ -296,10 +302,10 @@ function transformPrimitiveNode(node: unknown): ReflectTransformedNode | undefin
 }
 
 function transformRenderableElement(
-    element: ReflectElement,
-    depth: ReflectFrameDepth,
-    transformChildNode: ReflectTransformNode,
-    frameFactory: ReflectFrameElementFactory
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    transformChildNode: IntrospectionTransformNode,
+    frameFactory: IntrospectionFrameElementFactory
 ): React.ReactElement {
     return cloneElementWithChildren(
         element,
@@ -308,10 +314,10 @@ function transformRenderableElement(
 }
 
 function transformSuspenseElement(
-    element: ReflectElement,
-    depth: ReflectFrameDepth,
-    transformChildNode: ReflectTransformNode,
-    frameFactory: ReflectFrameElementFactory
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    transformChildNode: IntrospectionTransformNode,
+    frameFactory: IntrospectionFrameElementFactory
 ): React.ReactElement {
     return cloneSuspenseElement({
         createFrameElement: frameFactory,
@@ -323,10 +329,10 @@ function transformSuspenseElement(
 }
 
 function transformActivityElement(
-    element: ReflectElement,
-    depth: ReflectFrameDepth,
-    transformChildNode: ReflectTransformNode,
-    frameFactory: ReflectFrameElementFactory
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    transformChildNode: IntrospectionTransformNode,
+    frameFactory: IntrospectionFrameElementFactory
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
@@ -335,10 +341,10 @@ function transformActivityElement(
 }
 
 function transformViewTransitionElement(
-    element: ReflectElement,
-    depth: ReflectFrameDepth,
-    transformChildNode: ReflectTransformNode,
-    frameFactory: ReflectFrameElementFactory
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    transformChildNode: IntrospectionTransformNode,
+    frameFactory: IntrospectionFrameElementFactory
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined),
@@ -347,10 +353,10 @@ function transformViewTransitionElement(
 }
 
 function transformElement(
-    element: ReflectElement,
-    depth: ReflectFrameDepth,
-    transformChildNode: ReflectTransformNode,
-    frameFactory: ReflectFrameElementFactory
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    transformChildNode: IntrospectionTransformNode,
+    frameFactory: IntrospectionFrameElementFactory
 ): React.ReactElement {
     const { type } = element;
 
@@ -375,9 +381,9 @@ function transformElement(
 
 function transformNode(
     node: unknown,
-    depth: ReflectFrameDepth,
-    frameFactory: ReflectFrameElementFactory
-): ReflectTransformedNode {
+    depth: IntrospectionFrameDepth,
+    frameFactory: IntrospectionFrameElementFactory
+): IntrospectionTransformedNode {
     if (isReactPortalValue(node)) {
         throw createUnsupportedReactValueError();
     }
@@ -389,7 +395,7 @@ function transformNode(
     }
 
     if (React.isValidElement(node)) {
-        return transformElement(createReflectElement(node), depth, transformNode, frameFactory);
+        return transformElement(createIntrospectionElement(node), depth, transformNode, frameFactory);
     }
 
     if (Array.isArray(node)) {
@@ -401,18 +407,18 @@ function transformNode(
         : createOpaqueHost(node);
 }
 
-function ReflectFrame(props: ReflectFrameProps): React.ReactElement {
+function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(props.element, undefined),
         props.transformNode(
-            executeReflectFrameElement(props.element),
+            executeIntrospectionFrameElement(props.element),
             nextDepth(props.depth),
             props.createFrameElement
         )
     );
 }
 
-function createFrameElement(element: ReflectElement, depth: ReflectFrameDepth): React.ReactElement {
+function createFrameElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
     if (isClassComponent(element.type)) {
         return React.createElement(readClassFrameType(element.type), {
             createFrameElement,
@@ -423,7 +429,7 @@ function createFrameElement(element: ReflectElement, depth: ReflectFrameDepth): 
         });
     }
 
-    return React.createElement(ReflectFrame, {
+    return React.createElement(IntrospectionFrame, {
         createFrameElement,
         depth,
         element,
@@ -431,13 +437,13 @@ function createFrameElement(element: ReflectElement, depth: ReflectFrameDepth): 
     });
 }
 
-export function createReflectRenderElement(
+export function createIntrospectionRenderElement(
     element: React.ReactElement,
-    depth: ReflectFrameDepth
+    depth: IntrospectionFrameDepth
 ): React.ReactElement {
     if (isReactPortalValue(element)) {
         throw createUnsupportedReactValueError();
     }
 
-    return transformElement(createReflectElement(element), depth, transformNode, createFrameElement);
+    return transformElement(createIntrospectionElement(element), depth, transformNode, createFrameElement);
 }

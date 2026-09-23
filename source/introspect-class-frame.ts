@@ -4,32 +4,35 @@ import {
     createComponentMetadata,
     createEmptyHost,
     nextDepth,
-    type ReflectElement,
-    type ReflectFrameDepth,
-    type ReflectTransformedNode,
+    type IntrospectionElement,
+    type IntrospectionFrameDepth,
+    type IntrospectionTransformedNode,
     readElementProps,
     readElementRef,
-    throwReflectRenderError
-} from './reflect-frame-contract.ts';
-import type { ReflectError } from './reflect-public-types.ts';
+    throwIntrospectionRenderError
+} from './introspect-frame-contract.ts';
+import type { IntrospectionError } from './introspect-public-types.ts';
 
-type ReflectFrameElementFactory = (element: ReflectElement, depth: ReflectFrameDepth) => React.ReactElement;
+type IntrospectionFrameElementFactory = (
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth
+) => React.ReactElement;
 
-type ReflectTransformNode = (
+type IntrospectionTransformNode = (
     node: unknown,
-    depth: ReflectFrameDepth,
-    createFrameElement: ReflectFrameElementFactory
-) => ReflectTransformedNode;
+    depth: IntrospectionFrameDepth,
+    createFrameElement: IntrospectionFrameElementFactory
+) => IntrospectionTransformedNode;
 
-export type ReflectClassFrameProps = {
-    readonly createFrameElement: ReflectFrameElementFactory;
-    readonly depth: ReflectFrameDepth;
-    readonly element: ReflectElement;
-    readonly transformNode: ReflectTransformNode;
-    readonly type: ReflectClassComponent;
+export type IntrospectionClassFrameProps = {
+    readonly createFrameElement: IntrospectionFrameElementFactory;
+    readonly depth: IntrospectionFrameDepth;
+    readonly element: IntrospectionElement;
+    readonly transformNode: IntrospectionTransformNode;
+    readonly type: IntrospectionClassComponent;
 };
 
-type ReflectClassComponent = {
+type IntrospectionClassComponent = {
     readonly getDerivedStateFromError?: (error: unknown) => unknown;
     readonly getDerivedStateFromProps?: (
         props: Readonly<Record<PropertyKey, unknown>>,
@@ -42,10 +45,10 @@ type ReflectClassComponent = {
     new (
         props: Readonly<Record<PropertyKey, unknown>>,
         context: unknown
-    ): ReflectClassInstance;
+    ): IntrospectionClassInstance;
 };
 
-type ReflectClassUpdater = {
+type IntrospectionClassUpdater = {
     readonly enqueueForceUpdate: (
         instance: unknown,
         callback: (() => void) | undefined
@@ -57,7 +60,7 @@ type ReflectClassUpdater = {
     ) => void;
 };
 
-type ReflectClassInstance = React.Component<Readonly<Record<PropertyKey, unknown>>, unknown> & {
+type IntrospectionClassInstance = React.Component<Readonly<Record<PropertyKey, unknown>>, unknown> & {
     readonly componentDidCatch?: (error: unknown, errorInfo: unknown) => void;
     readonly componentDidMount?: () => void;
     readonly componentDidUpdate?: (props: unknown, state: unknown, snapshot: unknown) => void;
@@ -70,22 +73,22 @@ type ReflectClassInstance = React.Component<Readonly<Record<PropertyKey, unknown
     readonly render: () => React.ReactNode;
     readonly shouldComponentUpdate?: (props: unknown, state: unknown, context: unknown) => boolean;
     readonly state: unknown;
-    readonly updater: ReflectClassUpdater;
+    readonly updater: IntrospectionClassUpdater;
 };
 
-type ReflectClassFrameState = {
+type IntrospectionClassFrameState = {
     readonly boundaryErrorCause: unknown;
     readonly revision: number;
 };
 
-type ReflectStateUpdate = (props: Readonly<Record<PropertyKey, unknown>>, state: unknown) => unknown;
+type IntrospectionStateUpdate = (props: Readonly<Record<PropertyKey, unknown>>, state: unknown) => unknown;
 
-type ReflectStateUpdateFactory = (
+type IntrospectionStateUpdateFactory = (
     state: unknown,
     props: Readonly<Record<PropertyKey, unknown>>
 ) => unknown;
 
-type ReflectClassLifecycle = {
+type IntrospectionClassLifecycle = {
     readonly previousProps: Readonly<Record<PropertyKey, unknown>>;
     readonly previousState: unknown;
     readonly shouldCommit: boolean;
@@ -93,24 +96,24 @@ type ReflectClassLifecycle = {
 
 const emptyErrorInfo = Object.freeze({ componentStack: '' });
 const noCatchOnlyBoundaryRecovery = Symbol('noCatchOnlyBoundaryRecovery');
-const catchOnlyBoundaryRecoveries = new WeakMap<ReflectClassComponent, Map<string, unknown>>();
+const catchOnlyBoundaryRecoveries = new WeakMap<IntrospectionClassComponent, Map<string, unknown>>();
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
 }
 
-export function isClassComponent(value: unknown): value is ReflectClassComponent {
+export function isClassComponent(value: unknown): value is IntrospectionClassComponent {
     const prototype: unknown = typeof value === 'function' ? Reflect.get(value, 'prototype') : undefined;
 
     return isRecord(prototype) && prototype.isReactComponent !== undefined;
 }
 
-function isErrorBoundary(type: ReflectClassComponent): boolean {
+function isErrorBoundary(type: IntrospectionClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
         typeof type.prototype.componentDidCatch === 'function';
 }
 
-function createReflectError(cause: unknown, handled: boolean): ReflectError {
+function createIntrospectionError(cause: unknown, handled: boolean): IntrospectionError {
     return Object.freeze({
         cause,
         handled,
@@ -154,11 +157,11 @@ function mergeState(state: unknown, partialState: unknown): unknown {
         : partialState;
 }
 
-function isStateUpdateFactory(value: unknown): value is ReflectStateUpdateFactory {
+function isStateUpdateFactory(value: unknown): value is IntrospectionStateUpdateFactory {
     return typeof value === 'function';
 }
 
-function toStateUpdate(partialState: unknown): ReflectStateUpdate {
+function toStateUpdate(partialState: unknown): IntrospectionStateUpdate {
     if (isStateUpdateFactory(partialState)) {
         return function resolveStateUpdate(props, state) {
             return partialState(state, props);
@@ -173,7 +176,7 @@ function toStateUpdate(partialState: unknown): ReflectStateUpdate {
 function applyStateUpdates(
     props: Readonly<Record<PropertyKey, unknown>>,
     state: unknown,
-    updates: readonly ReflectStateUpdate[]
+    updates: readonly IntrospectionStateUpdate[]
 ): unknown {
     return updates.reduce(function applyUpdate(nextState, update) {
         return mergeState(nextState, update(props, nextState));
@@ -181,7 +184,7 @@ function applyStateUpdates(
 }
 
 function readDerivedState(
-    type: ReflectClassComponent,
+    type: IntrospectionClassComponent,
     props: Readonly<Record<PropertyKey, unknown>>,
     state: unknown
 ): unknown {
@@ -190,11 +193,11 @@ function readDerivedState(
         : state;
 }
 
-function assignClassField(instance: ReflectClassInstance, property: PropertyKey, value: unknown): void {
+function assignClassField(instance: IntrospectionClassInstance, property: PropertyKey, value: unknown): void {
     Reflect.set(instance, property, value);
 }
 
-function applyElementRef(ref: unknown, value: ReflectClassInstance | null): void {
+function applyElementRef(ref: unknown, value: IntrospectionClassInstance | null): void {
     if (typeof ref === 'function') {
         Reflect.apply(ref, undefined, [ value ]);
 
@@ -206,23 +209,23 @@ function applyElementRef(ref: unknown, value: ReflectClassInstance | null): void
     }
 }
 
-function executeReflectClassRender(instance: ReflectClassInstance): React.ReactNode {
+function executeIntrospectionClassRender(instance: IntrospectionClassInstance): React.ReactNode {
     try {
         return instance.render();
     } catch (error) {
-        return throwReflectRenderError(error);
+        return throwIntrospectionRenderError(error);
     }
 }
 
 function notifyCatchBoundary(
-    type: ReflectClassComponent,
-    instance: ReflectClassInstance,
+    type: IntrospectionClassComponent,
+    instance: IntrospectionClassInstance,
     error: unknown
 ): void {
     type.prototype.componentDidCatch?.call(instance, error, emptyErrorInfo);
 }
 
-function readCatchOnlyBoundaryRecoveries(type: ReflectClassComponent): Map<string, unknown> {
+function readCatchOnlyBoundaryRecoveries(type: IntrospectionClassComponent): Map<string, unknown> {
     let recoveries = catchOnlyBoundaryRecoveries.get(type);
 
     if (recoveries === undefined) {
@@ -233,31 +236,32 @@ function readCatchOnlyBoundaryRecoveries(type: ReflectClassComponent): Map<strin
     return recoveries;
 }
 
-function readCatchOnlyBoundaryRecovery(type: ReflectClassComponent, key: string): unknown {
+function readCatchOnlyBoundaryRecovery(type: IntrospectionClassComponent, key: string): unknown {
     const recoveries = readCatchOnlyBoundaryRecoveries(type);
 
     return recoveries.has(key) ? recoveries.get(key) : noCatchOnlyBoundaryRecovery;
 }
 
-function writeCatchOnlyBoundaryRecovery(type: ReflectClassComponent, key: string, state: unknown): void {
+function writeCatchOnlyBoundaryRecovery(type: IntrospectionClassComponent, key: string, state: unknown): void {
     readCatchOnlyBoundaryRecoveries(type).set(key, state);
 }
 
-function deleteCatchOnlyBoundaryRecovery(type: ReflectClassComponent, error: unknown): void {
+function deleteCatchOnlyBoundaryRecovery(type: IntrospectionClassComponent, error: unknown): void {
     readCatchOnlyBoundaryRecoveries(type).delete(String(error));
 }
 
-const ReflectClassFrameBase = class extends React.Component<ReflectClassFrameProps, ReflectClassFrameState> {
+const IntrospectionClassFrameBase = class
+    extends React.Component<IntrospectionClassFrameProps, IntrospectionClassFrameState> {
     protected appliedBoundaryErrorCause: unknown;
-    protected boundaryError: ReflectError | undefined;
+    protected boundaryError: IntrospectionError | undefined;
     protected isApplyingBoundaryError = false;
-    protected lifecycle: ReflectClassLifecycle | undefined;
-    protected pendingStateUpdates: readonly ReflectStateUpdate[];
-    protected renderedNode: ReflectTransformedNode;
+    protected lifecycle: IntrospectionClassLifecycle | undefined;
+    protected pendingStateUpdates: readonly IntrospectionStateUpdate[];
+    protected renderedNode: IntrospectionTransformedNode;
     protected shouldForceRender: boolean;
-    protected userInstance: ReflectClassInstance | undefined;
+    protected userInstance: IntrospectionClassInstance | undefined;
 
-    public constructor(props: ReflectClassFrameProps) {
+    public constructor(props: IntrospectionClassFrameProps) {
         super(props);
 
         this.appliedBoundaryErrorCause = undefined;
@@ -292,8 +296,8 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
     }
 
     public override componentDidUpdate(
-        _previousProps: ReflectClassFrameProps,
-        _previousState: ReflectClassFrameState,
+        _previousProps: IntrospectionClassFrameProps,
+        _previousState: IntrospectionClassFrameState,
         snapshot: unknown
     ): void {
         const { lifecycle } = this;
@@ -329,8 +333,8 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
     }
 
     protected readBoundaryState(
-        _instance: ReflectClassInstance,
-        _type: ReflectClassComponent,
+        _instance: IntrospectionClassInstance,
+        _type: IntrospectionClassComponent,
         state: unknown
     ): unknown {
         Object.is(this.userInstance, undefined);
@@ -343,7 +347,7 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
         this.shouldForceRender = false;
     }
 
-    protected createUpdater(): ReflectClassUpdater {
+    protected createUpdater(): IntrospectionClassUpdater {
         return {
             enqueueForceUpdate: (_instance: unknown, callback: (() => void) | undefined) => {
                 this.shouldForceRender = true;
@@ -371,7 +375,7 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
     }
 
     protected shouldRender(
-        instance: ReflectClassInstance,
+        instance: IntrospectionClassInstance,
         props: Readonly<Record<PropertyKey, unknown>>,
         state: unknown
     ): boolean {
@@ -390,7 +394,10 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
         return true;
     }
 
-    protected readNextState(instance: ReflectClassInstance, props: Readonly<Record<PropertyKey, unknown>>): unknown {
+    protected readNextState(
+        instance: IntrospectionClassInstance,
+        props: Readonly<Record<PropertyKey, unknown>>
+    ): unknown {
         const updatedState = applyStateUpdates(props, instance.state, this.pendingStateUpdates);
         const boundaryState = this.readBoundaryState(instance, this.props.type, updatedState);
 
@@ -398,10 +405,10 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
     }
 
     protected readRenderedNode(
-        instance: ReflectClassInstance,
+        instance: IntrospectionClassInstance,
         props: Readonly<Record<PropertyKey, unknown>>,
         state: unknown
-    ): ReflectTransformedNode {
+    ): IntrospectionTransformedNode {
         const shouldRender = this.shouldRender(instance, props, state);
 
         this.lifecycle = Object.freeze({
@@ -415,7 +422,7 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
 
         if (shouldRender) {
             this.renderedNode = this.props.transformNode(
-                executeReflectClassRender(instance),
+                executeIntrospectionClassRender(instance),
                 nextDepth(this.props.depth),
                 this.props.createFrameElement
             );
@@ -424,7 +431,7 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
         return this.renderedNode;
     }
 
-    protected readUserInstance(): ReflectClassInstance {
+    protected readUserInstance(): IntrospectionClassInstance {
         if (this.userInstance !== undefined) {
             return this.userInstance;
         }
@@ -445,8 +452,8 @@ const ReflectClassFrameBase = class extends React.Component<ReflectClassFramePro
     }
 };
 
-const ReflectClassBoundaryFrame = class extends ReflectClassFrameBase {
-    public static getDerivedStateFromError(error: unknown): ReflectClassFrameState {
+const IntrospectionClassBoundaryFrame = class extends IntrospectionClassFrameBase {
+    public static getDerivedStateFromError(error: unknown): IntrospectionClassFrameState {
         return {
             boundaryErrorCause: error,
             revision: 0
@@ -462,12 +469,12 @@ const ReflectClassBoundaryFrame = class extends ReflectClassFrameBase {
             deleteCatchOnlyBoundaryRecovery(this.props.type, error);
         }
 
-        this.boundaryError = createReflectError(error, true);
+        this.boundaryError = createIntrospectionError(error, true);
     }
 
     protected applyCatchOnlyBoundaryState(
-        instance: ReflectClassInstance,
-        type: ReflectClassComponent,
+        instance: IntrospectionClassInstance,
+        type: IntrospectionClassComponent,
         state: unknown,
         error: unknown
     ): unknown {
@@ -489,7 +496,7 @@ const ReflectClassBoundaryFrame = class extends ReflectClassFrameBase {
         return this.createCatchOnlyBoundaryState(type, recoveryKey, state);
     }
 
-    protected createCatchOnlyBoundaryState(type: ReflectClassComponent, key: string, state: unknown): unknown {
+    protected createCatchOnlyBoundaryState(type: IntrospectionClassComponent, key: string, state: unknown): unknown {
         const nextState = applyStateUpdates(readElementProps(this.props.element), state, this.pendingStateUpdates);
 
         writeCatchOnlyBoundaryRecovery(type, key, nextState);
@@ -498,8 +505,8 @@ const ReflectClassBoundaryFrame = class extends ReflectClassFrameBase {
     }
 
     protected override readBoundaryState(
-        instance: ReflectClassInstance,
-        type: ReflectClassComponent,
+        instance: IntrospectionClassInstance,
+        type: IntrospectionClassComponent,
         state: unknown
     ): unknown {
         const { boundaryErrorCause } = this.state;
@@ -509,7 +516,7 @@ const ReflectClassBoundaryFrame = class extends ReflectClassFrameBase {
         }
 
         this.appliedBoundaryErrorCause = boundaryErrorCause;
-        this.boundaryError = createReflectError(boundaryErrorCause, true);
+        this.boundaryError = createIntrospectionError(boundaryErrorCause, true);
 
         if (typeof type.getDerivedStateFromError !== 'function') {
             return this.applyCatchOnlyBoundaryState(instance, type, state, boundaryErrorCause);
@@ -523,7 +530,7 @@ const ReflectClassBoundaryFrame = class extends ReflectClassFrameBase {
 };
 
 export function readClassFrameType(
-    type: ReflectClassComponent
-): React.ComponentType<ReflectClassFrameProps> {
-    return isErrorBoundary(type) ? ReflectClassBoundaryFrame : ReflectClassFrameBase;
+    type: IntrospectionClassComponent
+): React.ComponentType<IntrospectionClassFrameProps> {
+    return isErrorBoundary(type) ? IntrospectionClassBoundaryFrame : IntrospectionClassFrameBase;
 }

@@ -1,0 +1,123 @@
+import React from 'react';
+import type { IntrospectionError, IntrospectionNotRenderedReason } from './introspect-public-types.ts';
+import { assertSupportedReactValue } from './introspect-unsupported-react.ts';
+
+export const introspectionComponentHostType = 'react-introspect-internal-component';
+export const introspectionEmptyHostType = 'react-introspect-internal-empty';
+export const introspectionOpaqueHostType = 'react-introspect-internal-opaque';
+
+export const introspectionComponentMetadata = '__reactIntrospectionComponentMetadata';
+export const introspectionElementKeyMetadata = '__reactIntrospectionElementKeyMetadata';
+export const introspectionValueMetadata = '__reactIntrospectionValueMetadata';
+
+export type IntrospectionFrameDepth = number | 'full';
+
+export type IntrospectionElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
+
+type TransformedElement = Readonly<React.ReactElement>;
+type TransformedChildren = readonly IntrospectionTransformedNode[];
+
+export type IntrospectionTransformedNode = TransformedChildren | TransformedElement | number | string;
+
+export type IntrospectionComponentMetadata = {
+    readonly activityMode: 'hidden' | 'visible' | undefined;
+    readonly error: IntrospectionError | undefined;
+    readonly givenChildren: unknown;
+    readonly key: string | null;
+    readonly props: Readonly<Record<PropertyKey, unknown>>;
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+    readonly type: unknown;
+};
+
+const introspectionRenderErrors = new WeakSet();
+
+function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
+    return typeof value === 'object' && value !== null || typeof value === 'function';
+}
+
+function isPublicPropKey(key: PropertyKey): boolean {
+    return key !== 'children' &&
+        key !== 'key' &&
+        key !== 'ref' &&
+        key !== introspectionElementKeyMetadata;
+}
+
+function isThenable(value: unknown): boolean {
+    return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
+}
+
+function publicProps(props: Readonly<Record<PropertyKey, unknown>>): Readonly<Record<PropertyKey, unknown>> {
+    const result: Record<PropertyKey, unknown> = {};
+
+    for (const key of Reflect.ownKeys(props)) {
+        if (isPublicPropKey(key)) {
+            result[key] = props[key];
+        }
+    }
+
+    return Object.freeze(result);
+}
+
+export function readElementProps(element: IntrospectionElement): Readonly<Record<PropertyKey, unknown>> {
+    return element.props;
+}
+
+export function readElementRef(element: IntrospectionElement): unknown {
+    return readElementProps(element).ref;
+}
+
+export function nextDepth(depth: IntrospectionFrameDepth): IntrospectionFrameDepth {
+    return depth === 'full' ? depth : Math.max(0, depth - 1);
+}
+
+export function createComponentMetadata(
+    element: IntrospectionElement,
+    renderedReason: IntrospectionNotRenderedReason | undefined,
+    error?: IntrospectionError,
+    activityMode?: 'hidden' | 'visible'
+): IntrospectionComponentMetadata {
+    const props = readElementProps(element);
+
+    assertSupportedReactValue(props.children);
+
+    return Object.freeze({
+        activityMode,
+        error,
+        givenChildren: props.children,
+        key: element.key,
+        props: publicProps(props),
+        renderedReason,
+        type: element.type
+    });
+}
+
+export function createComponentHost(
+    metadata: IntrospectionComponentMetadata,
+    children: IntrospectionTransformedNode
+): React.ReactElement {
+    return React.createElement(
+        introspectionComponentHostType,
+        {
+            [introspectionComponentMetadata]: metadata
+        },
+        children
+    );
+}
+
+export function createEmptyHost(value: unknown): React.ReactElement {
+    return React.createElement(introspectionEmptyHostType, {
+        [introspectionValueMetadata]: value
+    });
+}
+
+export function throwIntrospectionRenderError(error: unknown): never {
+    if (isRecord(error) && !isThenable(error)) {
+        introspectionRenderErrors.add(error);
+    }
+
+    throw error;
+}
+
+export function isIntrospectionRenderError(error: unknown): boolean {
+    return isRecord(error) && introspectionRenderErrors.has(error);
+}

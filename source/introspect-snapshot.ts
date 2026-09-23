@@ -3,14 +3,14 @@ import {
     createIdNormalizer,
     normalizeSnapshotProps,
     normalizeSnapshotValue,
-    type ReflectIdNormalization
-} from './reflect-id-normalization.ts';
+    type IntrospectionIdNormalization
+} from './introspect-id-normalization.ts';
 import type {
     ChildSnapshotsRequest,
     ChildSnapshotsResult,
     ElementNodeRequest,
     NodeIdAllocation,
-    ReflectSnapshot,
+    IntrospectionSnapshot,
     SnapshotBuild,
     SnapshotNodeInput,
     SnapshotNodeRequest,
@@ -24,7 +24,7 @@ import type {
     SourceElementNodeRequest,
     SourceElementRenderedChildrenRequest,
     SourceSnapshotNodeRequest
-} from './reflect-snapshot-contract.ts';
+} from './introspect-snapshot-contract.ts';
 import {
     freezePropsWithoutChildren,
     getElementChildrenState,
@@ -33,7 +33,7 @@ import {
     getSourceElementKind,
     getTextContent,
     getTypeName
-} from './reflect-snapshot-shape.ts';
+} from './introspect-snapshot-shape.ts';
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
@@ -412,13 +412,13 @@ const snapshotOperations = {
     }
 };
 
-export function createReflectSnapshotFromSource(
+export function createIntrospectionSnapshotFromSource(
     children: readonly SnapshotSourceNode[],
     renderCount: number,
-    idNormalization: ReflectIdNormalization = { generator: undefined, prefix: '' }
-): ReflectSnapshot {
+    idNormalization: IntrospectionIdNormalization = { generator: undefined, prefix: '' }
+): IntrospectionSnapshot {
     if (children.length !== 1) {
-        return createReflectSnapshotFromSource(
+        return createIntrospectionSnapshotFromSource(
             [
                 {
                     activityMode: undefined,

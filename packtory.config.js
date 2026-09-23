@@ -64,11 +64,11 @@ export const config = {
     },
     packages: [
         {
-            name: 'react-reflect',
+            name: 'react-introspect',
             roots: {
                 main: {
-                    js: 'react-reflect.entry-point.js',
-                    declarationFile: 'react-reflect.entry-point.d.ts'
+                    js: 'react-introspect.entry-point.js',
+                    declarationFile: 'react-introspect.entry-point.d.ts'
                 }
             },
             additionalFiles: [

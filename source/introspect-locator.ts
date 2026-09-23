@@ -1,24 +1,27 @@
 import type {
-    RuntimeReflectListLocator,
-    RuntimeReflectLocator,
-    RuntimeReflectNode,
-    RuntimeReflectView
-} from './reflect-runtime-types.ts';
+    RuntimeIntrospectionListLocator,
+    RuntimeIntrospectionLocator,
+    RuntimeIntrospectionNode,
+    RuntimeIntrospectionView
+} from './introspect-runtime-types.ts';
 
 type LocatorTarget = {
     readonly selector: unknown;
-    readonly view: RuntimeReflectView;
+    readonly view: RuntimeIntrospectionView;
 };
 
-function readLocatedNode(target: LocatorTarget): RuntimeReflectNode | undefined {
+function readLocatedNode(target: LocatorTarget): RuntimeIntrospectionNode | undefined {
     return target.view.find(target.selector);
 }
 
-function readLocatedNodes(target: LocatorTarget): readonly RuntimeReflectNode[] {
+function readLocatedNodes(target: LocatorTarget): readonly RuntimeIntrospectionNode[] {
     return Array.from(target.view.findAll(target.selector));
 }
 
-export function createReflectLocator(view: RuntimeReflectView, selector: unknown): RuntimeReflectLocator {
+export function createIntrospectionLocator(
+    view: RuntimeIntrospectionView,
+    selector: unknown
+): RuntimeIntrospectionLocator {
     const target = { selector, view };
 
     return Object.freeze({
@@ -49,7 +52,10 @@ export function createReflectLocator(view: RuntimeReflectView, selector: unknown
     });
 }
 
-export function createReflectListLocator(view: RuntimeReflectView, selector: unknown): RuntimeReflectListLocator {
+export function createIntrospectionListLocator(
+    view: RuntimeIntrospectionView,
+    selector: unknown
+): RuntimeIntrospectionListLocator {
     const target = { selector, view };
 
     return Object.freeze({

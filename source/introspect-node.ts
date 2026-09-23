@@ -1,11 +1,15 @@
-import { createReflectList } from './reflect-list.ts';
-import type { ReflectNodeState } from './reflect-public-types.ts';
-import type { RuntimeReflectList, RuntimeReflectNode, RuntimeRenderedChildren } from './reflect-runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from './reflect-selector.ts';
-import type { ReflectSnapshot, SnapshotNode, SnapshotProps } from './reflect-snapshot-contract.ts';
+import { createIntrospectionList } from './introspect-list.ts';
+import type { IntrospectionNodeState } from './introspect-public-types.ts';
+import type {
+    RuntimeIntrospectionList,
+    RuntimeIntrospectionNode,
+    RuntimeRenderedChildren
+} from './introspect-runtime-types.ts';
+import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
+import type { IntrospectionSnapshot, SnapshotNode, SnapshotProps } from './introspect-snapshot-contract.ts';
 
 export type SnapshotReader = {
-    readonly currentSnapshot: ReflectSnapshot;
+    readonly currentSnapshot: IntrospectionSnapshot;
     readonly act: (action: () => unknown) => unknown;
 };
 
@@ -68,7 +72,7 @@ function formatNode(node: SnapshotNode, depth: number): string {
     return `${prefix}${node.name}${children}`;
 }
 
-function nodeState(node: SnapshotNode): ReflectNodeState {
+function nodeState(node: SnapshotNode): IntrospectionNodeState {
     return Object.freeze({
         activityMode: node.activityMode,
         reason: node.renderedReason ?? (node.visibility === 'hidden' ? 'activity' : undefined),
@@ -77,22 +81,22 @@ function nodeState(node: SnapshotNode): ReflectNodeState {
     });
 }
 
-function findSnapshotNode(snapshot: ReflectSnapshot, id: number): SnapshotNode | undefined {
+function findSnapshotNode(snapshot: IntrospectionSnapshot, id: number): SnapshotNode | undefined {
     return snapshot.nodes.find(function hasNodeId(node) {
         return node.id === id;
     });
 }
 
-export function createReflectNode(
+export function createIntrospectionNode(
     reader: SnapshotReader,
-    snapshot: ReflectSnapshot,
+    snapshot: IntrospectionSnapshot,
     node: SnapshotNode
-): RuntimeReflectNode {
+): RuntimeIntrospectionNode {
     const context = { reader, snapshot };
 
-    function createNodeList(nodes: readonly SnapshotNode[]): RuntimeReflectList {
-        return createReflectList(nodes.map(function createChildNode(child) {
-            return createReflectNode(context.reader, context.snapshot, child);
+    function createNodeList(nodes: readonly SnapshotNode[]): RuntimeIntrospectionList {
+        return createIntrospectionList(nodes.map(function createChildNode(child) {
+            return createIntrospectionNode(context.reader, context.snapshot, child);
         }));
     }
 
@@ -110,16 +114,16 @@ export function createReflectNode(
         };
     }
 
-    function descendants(): readonly RuntimeReflectNode[] {
+    function descendants(): readonly RuntimeIntrospectionNode[] {
         return collectDescendants(node).map(function createDescendantNode(descendant) {
-            return createReflectNode(reader, snapshot, descendant);
+            return createIntrospectionNode(reader, snapshot, descendant);
         });
     }
 
-    function findAll(selector: unknown): RuntimeReflectList {
+    function findAll(selector: unknown): RuntimeIntrospectionList {
         const normalizedSelector = toSelector(selector);
 
-        return createReflectList(
+        return createIntrospectionList(
             descendants().filter(function isMatch(descendant) {
                 return nodeMatchesSelector(descendant, normalizedSelector);
             })
@@ -177,7 +181,7 @@ export function createReflectNode(
             let parent = node.parentId === undefined ? undefined : findSnapshotNode(snapshot, node.parentId);
 
             while (parent !== undefined) {
-                const parentNode = createReflectNode(reader, snapshot, parent);
+                const parentNode = createIntrospectionNode(reader, snapshot, parent);
 
                 if (nodeMatchesSelector(parentNode, normalizedSelector)) {
                     return parentNode;

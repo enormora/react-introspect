@@ -1,22 +1,22 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import diagnosticsChannel from 'node:diagnostics_channel';
-import type { ReflectError, ReflectWarning } from './reflect-public-types.ts';
+import type { IntrospectionError, IntrospectionWarning } from './introspect-public-types.ts';
 
-type ReflectDiagnosticMode = 'capture' | 'ignore' | 'throw';
+type IntrospectionDiagnosticMode = 'capture' | 'ignore' | 'throw';
 
-type ReflectDiagnosticsOptions = {
+type IntrospectionDiagnosticsOptions = {
     readonly errorMode: 'capture' | 'throw';
-    readonly warningMode: ReflectDiagnosticMode;
+    readonly warningMode: IntrospectionDiagnosticMode;
 };
 
-type ReflectDiagnosticsContext = {
+type IntrospectionDiagnosticsContext = {
     readonly recordConsoleWarning: (message: readonly unknown[]) => void;
 };
 
-export type ReflectDiagnostics = {
-    readonly errors: readonly ReflectError[];
+export type IntrospectionDiagnostics = {
+    readonly errors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
-    readonly warnings: readonly ReflectWarning[];
+    readonly warnings: readonly IntrospectionWarning[];
     readonly recordCaughtError: (cause: unknown) => void;
     readonly recordConsoleDiagnostic: (message: unknown) => void;
     readonly recordRecoverableError: (cause: unknown) => void;
@@ -25,7 +25,7 @@ export type ReflectDiagnostics = {
     readonly runAsync: <Result>(action: () => Promise<Result>) => Promise<Result>;
 };
 
-const storage = new AsyncLocalStorage<ReflectDiagnosticsContext>();
+const storage = new AsyncLocalStorage<IntrospectionDiagnosticsContext>();
 const consoleDiagnosticChannels = Object.freeze([
     'console.error',
     'console.warn'
@@ -35,7 +35,7 @@ function messageFromCause(cause: unknown): string {
     return cause instanceof Error ? cause.message : String(cause);
 }
 
-function throwDiagnostic(diagnostic: ReflectError | ReflectWarning): never {
+function throwDiagnostic(diagnostic: IntrospectionError | IntrospectionWarning): never {
     if (diagnostic.cause instanceof Error) {
         throw diagnostic.cause;
     }
@@ -43,14 +43,14 @@ function throwDiagnostic(diagnostic: ReflectError | ReflectWarning): never {
     throw new Error(diagnostic.message);
 }
 
-function createReflectWarning(cause: unknown): ReflectWarning {
+function createIntrospectionWarning(cause: unknown): IntrospectionWarning {
     return Object.freeze({
         cause,
         message: messageFromCause(cause)
     });
 }
 
-function createReflectError(cause: unknown, handled: boolean): ReflectError {
+function createIntrospectionError(cause: unknown, handled: boolean): IntrospectionError {
     return Object.freeze({
         cause,
         handled,
@@ -76,7 +76,7 @@ function toConsoleMessage(value: unknown): readonly unknown[] {
     return Array.isArray(value) ? value : Object.freeze([ value ]);
 }
 
-function recordReflectConsoleDiagnostic(message: unknown): void {
+function recordIntrospectionConsoleDiagnostic(message: unknown): void {
     const consoleMessage = toConsoleMessage(message);
 
     if (!isReactDiagnosticMessage(consoleMessage)) {
@@ -95,21 +95,21 @@ const subscribeConsoleDiagnostics = (function createConsoleDiagnosticsSubscripti
         }
 
         for (const channelName of consoleDiagnosticChannels) {
-            diagnosticsChannel.subscribe(channelName, recordReflectConsoleDiagnostic);
+            diagnosticsChannel.subscribe(channelName, recordIntrospectionConsoleDiagnostic);
         }
 
         ready = true;
     };
 })();
 
-export function createReflectDiagnostics(options: ReflectDiagnosticsOptions): ReflectDiagnostics {
+export function createIntrospectionDiagnostics(options: IntrospectionDiagnosticsOptions): IntrospectionDiagnostics {
     subscribeConsoleDiagnostics();
 
-    let errors: readonly ReflectError[] = Object.freeze([]);
-    let warnings: readonly ReflectWarning[] = Object.freeze([]);
-    let pendingThrownDiagnostic: ReflectError | ReflectWarning | null = null;
+    let errors: readonly IntrospectionError[] = Object.freeze([]);
+    let warnings: readonly IntrospectionWarning[] = Object.freeze([]);
+    let pendingThrownDiagnostic: IntrospectionError | IntrospectionWarning | null = null;
 
-    function appendWarning(warning: ReflectWarning): void {
+    function appendWarning(warning: IntrospectionWarning): void {
         if (options.warningMode === 'ignore') {
             return;
         }
@@ -124,7 +124,7 @@ export function createReflectDiagnostics(options: ReflectDiagnosticsOptions): Re
         }
     }
 
-    function appendError(error: ReflectError): void {
+    function appendError(error: IntrospectionError): void {
         if (
             errors.some(function isSameError(existingError) {
                 return existingError.cause === error.cause && existingError.handled === error.handled;
@@ -152,9 +152,9 @@ export function createReflectDiagnostics(options: ReflectDiagnosticsOptions): Re
         }
     }
 
-    const context: ReflectDiagnosticsContext = Object.freeze({
+    const context: IntrospectionDiagnosticsContext = Object.freeze({
         recordConsoleWarning(message) {
-            appendWarning(createReflectWarning(consoleMessageText(message)));
+            appendWarning(createIntrospectionWarning(consoleMessageText(message)));
         }
     });
 
@@ -172,13 +172,13 @@ export function createReflectDiagnostics(options: ReflectDiagnosticsOptions): Re
             return undefined;
         },
         recordConsoleDiagnostic(message) {
-            recordReflectConsoleDiagnostic(message);
+            recordIntrospectionConsoleDiagnostic(message);
         },
         recordRecoverableError(cause) {
-            appendWarning(createReflectWarning(cause));
+            appendWarning(createIntrospectionWarning(cause));
         },
         recordUncaughtError(cause) {
-            appendError(createReflectError(cause, false));
+            appendError(createIntrospectionError(cause, false));
         },
         run<Result>(action: () => Result) {
             return storage.run(context, function runWithDiagnostics() {
