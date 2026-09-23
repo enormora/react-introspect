@@ -29,7 +29,7 @@ lint: eslint lint-filename lint-unused-code lint-dependencies lint-duplication
 lint-fix: eslint-fix
 
 test-unit:
-    NODE_OPTIONS='--allow-fs-read=. --allow-fs-write=.overkill' overkill run --profile microtest
+    NODE_OPTIONS='--allow-fs-read=. --allow-fs-write=target' overkill run --profile microtest
 
 test-unit-with-coverage:
     c8 --config .c8rc.json node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --profile coverage --measure-resource-usage
