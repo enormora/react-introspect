@@ -1,0 +1,28 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "entry": [
+        "source/**/*.test.ts",
+        "source/**/*.type-test.ts",
+        "source/**/*.entry-point.ts",
+        "tool-configurations/dependency-cruiser.config.js",
+        "tool-configurations/eslint.config.js",
+        "tool-configurations/overkill.config.ts",
+        "package-smoke-test.js",
+        "packtory.config.js",
+        "tool-configurations/tstyche.json"
+    ],
+    "project": [
+        "source/**/*.ts!",
+        "*.js",
+        "*.ts",
+        "tool-configurations/**/*.js",
+        "tool-configurations/**/*.ts",
+        "!source/**/*.test.ts!",
+        "!source/**/*.type-test.ts!"
+    ],
+    "ignoreDependencies": [
+        "@ls-lint/ls-lint",
+        "c8",
+        "jscpd"
+    ]
+}

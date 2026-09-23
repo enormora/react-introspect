@@ -5,6 +5,6 @@
         "rootDir": "..",
         "types": ["node"]
     },
-    "include": ["./**/*.ts", "../overkill.config.ts", "../react-reconciler-runtime.d.ts"],
+    "include": ["./**/*.ts", "../tool-configurations/overkill.config.ts", "../react-reconciler-runtime.d.ts"],
     "exclude": ["./**/*.test.ts", "./**/*.type-test.ts"]
 }

@@ -22,12 +22,12 @@ export default [
     },
     {
         ...nodeConfigFileConfig,
-        files: [ 'dependency-cruiser.config.js', 'eslint.config.js' ]
+        files: [ 'tool-configurations/dependency-cruiser.config.js', 'tool-configurations/eslint.config.js' ]
     },
     {
         ...nodeConfigFileConfig,
         ...typescriptConfig,
-        files: [ 'overkill.config.ts' ]
+        files: [ 'tool-configurations/overkill.config.ts' ]
     },
     {
         ...nodeEntryPointFileConfig,
