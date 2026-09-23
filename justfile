@@ -38,7 +38,7 @@ test-types:
     ./node_modules/.bin/tstyche --config tool-configurations/tstyche.json
 
 test-package-smoke: compile
-    node package-smoke-test.js
+    node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile integration
 
 test: test-unit-with-coverage test-types test-package-smoke
 

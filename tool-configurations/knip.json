@@ -7,7 +7,6 @@
         "tool-configurations/dependency-cruiser.config.js",
         "tool-configurations/eslint.config.js",
         "tool-configurations/overkill.config.ts",
-        "package-smoke-test.js",
         "packtory.config.js",
         "tool-configurations/tstyche.json"
     ],

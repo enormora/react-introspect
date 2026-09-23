@@ -10,6 +10,7 @@ export const config = defineConfig({
             },
             testFamily: 'microtest',
             files: {
+                exclude: [ 'source/package-smoke.test.ts' ],
                 include: [ 'source/**/*.test.ts' ]
             },
             timeouts: {
@@ -23,10 +24,26 @@ export const config = defineConfig({
             },
             testFamily: 'microtest',
             files: {
+                exclude: [ 'source/package-smoke.test.ts' ],
                 include: [ 'source/**/*.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000
+            }
+        },
+        integration: {
+            execution: {
+                processModel: 'supervised-process',
+                scheduling: 'serial'
+            },
+            testFamily: 'integration',
+            files: {
+                include: [ 'source/package-smoke.test.ts' ]
+            },
+            timeouts: {
+                collectionMilliseconds: 30_000,
+                hardMilliseconds: 180_000,
+                softMilliseconds: 120_000
             }
         }
     }
