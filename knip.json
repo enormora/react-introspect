@@ -6,6 +6,7 @@
         "source/**/*.entry-point.ts",
         "dependency-cruiser.config.js",
         "overkill.config.ts",
+        "package-smoke-test.js",
         "packtory.config.js",
         "tstyche.json"
     ],

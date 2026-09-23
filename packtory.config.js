@@ -6,7 +6,9 @@ const rootPackageJson = JSON.parse(await fs.readFile(path.join(projectFolder, 'p
 
 const packageMetadata = {
     author: rootPackageJson.author,
+    bugs: rootPackageJson.bugs,
     description: rootPackageJson.description,
+    homepage: rootPackageJson.homepage,
     keywords: rootPackageJson.keywords,
     license: rootPackageJson.license,
     repository: rootPackageJson.repository,

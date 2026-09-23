@@ -37,7 +37,10 @@ test-unit-with-coverage:
 test-types:
     ./node_modules/.bin/tstyche
 
-test: test-unit-with-coverage test-types
+test-package-smoke: compile
+    node package-smoke-test.js
 
-publish-dry-run: compile
+test: test-unit-with-coverage test-types test-package-smoke
+
+publish-dry-run: test-package-smoke
     packtory publish

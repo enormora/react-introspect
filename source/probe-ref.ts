@@ -6,7 +6,7 @@ import type {
     ProbeRefs,
     ProbeRefShorthand,
     ProbeRefTarget
-} from './probe-public-types.ts';
+} from './probe-public-types.js';
 
 const matcherType = 'matchRefs';
 
