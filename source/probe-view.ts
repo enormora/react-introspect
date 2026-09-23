@@ -16,9 +16,18 @@ import {
     createEmptyProbeSnapshot,
     type ProbeSnapshot,
     type SnapshotNode
-} from './probe-snapshot.ts';
+} from './probe-snapshot-contract.ts';
 
 const defaultWaitTimeout = 1000;
+const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
+    let nextIdPrefixIndex = 0;
+
+    return function createIdPrefix() {
+        nextIdPrefixIndex += 1;
+
+        return `react-probe-${nextIdPrefixIndex}-`;
+    };
+})();
 
 function nodeList(
     reader: SnapshotReader,
@@ -44,6 +53,7 @@ function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
 export function createProbeView(element: React.ReactElement, options: RuntimeProbeOptions = {}): RuntimeProbeView {
     let currentSnapshot = createEmptyProbeSnapshot(0);
     const depth = options.depth ?? 1;
+    const idPrefix = options.idPrefix ?? createDefaultIdPrefix();
     const diagnostics = createProbeDiagnostics({
         errorMode: options.errorMode ?? 'capture',
         warningMode: options.warningMode ?? 'throw'
@@ -52,6 +62,8 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
         return createProbeReconcilerRoot({
             diagnostics,
             element: createProbeRenderElement(element, depth),
+            idGenerator: options.idGenerator,
+            idPrefix,
             publish(snapshot) {
                 currentSnapshot = snapshot;
             },

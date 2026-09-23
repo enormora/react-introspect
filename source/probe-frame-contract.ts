@@ -16,6 +16,7 @@ export type ProbeElement = React.ReactElement<Readonly<Record<PropertyKey, unkno
 export type ProbeTransformedNode = Readonly<React.ReactElement> | number | string | readonly ProbeTransformedNode[];
 
 export type ProbeComponentMetadata = {
+    readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly error: ProbeError | undefined;
     readonly givenChildren: unknown;
     readonly key: string | null;
@@ -68,11 +69,13 @@ export function nextDepth(depth: ProbeFrameDepth): ProbeFrameDepth {
 export function createComponentMetadata(
     element: ProbeElement,
     renderedReason: ProbeNotRenderedReason | undefined,
-    error?: ProbeError
+    error?: ProbeError,
+    activityMode?: 'hidden' | 'visible'
 ): ProbeComponentMetadata {
     const props = readElementProps(element);
 
     return Object.freeze({
+        activityMode,
         error,
         givenChildren: props.children,
         key: element.key,

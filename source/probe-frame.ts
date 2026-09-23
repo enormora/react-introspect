@@ -4,16 +4,16 @@ import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
+    nextDepth,
     type ProbeElement,
     probeElementKeyMetadata,
     type ProbeFrameDepth,
-    nextDepth,
     probeOpaqueHostType,
     type ProbeTransformedNode,
+    probeValueMetadata,
     readElementProps,
     readElementRef,
-    throwProbeRenderError,
-    probeValueMetadata
+    throwProbeRenderError
 } from './probe-frame-contract.ts';
 
 type ProbeFrameProps = {
@@ -66,6 +66,8 @@ const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
 const lazyType = Symbol.for('react.lazy');
 const contextType = Symbol.for('react.context');
+const activityType: unknown = Symbol.for('react.activity');
+const viewTransitionType: unknown = Symbol.for('react.view_transition');
 const lazyInitializerKey = '_init';
 const lazyPayloadKey = '_payload';
 
@@ -132,6 +134,10 @@ function isProbeElement(element: React.ReactElement): element is ProbeElement {
 
 function readElementChildren(element: ProbeElement): unknown {
     return readElementProps(element).children;
+}
+
+function readActivityMode(element: ProbeElement): 'hidden' | 'visible' {
+    return readElementProps(element).mode === 'hidden' ? 'hidden' : 'visible';
 }
 
 function canExecute(depth: ProbeFrameDepth): boolean {
@@ -225,6 +231,10 @@ function cloneSuspenseElement(request: ProbeSuspenseTransformRequest): React.Rea
     }, request.transformedChildren);
 }
 
+function cloneWrapperElement(element: ProbeElement, children: ProbeTransformedNode): React.ReactElement {
+    return React.cloneElement(element, {}, children);
+}
+
 function transformCollection(
     nodes: readonly unknown[],
     depth: ProbeFrameDepth,
@@ -246,6 +256,18 @@ function isExecutableComponentType(type: unknown): boolean {
         isMemoType(type) ||
         isForwardRefType(type) ||
         isLazyType(type);
+}
+
+function isActivityType(type: unknown): boolean {
+    return type === activityType;
+}
+
+function isViewTransitionType(type: unknown): boolean {
+    return type === viewTransitionType;
+}
+
+function isRenderableElementType(type: unknown): boolean {
+    return typeof type === 'string' || type === React.Fragment || isContextType(type);
 }
 
 function transformComponentElement(
@@ -299,6 +321,30 @@ function transformSuspenseElement(
     });
 }
 
+function transformActivityElement(
+    element: ProbeElement,
+    depth: ProbeFrameDepth,
+    transformChildNode: ProbeTransformNode,
+    frameFactory: ProbeFrameElementFactory
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
+        cloneWrapperElement(element, transformChildNode(readElementChildren(element), depth, frameFactory))
+    );
+}
+
+function transformViewTransitionElement(
+    element: ProbeElement,
+    depth: ProbeFrameDepth,
+    transformChildNode: ProbeTransformNode,
+    frameFactory: ProbeFrameElementFactory
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata(element, undefined),
+        cloneWrapperElement(element, transformChildNode(readElementChildren(element), depth, frameFactory))
+    );
+}
+
 function transformElement(
     element: ProbeElement,
     depth: ProbeFrameDepth,
@@ -311,7 +357,15 @@ function transformElement(
         return transformSuspenseElement(element, depth, transformChildNode, frameFactory);
     }
 
-    if (typeof type === 'string' || type === React.Fragment || isContextType(type)) {
+    if (isActivityType(type)) {
+        return transformActivityElement(element, depth, transformChildNode, frameFactory);
+    }
+
+    if (isViewTransitionType(type)) {
+        return transformViewTransitionElement(element, depth, transformChildNode, frameFactory);
+    }
+
+    if (isRenderableElementType(type)) {
         return transformRenderableElement(element, depth, transformChildNode, frameFactory);
     }
 

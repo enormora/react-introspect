@@ -11,6 +11,8 @@ import {
     createTextInstance,
     getChildHostContext,
     getRootHostContext,
+    hideInstance,
+    hideTextInstance,
     insertBefore,
     type ProbeHostContainer,
     type ProbeHostInstance,
@@ -18,10 +20,15 @@ import {
     type ProbeTextInstance,
     removeChild as removeHostChild,
     toSnapshot,
+    unhideInstance,
+    unhideTextInstance,
     validateContainerRefs
 } from './probe-host-tree.ts';
 import type { ProbeRefs } from './probe-public-types.ts';
-import { createEmptyProbeSnapshot, type ProbeSnapshot } from './probe-snapshot.ts';
+import {
+    createEmptyProbeSnapshot,
+    type ProbeSnapshot
+} from './probe-snapshot-contract.ts';
 
 type Waiter = {
     readonly predicate: () => boolean;
@@ -31,6 +38,8 @@ type Waiter = {
 type ProbeReconcilerRootOptions = {
     readonly diagnostics: ProbeDiagnostics;
     readonly element: React.ReactElement;
+    readonly idGenerator: ((generatedId: string) => string) | undefined;
+    readonly idPrefix: string;
     readonly publish: (snapshot: ProbeSnapshot) => void;
     readonly refs: ProbeRefs | undefined;
     readonly strictMode: boolean;
@@ -113,8 +122,8 @@ const probeReconcilerHostConfig = {
         return instance.readPublicInstance();
     },
     getRootHostContext,
-    hideInstance: noop,
-    hideTextInstance: noop,
+    hideInstance,
+    hideTextInstance,
     insertBefore,
     insertInContainerBefore: insertBefore,
     isPrimaryRenderer: false,
@@ -150,8 +159,8 @@ const probeReconcilerHostConfig = {
     suspendInstance: noop,
     suspendOnActiveViewTransition: alwaysFalse,
     trackSchedulerEvent: noop,
-    unhideInstance: noop,
-    unhideTextInstance: noop,
+    unhideInstance,
+    unhideTextInstance,
     waitForCommitToBeReady: returnNull
 };
 
@@ -168,7 +177,7 @@ function createReconcilerContainer(
         null,
         strictMode,
         null,
-        '',
+        container.readIdNormalization().prefix,
         diagnostics.recordUncaughtError,
         diagnostics.recordCaughtError,
         diagnostics.recordRecoverableError,
@@ -230,6 +239,10 @@ function createSessionContainer(
         },
         function readNextRenderCount() {
             return state.readRenderCount() + 1;
+        },
+        {
+            generator: options.idGenerator,
+            prefix: options.idPrefix
         },
         options.refs
     );

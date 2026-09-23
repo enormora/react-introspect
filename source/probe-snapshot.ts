@@ -1,140 +1,54 @@
 import React from 'react';
-import type { ProbeError, ProbeNotRenderedReason } from './probe-public-types.ts';
-
-export type ProbeSnapshot = {
-    readonly nodes: readonly SnapshotNode[];
-    readonly renderCount: number;
-    readonly root: SnapshotNode | undefined;
-};
-
-export type SnapshotProps = Readonly<Record<PropertyKey, unknown>>;
-
-type SnapshotNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
-
-type SnapshotSourceVisibleNode = SnapshotSourceElement | SnapshotSourceEmpty;
-
-export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | SnapshotSourceVisibleNode;
-
-type SnapshotSourceElementBase = {
-    readonly children: readonly SnapshotSourceNode[];
-    readonly error: ProbeError | undefined;
-    readonly key: string | null;
-    readonly props: SnapshotProps;
-    readonly renderedReason: ProbeNotRenderedReason | undefined;
-    readonly type: unknown;
-};
-
-type SnapshotSourceReactElement = SnapshotSourceElementBase & {
-    readonly givenChildren: unknown;
-    readonly givenChildrenKind: 'react';
-};
-
-type SnapshotSourceOwnedElement = SnapshotSourceElementBase & {
-    readonly givenChildren: readonly SnapshotSourceNode[];
-    readonly givenChildrenKind: 'source';
-};
-
-type SnapshotSourceElement = SnapshotSourceOwnedElement | SnapshotSourceReactElement;
-
-type SnapshotSourceEmpty = { readonly kind: 'empty'; readonly value: unknown; };
-
-type SnapshotSourceOpaque = { readonly kind: 'opaque'; readonly value: unknown; };
-
-type SnapshotSourceText = { readonly kind: 'text'; readonly value: string; };
-
-export type SnapshotNode = {
-    readonly error: ProbeError | undefined;
-    readonly givenChildren: readonly SnapshotNode[];
-    readonly id: number;
-    readonly key: string | null;
-    readonly kind: SnapshotNodeKind;
-    readonly name: string;
-    readonly parentId: number | undefined;
-    readonly path: string;
-    readonly props: SnapshotProps;
-    readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: ProbeNotRenderedReason | undefined;
-    readonly textContent: string;
-    readonly type: unknown;
-};
-
-type SnapshotBuild = { readonly nextId: number; readonly nodes: readonly SnapshotNode[]; };
-
-type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: number; };
-
-type SnapshotNodeInput = {
-    readonly error: ProbeError | undefined;
-    readonly givenChildren: readonly SnapshotNode[];
-    readonly id: number;
-    readonly key: string | null;
-    readonly kind: SnapshotNodeKind;
-    readonly name: string;
-    readonly parentId: number | undefined;
-    readonly path: string;
-    readonly props: SnapshotProps;
-    readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: ProbeNotRenderedReason | undefined;
-    readonly textContent: string;
-    readonly type: unknown;
-};
-
-type SnapshotNodeRequest = {
-    readonly build: SnapshotBuild;
-    readonly index: number;
-    readonly node: unknown;
-    readonly parentId: number | undefined;
-    readonly parentPath: string;
-};
-
-type ElementNodeRequest = SnapshotNodeRequest & { readonly element: React.ReactElement<SnapshotProps>; };
-
-type SourceElementNodeRequest = SnapshotNodeRequest & { readonly element: SnapshotSourceElement; };
-
-type ChildSnapshotsRequest = {
-    readonly build: SnapshotBuild;
-    readonly children: unknown;
-    readonly parentId: number | undefined;
-    readonly parentPath: string;
-};
-
-type SourceChildSnapshotsRequest = {
-    readonly build: SnapshotBuild;
-    readonly children: readonly SnapshotSourceNode[];
-    readonly parentId: number | undefined;
-    readonly parentPath: string;
-};
-
-type SourceSnapshotNodeRequest = SnapshotNodeRequest & { readonly node: SnapshotSourceNode; };
-
-type SourceElementChildrenRequest = {
-    readonly build: SnapshotBuild;
-    readonly element: SnapshotSourceElement;
-    readonly parentId: number;
-    readonly parentPath: string;
-};
-
-type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest & {
-    readonly givenChildrenResult: ChildSnapshotsResult;
-};
-
-type SnapshotNodeResult = {
-    readonly build: SnapshotBuild;
-    readonly node: SnapshotNode;
-};
-
-type ChildSnapshotsResult = {
-    readonly build: SnapshotBuild;
-    readonly nodes: readonly SnapshotNode[];
-};
-
-type ElementChildrenState = {
-    readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: ProbeNotRenderedReason | undefined;
-    readonly textContent: string;
-};
+import {
+    createIdNormalizer,
+    normalizeSnapshotProps,
+    normalizeSnapshotValue,
+    type ProbeIdNormalization
+} from './probe-id-normalization.ts';
+import type {
+    ChildSnapshotsRequest,
+    ChildSnapshotsResult,
+    ElementNodeRequest,
+    NodeIdAllocation,
+    ProbeSnapshot,
+    SnapshotBuild,
+    SnapshotNodeInput,
+    SnapshotNodeRequest,
+    SnapshotNodeResult,
+    SnapshotProps,
+    SnapshotSourceElement,
+    SnapshotSourceNode,
+    SnapshotVisibility,
+    SourceChildSnapshotsRequest,
+    SourceElementChildrenRequest,
+    SourceElementNodeRequest,
+    SourceElementRenderedChildrenRequest,
+    SourceSnapshotNodeRequest
+} from './probe-snapshot-contract.ts';
+import {
+    freezePropsWithoutChildren,
+    getElementChildrenState,
+    getElementKind,
+    getIndexedPath,
+    getSourceElementKind,
+    getTextContent,
+    getTypeName
+} from './probe-snapshot-shape.ts';
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
+}
+
+function visibilityFromSource(
+    inheritedVisibility: SnapshotVisibility,
+    sourceVisibility: SnapshotVisibility,
+    activityMode: 'hidden' | 'visible' | undefined
+): SnapshotVisibility {
+    if (inheritedVisibility === 'hidden' || sourceVisibility === 'hidden' || activityMode === 'hidden') {
+        return 'hidden';
+    }
+
+    return 'visible';
 }
 
 function readElementProps(element: React.ReactElement<SnapshotProps>): SnapshotProps {
@@ -157,91 +71,12 @@ function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boole
     return element.givenChildrenKind === 'source' && element.givenChildren === element.children;
 }
 
-function getTextContent(nodes: readonly SnapshotNode[]): string {
-    return nodes
-        .map(function readTextContent(node) {
-            return node.textContent;
-        })
-        .join('');
-}
-
-function getTypeName(type: unknown): string {
-    if (typeof type === 'string') {
-        return type;
-    }
-
-    if (type === React.Fragment) {
-        return 'Fragment';
-    }
-
-    if (typeof type === 'function') {
-        const displayName: unknown = Reflect.get(type, 'displayName');
-
-        return typeof displayName === 'string' ? displayName : type.name;
-    }
-
-    return 'Component';
-}
-
-function getIndexedPath(parentPath: string, index: number, name: string): string {
-    return parentPath === 'root' ? name : `${parentPath} > ${name}[${index}]`;
-}
-
-function rendersOwnChildren(type: unknown): boolean {
-    return typeof type === 'string' || type === React.Fragment;
-}
-
-function getElementKind(type: unknown): SnapshotNodeKind {
-    if (typeof type === 'string') {
-        return 'host';
-    }
-
-    if (type === React.Fragment) {
-        return 'fragment';
-    }
-
-    return 'component';
-}
-
-function getSourceElementKind(element: SnapshotSourceElement): SnapshotNodeKind {
-    if (typeof element.type === 'string') {
-        return 'host';
-    }
-
-    if (element.type === React.Fragment) {
-        return 'fragment';
-    }
-
-    return 'component';
-}
-
-function getElementChildrenState(type: unknown, children: readonly SnapshotNode[]): ElementChildrenState {
-    const renderedChildren = rendersOwnChildren(type) ? children : Object.freeze([]);
-
-    return {
-        renderedChildren,
-        renderedReason: rendersOwnChildren(type) ? undefined : 'depth',
-        textContent: getTextContent(renderedChildren.length > 0 ? renderedChildren : children)
-    };
-}
-
-function freezePropsWithoutChildren(props: SnapshotProps): SnapshotProps {
-    const publicProps: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        if (key !== 'children' && key !== 'key') {
-            publicProps[key] = props[key];
-        }
-    }
-
-    return Object.freeze(publicProps);
-}
-
 function allocateNodeId(build: SnapshotBuild): NodeIdAllocation {
     return {
         build: {
             nextId: build.nextId + 1,
-            nodes: build.nodes
+            nodes: build.nodes,
+            normalizeIdString: build.normalizeIdString
         },
         id: build.nextId
     };
@@ -253,6 +88,7 @@ function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNodeInput): Snaps
     return {
         build: {
             nextId: build.nextId,
+            normalizeIdString: build.normalizeIdString,
             nodes: Object.freeze([
                 ...build.nodes,
                 node
@@ -280,7 +116,9 @@ const snapshotOperations = {
             function addChild(result, child, index) {
                 const childResult = snapshotOperations.createSnapshotNode({
                     build: result.build,
+                    idNormalization: request.idNormalization,
                     index,
+                    inheritedVisibility: request.inheritedVisibility,
                     node: child,
                     parentId: request.parentId,
                     parentPath: request.parentPath
@@ -309,11 +147,14 @@ const snapshotOperations = {
         const childrenResult = snapshotOperations.createChildSnapshots({
             build: idAllocation.build,
             children: props.children,
+            idNormalization: request.idNormalization,
+            inheritedVisibility: request.inheritedVisibility,
             parentId: idAllocation.id,
             parentPath: path
         });
         const childrenState = getElementChildrenState(type, childrenResult.nodes);
         const result = pushSnapshotNode(childrenResult.build, {
+            activityMode: undefined,
             givenChildren: childrenResult.nodes,
             error: undefined,
             id: idAllocation.id,
@@ -322,11 +163,12 @@ const snapshotOperations = {
             name,
             parentId: request.parentId,
             path,
-            props: freezePropsWithoutChildren(props),
+            props: normalizeSnapshotProps(freezePropsWithoutChildren(props), request.build.normalizeIdString),
             renderedChildren: childrenState.renderedChildren,
             renderedReason: childrenState.renderedReason,
             textContent: childrenState.textContent,
-            type
+            type,
+            visibility: request.inheritedVisibility
         });
 
         return result;
@@ -335,9 +177,16 @@ const snapshotOperations = {
         const idAllocation = allocateNodeId(request.build);
         const name = getTypeName(request.element.type);
         const path = getIndexedPath(request.parentPath, request.index, name);
+        const visibility = visibilityFromSource(
+            request.inheritedVisibility,
+            request.element.visibility,
+            request.element.activityMode
+        );
         const childrenRequest = {
             build: idAllocation.build,
             element: request.element,
+            idNormalization: request.idNormalization,
+            inheritedVisibility: visibility,
             parentId: idAllocation.id,
             parentPath: path
         };
@@ -352,6 +201,7 @@ const snapshotOperations = {
         const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildrenResult.nodes;
 
         return pushSnapshotNode(renderedChildrenResult.build, {
+            activityMode: request.element.activityMode,
             givenChildren: givenChildrenResult.nodes,
             error: request.element.error,
             id: idAllocation.id,
@@ -360,11 +210,12 @@ const snapshotOperations = {
             name,
             parentId: request.parentId,
             path,
-            props: request.element.props,
+            props: normalizeSnapshotProps(request.element.props, request.build.normalizeIdString),
             renderedChildren,
             renderedReason: request.element.renderedReason,
             textContent: getTextContent(visibleChildren),
-            type: request.element.type
+            type: request.element.type,
+            visibility
         });
     },
     createSourceElementGivenChildren(request: SourceElementChildrenRequest): ChildSnapshotsResult {
@@ -372,12 +223,16 @@ const snapshotOperations = {
             ? snapshotOperations.createSourceChildSnapshots({
                 build: request.build,
                 children: request.element.givenChildren,
+                idNormalization: request.idNormalization,
+                inheritedVisibility: request.inheritedVisibility,
                 parentId: request.parentId,
                 parentPath: request.parentPath
             })
             : snapshotOperations.createChildSnapshots({
                 build: request.build,
                 children: request.element.givenChildren,
+                idNormalization: request.idNormalization,
+                inheritedVisibility: request.inheritedVisibility,
                 parentId: request.parentId,
                 parentPath: request.parentPath
             });
@@ -397,6 +252,8 @@ const snapshotOperations = {
         return snapshotOperations.createSourceChildSnapshots({
             build: request.givenChildrenResult.build,
             children: request.element.children,
+            idNormalization: request.idNormalization,
+            inheritedVisibility: request.inheritedVisibility,
             parentId: request.parentId,
             parentPath: request.parentPath
         });
@@ -405,6 +262,7 @@ const snapshotOperations = {
         const idAllocation = allocateNodeId(request.build);
 
         return pushSnapshotNode(idAllocation.build, {
+            activityMode: undefined,
             givenChildren: Object.freeze([]),
             error: undefined,
             id: idAllocation.id,
@@ -413,17 +271,21 @@ const snapshotOperations = {
             name: '#empty',
             parentId: request.parentId,
             path: getIndexedPath(request.parentPath, request.index, '#empty'),
-            props: Object.freeze({ value: request.node }),
+            props: Object.freeze({
+                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
+            }),
             renderedChildren: Object.freeze([]),
             renderedReason: undefined,
             textContent: '',
-            type: '#empty'
+            type: '#empty',
+            visibility: request.inheritedVisibility
         });
     },
     createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
         const idAllocation = allocateNodeId(request.build);
 
         return pushSnapshotNode(idAllocation.build, {
+            activityMode: undefined,
             givenChildren: Object.freeze([]),
             error: undefined,
             id: idAllocation.id,
@@ -432,11 +294,14 @@ const snapshotOperations = {
             name: 'Opaque',
             parentId: request.parentId,
             path: getIndexedPath(request.parentPath, request.index, 'Opaque'),
-            props: Object.freeze({ value: request.node }),
+            props: Object.freeze({
+                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
+            }),
             renderedChildren: Object.freeze([]),
             renderedReason: 'unsupported',
             textContent: '',
-            type: 'opaque'
+            type: 'opaque',
+            visibility: request.inheritedVisibility
         });
     },
     createSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
@@ -462,7 +327,9 @@ const snapshotOperations = {
             function addChild(result, child, index) {
                 const childResult = snapshotOperations.createSourceSnapshotNode({
                     build: result.build,
+                    idNormalization: request.idNormalization,
                     index,
+                    inheritedVisibility: request.inheritedVisibility,
                     node: child,
                     parentId: request.parentId,
                     parentPath: request.parentPath
@@ -493,6 +360,11 @@ const snapshotOperations = {
         if (request.node.kind === 'text') {
             return snapshotOperations.createTextSnapshotNode({
                 ...request,
+                inheritedVisibility: visibilityFromSource(
+                    request.inheritedVisibility,
+                    request.node.visibility,
+                    undefined
+                ),
                 node: request.node.value
             });
         }
@@ -500,12 +372,18 @@ const snapshotOperations = {
         if (request.node.kind === 'empty') {
             return snapshotOperations.createEmptySnapshotNode({
                 ...request,
+                inheritedVisibility: visibilityFromSource(
+                    request.inheritedVisibility,
+                    request.node.visibility,
+                    undefined
+                ),
                 node: request.node.value
             });
         }
 
         return snapshotOperations.createOpaqueSnapshotNode({
             ...request,
+            inheritedVisibility: visibilityFromSource(request.inheritedVisibility, request.node.visibility, undefined),
             node: request.node.value
         });
     },
@@ -513,6 +391,7 @@ const snapshotOperations = {
         const idAllocation = allocateNodeId(request.build);
 
         return pushSnapshotNode(idAllocation.build, {
+            activityMode: undefined,
             givenChildren: Object.freeze([]),
             error: undefined,
             id: idAllocation.id,
@@ -521,48 +400,53 @@ const snapshotOperations = {
             name: '#text',
             parentId: request.parentId,
             path: getIndexedPath(request.parentPath, request.index, '#text'),
-            props: Object.freeze({ value: request.node }),
+            props: Object.freeze({
+                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
+            }),
             renderedChildren: Object.freeze([]),
             renderedReason: undefined,
-            textContent: String(request.node),
-            type: '#text'
+            textContent: request.build.normalizeIdString(String(request.node)),
+            type: '#text',
+            visibility: request.inheritedVisibility
         });
     }
 };
 
-export function createEmptyProbeSnapshot(renderCount: number): ProbeSnapshot {
-    return Object.freeze({
-        nodes: Object.freeze([]),
-        renderCount,
-        root: undefined
-    });
-}
-
 export function createProbeSnapshotFromSource(
     children: readonly SnapshotSourceNode[],
-    renderCount: number
+    renderCount: number,
+    idNormalization: ProbeIdNormalization = { generator: undefined, prefix: '' }
 ): ProbeSnapshot {
     if (children.length !== 1) {
-        return createProbeSnapshotFromSource([
-            {
-                children,
-                error: undefined,
-                givenChildren: [],
-                givenChildrenKind: 'source',
-                key: null,
-                props: Object.freeze({}),
-                renderedReason: undefined,
-                type: React.Fragment
-            }
-        ], renderCount);
+        return createProbeSnapshotFromSource(
+            [
+                {
+                    activityMode: undefined,
+                    children,
+                    error: undefined,
+                    givenChildren: [],
+                    givenChildrenKind: 'source',
+                    key: null,
+                    props: Object.freeze({}),
+                    renderedReason: undefined,
+                    type: React.Fragment,
+                    visibility: 'visible'
+                }
+            ],
+            renderCount,
+            idNormalization
+        );
     }
 
     const result = snapshotOperations.createSourceChildSnapshots({
         build: {
             nextId: 0,
-            nodes: Object.freeze([])
+            nodes: Object.freeze([]),
+            normalizeIdString: createIdNormalizer(idNormalization)
         },
         children,
+        idNormalization,
+        inheritedVisibility: 'visible',
         parentId: undefined,
         parentPath: 'root'
     });

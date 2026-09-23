@@ -7,14 +7,15 @@ import {
     probeOpaqueHostType,
     probeValueMetadata
 } from './probe-frame-contract.ts';
+import type { ProbeIdNormalization } from './probe-id-normalization.ts';
 import type { ProbeRefs } from './probe-public-types.ts';
 import { type ProbeRefHostTarget, resolveProbeRef, validateProbeRefs } from './probe-ref.ts';
 import {
     createEmptyProbeSnapshot,
-    createProbeSnapshotFromSource,
     type ProbeSnapshot,
     type SnapshotSourceNode
-} from './probe-snapshot.ts';
+} from './probe-snapshot-contract.ts';
+import { createProbeSnapshotFromSource } from './probe-snapshot.ts';
 
 export type ProbeHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -28,6 +29,7 @@ type ProbeChildStore = {
 };
 
 export type ProbeHostContainer = {
+    readonly readIdNormalization: () => ProbeIdNormalization;
     readonly readRefs: () => ProbeRefs | undefined;
     readonly publish: (snapshot: ProbeSnapshot) => void;
     readonly readNextRenderCount: () => number;
@@ -38,13 +40,17 @@ export type ProbeHostContainer = {
 export type ProbeHostInstance = {
     readonly readProps: () => ProbeHostProps;
     readonly readPublicInstance: () => unknown;
+    readonly readVisibility: () => 'hidden' | 'visible';
     readonly refreshPublicInstance: (props: ProbeHostProps) => void;
     readonly type: string;
+    readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
     readonly writeProps: (props: ProbeHostProps) => void;
 } & ProbeChildStore;
 
 export type ProbeTextInstance = {
     readonly readText: () => string;
+    readonly readVisibility: () => 'hidden' | 'visible';
+    readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
     readonly writeText: (text: string) => void;
 };
 
@@ -58,6 +64,7 @@ const internalHostTypes = Object.freeze([
     probeOpaqueHostType
 ]);
 const probeComponentMetadataKeys = Object.freeze([
+    'activityMode',
     'error',
     'givenChildren',
     'key',
@@ -139,6 +146,7 @@ function readComponentMetadata(instance: ProbeHostInstance): ProbeComponentMetad
 
     if (!isProbeComponentMetadata(value)) {
         return Object.freeze({
+            activityMode: undefined,
             error: undefined,
             givenChildren: undefined,
             key: null,
@@ -212,13 +220,14 @@ function detachChild(child: ProbeHostChild): void {
 
 function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
     if (isTextInstance(child)) {
-        return { kind: 'text', value: child.readText() };
+        return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
     }
 
     if (child.type === probeEmptyHostType || child.type === probeOpaqueHostType) {
         return {
             kind: child.type === probeEmptyHostType ? 'empty' : 'opaque',
-            value: readSpecialValue(child)
+            value: readSpecialValue(child),
+            visibility: child.readVisibility()
         };
     }
 
@@ -226,6 +235,7 @@ function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
         const metadata = readComponentMetadata(child);
 
         return {
+            activityMode: metadata.activityMode,
             children: child.readChildren().map(toSourceNode),
             error: metadata.error,
             givenChildren: metadata.givenChildren,
@@ -233,13 +243,15 @@ function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
             key: metadata.key,
             props: metadata.props,
             renderedReason: metadata.renderedReason,
-            type: metadata.type
+            type: metadata.type,
+            visibility: child.readVisibility()
         };
     }
 
     const children = child.readChildren().map(toSourceNode);
 
     return {
+        activityMode: undefined,
         children,
         error: undefined,
         givenChildren: children,
@@ -247,7 +259,8 @@ function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
         key: readHostKey(child),
         props: publicProps(child.readProps()),
         renderedReason: undefined,
-        type: child.type
+        type: child.type,
+        visibility: child.readVisibility()
     };
 }
 
@@ -270,6 +283,7 @@ export function clearContainer(container: ProbeHostContainer): void {
 export function createHostContainer(
     publish: (snapshot: ProbeSnapshot) => void,
     readNextRenderCount: () => number,
+    idNormalization: ProbeIdNormalization,
     refs: ProbeRefs | undefined
 ): ProbeHostContainer {
     let mounted = true;
@@ -277,6 +291,9 @@ export function createHostContainer(
     return Object.freeze({
         ...createChildStore(),
         publish,
+        readIdNormalization() {
+            return idNormalization;
+        },
         readMounted() {
             return mounted;
         },
@@ -298,6 +315,7 @@ export function createHostInstance(
 ): ProbeHostInstance {
     let currentProps = props;
     let currentPublicInstance = resolvePublicInstance(context.refs, type, props);
+    let currentVisibility: 'hidden' | 'visible' = 'visible';
 
     return Object.freeze({
         ...createChildStore(),
@@ -307,10 +325,16 @@ export function createHostInstance(
         readPublicInstance() {
             return currentPublicInstance;
         },
+        readVisibility() {
+            return currentVisibility;
+        },
         refreshPublicInstance(nextProps: ProbeHostProps) {
             currentPublicInstance = resolvePublicInstance(context.refs, type, nextProps);
         },
         type,
+        writeVisibility(visibility: 'hidden' | 'visible') {
+            currentVisibility = visibility;
+        },
         writeProps(nextProps: ProbeHostProps) {
             currentProps = nextProps;
         }
@@ -319,10 +343,17 @@ export function createHostInstance(
 
 export function createTextInstance(text: string): ProbeTextInstance {
     let currentText = text;
+    let currentVisibility: 'hidden' | 'visible' = 'visible';
 
     return Object.freeze({
         readText() {
             return currentText;
+        },
+        readVisibility() {
+            return currentVisibility;
+        },
+        writeVisibility(visibility: 'hidden' | 'visible') {
+            currentVisibility = visibility;
         },
         writeText(nextText: string) {
             currentText = nextText;
@@ -369,8 +400,25 @@ export function toSnapshot(container: ProbeHostContainer): ProbeSnapshot {
 
     return createProbeSnapshotFromSource(
         container.readChildren().map(toSourceNode),
-        container.readNextRenderCount()
+        container.readNextRenderCount(),
+        container.readIdNormalization()
     );
+}
+
+export function hideInstance(instance: ProbeHostInstance): void {
+    instance.writeVisibility('hidden');
+}
+
+export function hideTextInstance(instance: ProbeTextInstance): void {
+    instance.writeVisibility('hidden');
+}
+
+export function unhideInstance(instance: ProbeHostInstance): void {
+    instance.writeVisibility('visible');
+}
+
+export function unhideTextInstance(instance: ProbeTextInstance): void {
+    instance.writeVisibility('visible');
 }
 
 export function validateContainerRefs(container: ProbeHostContainer): void {

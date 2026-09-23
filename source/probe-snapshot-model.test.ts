@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { ProbeSnapshot, SnapshotNode } from './probe-snapshot.ts';
+import type { ProbeSnapshot, SnapshotNode } from './probe-snapshot-contract.ts';
 import { probe } from './react-probe.entry-point.ts';
 
 type EqualScope = {

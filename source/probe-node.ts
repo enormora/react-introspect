@@ -2,7 +2,7 @@ import { createProbeList } from './probe-list.ts';
 import type { ProbeNodeState } from './probe-public-types.ts';
 import type { RuntimeProbeList, RuntimeProbeNode, RuntimeRenderedChildren } from './probe-runtime-types.ts';
 import { nodeMatchesSelector, toSelector } from './probe-selector.ts';
-import type { ProbeSnapshot, SnapshotNode, SnapshotProps } from './probe-snapshot.ts';
+import type { ProbeSnapshot, SnapshotNode, SnapshotProps } from './probe-snapshot-contract.ts';
 
 export type SnapshotReader = {
     readonly currentSnapshot: ProbeSnapshot;
@@ -70,10 +70,10 @@ function formatNode(node: SnapshotNode, depth: number): string {
 
 function nodeState(node: SnapshotNode): ProbeNodeState {
     return Object.freeze({
-        activityMode: undefined,
-        reason: node.renderedReason,
+        activityMode: node.activityMode,
+        reason: node.renderedReason ?? (node.visibility === 'hidden' ? 'activity' : undefined),
         rendered: node.renderedReason === undefined,
-        visible: true
+        visible: node.visibility === 'visible'
     });
 }
 
@@ -161,7 +161,7 @@ export function createProbeNode(
             return node.type;
         },
         get visibility() {
-            return node.renderedReason === undefined ? 'visible' : 'notRendered';
+            return node.renderedReason === undefined ? node.visibility : 'notRendered';
         },
         callProp(property: PropertyKey, ...parameters: readonly unknown[]) {
             return reader.act(function callSnapshotProp() {
