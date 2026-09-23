@@ -1,8 +1,8 @@
 import * as timers from 'node:timers';
 import React from 'react';
 import createReconciler from 'react-reconciler';
-import type { ProbeDiagnostics } from './probe-diagnostics.ts';
-import { isProbeRenderError } from './probe-frame-contract.ts';
+import type { ReflectDiagnostics } from './reflect-diagnostics.ts';
+import { isReflectRenderError } from './reflect-frame-contract.ts';
 import {
     appendChild,
     clearContainer,
@@ -14,39 +14,39 @@ import {
     hideInstance,
     hideTextInstance,
     insertBefore,
-    type ProbeHostContainer,
-    type ProbeHostInstance,
-    type ProbeHostProps,
-    type ProbeTextInstance,
+    type ReflectHostContainer,
+    type ReflectHostInstance,
+    type ReflectHostProps,
+    type ReflectTextInstance,
     removeChild as removeHostChild,
     toSnapshot,
     unhideInstance,
     unhideTextInstance,
     validateContainerRefs
-} from './probe-host-tree.ts';
-import type { ProbeRefs } from './probe-public-types.ts';
+} from './reflect-host-tree.ts';
+import type { ReflectRefs } from './reflect-public-types.ts';
 import {
-    createEmptyProbeSnapshot,
-    type ProbeSnapshot
-} from './probe-snapshot-contract.ts';
+    createEmptyReflectSnapshot,
+    type ReflectSnapshot
+} from './reflect-snapshot-contract.ts';
 
 type Waiter = {
     readonly predicate: () => boolean;
     readonly resolve: () => void;
 };
 
-type ProbeReconcilerRootOptions = {
-    readonly diagnostics: ProbeDiagnostics;
+type ReflectReconcilerRootOptions = {
+    readonly diagnostics: ReflectDiagnostics;
     readonly element: React.ReactElement;
     readonly idGenerator: ((generatedId: string) => string) | undefined;
     readonly idPrefix: string;
-    readonly publish: (snapshot: ProbeSnapshot) => void;
-    readonly refs: ProbeRefs | undefined;
+    readonly publish: (snapshot: ReflectSnapshot) => void;
+    readonly refs: ReflectRefs | undefined;
     readonly strictMode: boolean;
     readonly waitTimeout: number;
 };
 
-export type ProbeReconcilerRoot = {
+export type ReflectReconcilerRoot = {
     readonly act: (action: () => unknown) => unknown;
     readonly unmount: () => void;
     readonly update: (element: React.ReactElement) => void;
@@ -75,7 +75,7 @@ function getDefaultEventPriority(): number {
     return defaultEventPriority;
 }
 
-function publishContainerSnapshot(container: ProbeHostContainer): void {
+function publishContainerSnapshot(container: ReflectHostContainer): void {
     container.publish(toSnapshot(container));
 }
 
@@ -83,7 +83,7 @@ function prepareForCommit(): null {
     return null;
 }
 
-const probeReconcilerHostConfig = {
+const reflectReconcilerHostConfig = {
     NotPendingTransition: null,
     HostTransitionContext: {
         _currentValue: null,
@@ -102,14 +102,14 @@ const probeReconcilerHostConfig = {
     clearContainer,
     clearSuspenseBoundary: noop,
     commitMount: noop,
-    commitTextUpdate(instance: ProbeTextInstance, _oldText: string, newText: string) {
+    commitTextUpdate(instance: ReflectTextInstance, _oldText: string, newText: string) {
         instance.writeText(newText);
     },
     commitUpdate(
-        instance: ProbeHostInstance,
+        instance: ReflectHostInstance,
         _type: string,
-        _oldProps: ProbeHostProps,
-        newProps: ProbeHostProps
+        _oldProps: ReflectHostProps,
+        newProps: ReflectHostProps
     ) {
         instance.writeProps(newProps);
         instance.refreshPublicInstance(newProps);
@@ -120,7 +120,7 @@ const probeReconcilerHostConfig = {
     finalizeInitialChildren: alwaysFalse,
     getChildHostContext,
     getCurrentUpdatePriority: getDefaultEventPriority,
-    getPublicInstance(instance: ProbeHostInstance) {
+    getPublicInstance(instance: ReflectHostInstance) {
         return instance.readPublicInstance();
     },
     getRootHostContext,
@@ -166,11 +166,11 @@ const probeReconcilerHostConfig = {
     waitForCommitToBeReady: returnNull
 };
 
-const renderer = createReconciler(probeReconcilerHostConfig);
+const renderer = createReconciler(reflectReconcilerHostConfig);
 
 function createReconcilerContainer(
-    container: ProbeHostContainer,
-    diagnostics: ProbeDiagnostics,
+    container: ReflectHostContainer,
+    diagnostics: ReflectDiagnostics,
     strictMode: boolean
 ): Record<string, unknown> {
     return renderer.createContainer(
@@ -209,21 +209,21 @@ function actNow(action: () => unknown): unknown {
     return results.values().next().value;
 }
 
-type ProbeReconcilerState = {
+type ReflectReconcilerState = {
     readonly readRenderCount: () => number;
     readonly readWaiters: () => readonly Waiter[];
     readonly writeRenderCount: (count: number) => void;
     readonly writeWaiters: (waiters: readonly Waiter[]) => void;
 };
 
-type ProbeReconcilerSession = {
-    readonly container: ProbeHostContainer;
-    readonly options: ProbeReconcilerRootOptions;
+type ReflectReconcilerSession = {
+    readonly container: ReflectHostContainer;
+    readonly options: ReflectReconcilerRootOptions;
     readonly root: Readonly<Record<string, unknown>>;
-    readonly state: ProbeReconcilerState;
+    readonly state: ReflectReconcilerState;
 };
 
-function settleWaiters(sessionState: ProbeReconcilerState): void {
+function settleWaiters(sessionState: ReflectReconcilerState): void {
     const settledWaiters = sessionState.readWaiters().filter(function isSettled(waiter) {
         return waiter.predicate();
     });
@@ -240,9 +240,9 @@ function settleWaiters(sessionState: ProbeReconcilerState): void {
 }
 
 function createSessionContainer(
-    options: ProbeReconcilerRootOptions,
-    state: ProbeReconcilerState
-): ProbeHostContainer {
+    options: ReflectReconcilerRootOptions,
+    state: ReflectReconcilerState
+): ReflectHostContainer {
     return createHostContainer(
         function publishSnapshot(snapshot) {
             state.writeRenderCount(snapshot.renderCount);
@@ -260,7 +260,7 @@ function createSessionContainer(
     );
 }
 
-function createProbeReconcilerSession(options: ProbeReconcilerRootOptions): ProbeReconcilerSession {
+function createReflectReconcilerSession(options: ReflectReconcilerRootOptions): ReflectReconcilerSession {
     let renderCount = 0;
     let waiters: readonly Waiter[] = [];
     const state = Object.freeze({
@@ -288,7 +288,7 @@ function createProbeReconcilerSession(options: ProbeReconcilerRootOptions): Prob
     });
 }
 
-function actSession(session: ProbeReconcilerSession, action: () => unknown): unknown {
+function actSession(session: ReflectReconcilerSession, action: () => unknown): unknown {
     return session.options.diagnostics.run(function actWithDiagnostics() {
         return actNow(function runAction() {
             const result = action();
@@ -301,7 +301,7 @@ function actSession(session: ProbeReconcilerSession, action: () => unknown): unk
     });
 }
 
-async function waitForIdleSession(session: ProbeReconcilerSession): Promise<void> {
+async function waitForIdleSession(session: ReflectReconcilerSession): Promise<void> {
     await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
         await Promise.resolve();
         renderer.flushPassiveEffects();
@@ -309,7 +309,7 @@ async function waitForIdleSession(session: ProbeReconcilerSession): Promise<void
     });
 }
 
-async function waitForSession(session: ProbeReconcilerSession, predicate: () => boolean): Promise<void> {
+async function waitForSession(session: ReflectReconcilerSession, predicate: () => boolean): Promise<void> {
     if (session.options.diagnostics.run(predicate)) {
         return;
     }
@@ -335,24 +335,24 @@ async function waitForSession(session: ProbeReconcilerSession, predicate: () => 
     }
 }
 
-function publishEmptySnapshot(session: ProbeReconcilerSession, renderCountBefore: number): void {
+function publishEmptySnapshot(session: ReflectReconcilerSession, renderCountBefore: number): void {
     const errorRenderCount = Math.max(session.state.readRenderCount(), renderCountBefore + 1);
 
-    session.options.publish(createEmptyProbeSnapshot(errorRenderCount));
+    session.options.publish(createEmptyReflectSnapshot(errorRenderCount));
 }
 
-function publishEmptyErrorSnapshot(session: ProbeReconcilerSession, renderCountBefore: number): void {
+function publishEmptyErrorSnapshot(session: ReflectReconcilerSession, renderCountBefore: number): void {
     session.container.writeMounted(false);
     session.container.writeChildren([]);
     publishEmptySnapshot(session, renderCountBefore);
 }
 
 function captureRenderError(
-    session: ProbeReconcilerSession,
+    session: ReflectReconcilerSession,
     error: unknown,
     renderCountBefore: number
 ): void {
-    if (!isProbeRenderError(error)) {
+    if (!isReflectRenderError(error)) {
         throw error;
     }
 
@@ -360,7 +360,7 @@ function captureRenderError(
     session.options.diagnostics.recordUncaughtError(error);
 }
 
-function captureMissingInitialCommit(session: ProbeReconcilerSession, renderCountBefore: number): void {
+function captureMissingInitialCommit(session: ReflectReconcilerSession, renderCountBefore: number): void {
     if (
         renderCountBefore > 0 ||
         session.state.readRenderCount() > renderCountBefore ||
@@ -369,7 +369,7 @@ function captureMissingInitialCommit(session: ProbeReconcilerSession, renderCoun
         return;
     }
 
-    const message = 'React Probe cannot commit a suspended root. ' +
+    const message = 'React Reflect cannot commit a suspended root. ' +
         'Wrap lazy, async, or promise-using roots in React.Suspense.';
 
     publishEmptyErrorSnapshot(session, renderCountBefore);
@@ -377,7 +377,7 @@ function captureMissingInitialCommit(session: ProbeReconcilerSession, renderCoun
 }
 
 function updateRootElement(
-    session: ProbeReconcilerSession,
+    session: ReflectReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
     renderer.flushSyncFromReconciler(function updateContainer() {
@@ -386,7 +386,7 @@ function updateRootElement(
 }
 
 function renderRootElement(
-    session: ProbeReconcilerSession,
+    session: ReflectReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
     actNow(function renderElement() {
@@ -396,7 +396,7 @@ function renderRootElement(
 }
 
 function renderWithDiagnostics(
-    session: ProbeReconcilerSession,
+    session: ReflectReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
     const renderCountBefore = session.state.readRenderCount();
@@ -415,13 +415,13 @@ function renderWithDiagnostics(
     captureMissingInitialCommit(session, renderCountBefore);
 }
 
-function flushElement(session: ProbeReconcilerSession, element: Readonly<React.ReactElement> | null): void {
+function flushElement(session: ReflectReconcilerSession, element: Readonly<React.ReactElement> | null): void {
     session.options.diagnostics.run(function renderElementWithDiagnostics() {
         renderWithDiagnostics(session, element);
     });
 }
 
-async function waitForNextRenderSession(session: ProbeReconcilerSession): Promise<void> {
+async function waitForNextRenderSession(session: ReflectReconcilerSession): Promise<void> {
     const expectedRenderCount = session.state.readRenderCount() + 1;
 
     return waitForSession(session, function didRender() {
@@ -429,14 +429,14 @@ async function waitForNextRenderSession(session: ProbeReconcilerSession): Promis
     });
 }
 
-async function waitForRenderCountSession(session: ProbeReconcilerSession, count: number): Promise<void> {
+async function waitForRenderCountSession(session: ReflectReconcilerSession, count: number): Promise<void> {
     return waitForSession(session, function didRenderCount() {
         return session.state.readRenderCount() >= count;
     });
 }
 
-export function createProbeReconcilerRoot(options: ProbeReconcilerRootOptions): ProbeReconcilerRoot {
-    const session = createProbeReconcilerSession(options);
+export function createReflectReconcilerRoot(options: ReflectReconcilerRootOptions): ReflectReconcilerRoot {
+    const session = createReflectReconcilerSession(options);
 
     flushElement(session, options.element);
 

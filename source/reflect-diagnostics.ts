@@ -1,22 +1,22 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import diagnosticsChannel from 'node:diagnostics_channel';
-import type { ProbeError, ProbeWarning } from './probe-public-types.ts';
+import type { ReflectError, ReflectWarning } from './reflect-public-types.ts';
 
-type ProbeDiagnosticMode = 'capture' | 'ignore' | 'throw';
+type ReflectDiagnosticMode = 'capture' | 'ignore' | 'throw';
 
-type ProbeDiagnosticsOptions = {
+type ReflectDiagnosticsOptions = {
     readonly errorMode: 'capture' | 'throw';
-    readonly warningMode: ProbeDiagnosticMode;
+    readonly warningMode: ReflectDiagnosticMode;
 };
 
-type ProbeDiagnosticsContext = {
+type ReflectDiagnosticsContext = {
     readonly recordConsoleWarning: (message: readonly unknown[]) => void;
 };
 
-export type ProbeDiagnostics = {
-    readonly errors: readonly ProbeError[];
+export type ReflectDiagnostics = {
+    readonly errors: readonly ReflectError[];
     readonly hasWarnings: boolean;
-    readonly warnings: readonly ProbeWarning[];
+    readonly warnings: readonly ReflectWarning[];
     readonly recordCaughtError: (cause: unknown) => void;
     readonly recordConsoleDiagnostic: (message: unknown) => void;
     readonly recordRecoverableError: (cause: unknown) => void;
@@ -25,7 +25,7 @@ export type ProbeDiagnostics = {
     readonly runAsync: <Result>(action: () => Promise<Result>) => Promise<Result>;
 };
 
-const storage = new AsyncLocalStorage<ProbeDiagnosticsContext>();
+const storage = new AsyncLocalStorage<ReflectDiagnosticsContext>();
 const consoleDiagnosticChannels = Object.freeze([
     'console.error',
     'console.warn'
@@ -35,7 +35,7 @@ function messageFromCause(cause: unknown): string {
     return cause instanceof Error ? cause.message : String(cause);
 }
 
-function throwDiagnostic(diagnostic: ProbeError | ProbeWarning): never {
+function throwDiagnostic(diagnostic: ReflectError | ReflectWarning): never {
     if (diagnostic.cause instanceof Error) {
         throw diagnostic.cause;
     }
@@ -43,14 +43,14 @@ function throwDiagnostic(diagnostic: ProbeError | ProbeWarning): never {
     throw new Error(diagnostic.message);
 }
 
-function createProbeWarning(cause: unknown): ProbeWarning {
+function createReflectWarning(cause: unknown): ReflectWarning {
     return Object.freeze({
         cause,
         message: messageFromCause(cause)
     });
 }
 
-function createProbeError(cause: unknown, handled: boolean): ProbeError {
+function createReflectError(cause: unknown, handled: boolean): ReflectError {
     return Object.freeze({
         cause,
         handled,
@@ -76,7 +76,7 @@ function toConsoleMessage(value: unknown): readonly unknown[] {
     return Array.isArray(value) ? value : Object.freeze([ value ]);
 }
 
-function recordProbeConsoleDiagnostic(message: unknown): void {
+function recordReflectConsoleDiagnostic(message: unknown): void {
     const consoleMessage = toConsoleMessage(message);
 
     if (!isReactDiagnosticMessage(consoleMessage)) {
@@ -95,21 +95,21 @@ const subscribeConsoleDiagnostics = (function createConsoleDiagnosticsSubscripti
         }
 
         for (const channelName of consoleDiagnosticChannels) {
-            diagnosticsChannel.subscribe(channelName, recordProbeConsoleDiagnostic);
+            diagnosticsChannel.subscribe(channelName, recordReflectConsoleDiagnostic);
         }
 
         ready = true;
     };
 })();
 
-export function createProbeDiagnostics(options: ProbeDiagnosticsOptions): ProbeDiagnostics {
+export function createReflectDiagnostics(options: ReflectDiagnosticsOptions): ReflectDiagnostics {
     subscribeConsoleDiagnostics();
 
-    let errors: readonly ProbeError[] = Object.freeze([]);
-    let warnings: readonly ProbeWarning[] = Object.freeze([]);
-    let pendingThrownDiagnostic: ProbeError | ProbeWarning | null = null;
+    let errors: readonly ReflectError[] = Object.freeze([]);
+    let warnings: readonly ReflectWarning[] = Object.freeze([]);
+    let pendingThrownDiagnostic: ReflectError | ReflectWarning | null = null;
 
-    function appendWarning(warning: ProbeWarning): void {
+    function appendWarning(warning: ReflectWarning): void {
         if (options.warningMode === 'ignore') {
             return;
         }
@@ -124,7 +124,7 @@ export function createProbeDiagnostics(options: ProbeDiagnosticsOptions): ProbeD
         }
     }
 
-    function appendError(error: ProbeError): void {
+    function appendError(error: ReflectError): void {
         if (
             errors.some(function isSameError(existingError) {
                 return existingError.cause === error.cause && existingError.handled === error.handled;
@@ -152,9 +152,9 @@ export function createProbeDiagnostics(options: ProbeDiagnosticsOptions): ProbeD
         }
     }
 
-    const context: ProbeDiagnosticsContext = Object.freeze({
+    const context: ReflectDiagnosticsContext = Object.freeze({
         recordConsoleWarning(message) {
-            appendWarning(createProbeWarning(consoleMessageText(message)));
+            appendWarning(createReflectWarning(consoleMessageText(message)));
         }
     });
 
@@ -172,13 +172,13 @@ export function createProbeDiagnostics(options: ProbeDiagnosticsOptions): ProbeD
             return undefined;
         },
         recordConsoleDiagnostic(message) {
-            recordProbeConsoleDiagnostic(message);
+            recordReflectConsoleDiagnostic(message);
         },
         recordRecoverableError(cause) {
-            appendWarning(createProbeWarning(cause));
+            appendWarning(createReflectWarning(cause));
         },
         recordUncaughtError(cause) {
-            appendError(createProbeError(cause, false));
+            appendError(createReflectError(cause, false));
         },
         run<Result>(action: () => Result) {
             return storage.run(context, function runWithDiagnostics() {

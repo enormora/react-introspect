@@ -4,32 +4,32 @@ import {
     createComponentMetadata,
     createEmptyHost,
     nextDepth,
-    type ProbeElement,
-    type ProbeFrameDepth,
-    type ProbeTransformedNode,
+    type ReflectElement,
+    type ReflectFrameDepth,
+    type ReflectTransformedNode,
     readElementProps,
     readElementRef,
-    throwProbeRenderError
-} from './probe-frame-contract.ts';
-import type { ProbeError } from './probe-public-types.ts';
+    throwReflectRenderError
+} from './reflect-frame-contract.ts';
+import type { ReflectError } from './reflect-public-types.ts';
 
-type ProbeFrameElementFactory = (element: ProbeElement, depth: ProbeFrameDepth) => React.ReactElement;
+type ReflectFrameElementFactory = (element: ReflectElement, depth: ReflectFrameDepth) => React.ReactElement;
 
-type ProbeTransformNode = (
+type ReflectTransformNode = (
     node: unknown,
-    depth: ProbeFrameDepth,
-    createFrameElement: ProbeFrameElementFactory
-) => ProbeTransformedNode;
+    depth: ReflectFrameDepth,
+    createFrameElement: ReflectFrameElementFactory
+) => ReflectTransformedNode;
 
-export type ProbeClassFrameProps = {
-    readonly createFrameElement: ProbeFrameElementFactory;
-    readonly depth: ProbeFrameDepth;
-    readonly element: ProbeElement;
-    readonly transformNode: ProbeTransformNode;
-    readonly type: ProbeClassComponent;
+export type ReflectClassFrameProps = {
+    readonly createFrameElement: ReflectFrameElementFactory;
+    readonly depth: ReflectFrameDepth;
+    readonly element: ReflectElement;
+    readonly transformNode: ReflectTransformNode;
+    readonly type: ReflectClassComponent;
 };
 
-type ProbeClassComponent = {
+type ReflectClassComponent = {
     readonly getDerivedStateFromError?: (error: unknown) => unknown;
     readonly getDerivedStateFromProps?: (
         props: Readonly<Record<PropertyKey, unknown>>,
@@ -42,10 +42,10 @@ type ProbeClassComponent = {
     new (
         props: Readonly<Record<PropertyKey, unknown>>,
         context: unknown
-    ): ProbeClassInstance;
+    ): ReflectClassInstance;
 };
 
-type ProbeClassUpdater = {
+type ReflectClassUpdater = {
     readonly enqueueForceUpdate: (
         instance: unknown,
         callback: (() => void) | undefined
@@ -57,7 +57,7 @@ type ProbeClassUpdater = {
     ) => void;
 };
 
-type ProbeClassInstance = React.Component<Readonly<Record<PropertyKey, unknown>>, unknown> & {
+type ReflectClassInstance = React.Component<Readonly<Record<PropertyKey, unknown>>, unknown> & {
     readonly componentDidCatch?: (error: unknown, errorInfo: unknown) => void;
     readonly componentDidMount?: () => void;
     readonly componentDidUpdate?: (props: unknown, state: unknown, snapshot: unknown) => void;
@@ -70,22 +70,22 @@ type ProbeClassInstance = React.Component<Readonly<Record<PropertyKey, unknown>>
     readonly render: () => React.ReactNode;
     readonly shouldComponentUpdate?: (props: unknown, state: unknown, context: unknown) => boolean;
     readonly state: unknown;
-    readonly updater: ProbeClassUpdater;
+    readonly updater: ReflectClassUpdater;
 };
 
-type ProbeClassFrameState = {
+type ReflectClassFrameState = {
     readonly boundaryErrorCause: unknown;
     readonly revision: number;
 };
 
-type ProbeStateUpdate = (props: Readonly<Record<PropertyKey, unknown>>, state: unknown) => unknown;
+type ReflectStateUpdate = (props: Readonly<Record<PropertyKey, unknown>>, state: unknown) => unknown;
 
-type ProbeStateUpdateFactory = (
+type ReflectStateUpdateFactory = (
     state: unknown,
     props: Readonly<Record<PropertyKey, unknown>>
 ) => unknown;
 
-type ProbeClassLifecycle = {
+type ReflectClassLifecycle = {
     readonly previousProps: Readonly<Record<PropertyKey, unknown>>;
     readonly previousState: unknown;
     readonly shouldCommit: boolean;
@@ -93,24 +93,24 @@ type ProbeClassLifecycle = {
 
 const emptyErrorInfo = Object.freeze({ componentStack: '' });
 const noCatchOnlyBoundaryRecovery = Symbol('noCatchOnlyBoundaryRecovery');
-const catchOnlyBoundaryRecoveries = new WeakMap<ProbeClassComponent, Map<string, unknown>>();
+const catchOnlyBoundaryRecoveries = new WeakMap<ReflectClassComponent, Map<string, unknown>>();
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
 }
 
-export function isClassComponent(value: unknown): value is ProbeClassComponent {
+export function isClassComponent(value: unknown): value is ReflectClassComponent {
     const prototype: unknown = typeof value === 'function' ? Reflect.get(value, 'prototype') : undefined;
 
     return isRecord(prototype) && prototype.isReactComponent !== undefined;
 }
 
-function isErrorBoundary(type: ProbeClassComponent): boolean {
+function isErrorBoundary(type: ReflectClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
         typeof type.prototype.componentDidCatch === 'function';
 }
 
-function createProbeError(cause: unknown, handled: boolean): ProbeError {
+function createReflectError(cause: unknown, handled: boolean): ReflectError {
     return Object.freeze({
         cause,
         handled,
@@ -154,11 +154,11 @@ function mergeState(state: unknown, partialState: unknown): unknown {
         : partialState;
 }
 
-function isStateUpdateFactory(value: unknown): value is ProbeStateUpdateFactory {
+function isStateUpdateFactory(value: unknown): value is ReflectStateUpdateFactory {
     return typeof value === 'function';
 }
 
-function toStateUpdate(partialState: unknown): ProbeStateUpdate {
+function toStateUpdate(partialState: unknown): ReflectStateUpdate {
     if (isStateUpdateFactory(partialState)) {
         return function resolveStateUpdate(props, state) {
             return partialState(state, props);
@@ -173,7 +173,7 @@ function toStateUpdate(partialState: unknown): ProbeStateUpdate {
 function applyStateUpdates(
     props: Readonly<Record<PropertyKey, unknown>>,
     state: unknown,
-    updates: readonly ProbeStateUpdate[]
+    updates: readonly ReflectStateUpdate[]
 ): unknown {
     return updates.reduce(function applyUpdate(nextState, update) {
         return mergeState(nextState, update(props, nextState));
@@ -181,7 +181,7 @@ function applyStateUpdates(
 }
 
 function readDerivedState(
-    type: ProbeClassComponent,
+    type: ReflectClassComponent,
     props: Readonly<Record<PropertyKey, unknown>>,
     state: unknown
 ): unknown {
@@ -190,11 +190,11 @@ function readDerivedState(
         : state;
 }
 
-function assignClassField(instance: ProbeClassInstance, property: PropertyKey, value: unknown): void {
+function assignClassField(instance: ReflectClassInstance, property: PropertyKey, value: unknown): void {
     Reflect.set(instance, property, value);
 }
 
-function applyElementRef(ref: unknown, value: ProbeClassInstance | null): void {
+function applyElementRef(ref: unknown, value: ReflectClassInstance | null): void {
     if (typeof ref === 'function') {
         Reflect.apply(ref, undefined, [ value ]);
 
@@ -206,23 +206,23 @@ function applyElementRef(ref: unknown, value: ProbeClassInstance | null): void {
     }
 }
 
-function executeProbeClassRender(instance: ProbeClassInstance): React.ReactNode {
+function executeReflectClassRender(instance: ReflectClassInstance): React.ReactNode {
     try {
         return instance.render();
     } catch (error) {
-        return throwProbeRenderError(error);
+        return throwReflectRenderError(error);
     }
 }
 
 function notifyCatchBoundary(
-    type: ProbeClassComponent,
-    instance: ProbeClassInstance,
+    type: ReflectClassComponent,
+    instance: ReflectClassInstance,
     error: unknown
 ): void {
     type.prototype.componentDidCatch?.call(instance, error, emptyErrorInfo);
 }
 
-function readCatchOnlyBoundaryRecoveries(type: ProbeClassComponent): Map<string, unknown> {
+function readCatchOnlyBoundaryRecoveries(type: ReflectClassComponent): Map<string, unknown> {
     let recoveries = catchOnlyBoundaryRecoveries.get(type);
 
     if (recoveries === undefined) {
@@ -233,31 +233,31 @@ function readCatchOnlyBoundaryRecoveries(type: ProbeClassComponent): Map<string,
     return recoveries;
 }
 
-function readCatchOnlyBoundaryRecovery(type: ProbeClassComponent, key: string): unknown {
+function readCatchOnlyBoundaryRecovery(type: ReflectClassComponent, key: string): unknown {
     const recoveries = readCatchOnlyBoundaryRecoveries(type);
 
     return recoveries.has(key) ? recoveries.get(key) : noCatchOnlyBoundaryRecovery;
 }
 
-function writeCatchOnlyBoundaryRecovery(type: ProbeClassComponent, key: string, state: unknown): void {
+function writeCatchOnlyBoundaryRecovery(type: ReflectClassComponent, key: string, state: unknown): void {
     readCatchOnlyBoundaryRecoveries(type).set(key, state);
 }
 
-function deleteCatchOnlyBoundaryRecovery(type: ProbeClassComponent, error: unknown): void {
+function deleteCatchOnlyBoundaryRecovery(type: ReflectClassComponent, error: unknown): void {
     readCatchOnlyBoundaryRecoveries(type).delete(String(error));
 }
 
-const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, ProbeClassFrameState> {
+const ReflectClassFrameBase = class extends React.Component<ReflectClassFrameProps, ReflectClassFrameState> {
     protected appliedBoundaryErrorCause: unknown;
-    protected boundaryError: ProbeError | undefined;
+    protected boundaryError: ReflectError | undefined;
     protected isApplyingBoundaryError = false;
-    protected lifecycle: ProbeClassLifecycle | undefined;
-    protected pendingStateUpdates: readonly ProbeStateUpdate[];
-    protected renderedNode: ProbeTransformedNode;
+    protected lifecycle: ReflectClassLifecycle | undefined;
+    protected pendingStateUpdates: readonly ReflectStateUpdate[];
+    protected renderedNode: ReflectTransformedNode;
     protected shouldForceRender: boolean;
-    protected userInstance: ProbeClassInstance | undefined;
+    protected userInstance: ReflectClassInstance | undefined;
 
-    public constructor(props: ProbeClassFrameProps) {
+    public constructor(props: ReflectClassFrameProps) {
         super(props);
 
         this.appliedBoundaryErrorCause = undefined;
@@ -292,8 +292,8 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
     }
 
     public override componentDidUpdate(
-        _previousProps: ProbeClassFrameProps,
-        _previousState: ProbeClassFrameState,
+        _previousProps: ReflectClassFrameProps,
+        _previousState: ReflectClassFrameState,
         snapshot: unknown
     ): void {
         const { lifecycle } = this;
@@ -329,8 +329,8 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
     }
 
     protected readBoundaryState(
-        _instance: ProbeClassInstance,
-        _type: ProbeClassComponent,
+        _instance: ReflectClassInstance,
+        _type: ReflectClassComponent,
         state: unknown
     ): unknown {
         Object.is(this.userInstance, undefined);
@@ -343,7 +343,7 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
         this.shouldForceRender = false;
     }
 
-    protected createUpdater(): ProbeClassUpdater {
+    protected createUpdater(): ReflectClassUpdater {
         return {
             enqueueForceUpdate: (_instance: unknown, callback: (() => void) | undefined) => {
                 this.shouldForceRender = true;
@@ -371,7 +371,7 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
     }
 
     protected shouldRender(
-        instance: ProbeClassInstance,
+        instance: ReflectClassInstance,
         props: Readonly<Record<PropertyKey, unknown>>,
         state: unknown
     ): boolean {
@@ -390,7 +390,7 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
         return true;
     }
 
-    protected readNextState(instance: ProbeClassInstance, props: Readonly<Record<PropertyKey, unknown>>): unknown {
+    protected readNextState(instance: ReflectClassInstance, props: Readonly<Record<PropertyKey, unknown>>): unknown {
         const updatedState = applyStateUpdates(props, instance.state, this.pendingStateUpdates);
         const boundaryState = this.readBoundaryState(instance, this.props.type, updatedState);
 
@@ -398,10 +398,10 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
     }
 
     protected readRenderedNode(
-        instance: ProbeClassInstance,
+        instance: ReflectClassInstance,
         props: Readonly<Record<PropertyKey, unknown>>,
         state: unknown
-    ): ProbeTransformedNode {
+    ): ReflectTransformedNode {
         const shouldRender = this.shouldRender(instance, props, state);
 
         this.lifecycle = Object.freeze({
@@ -415,7 +415,7 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
 
         if (shouldRender) {
             this.renderedNode = this.props.transformNode(
-                executeProbeClassRender(instance),
+                executeReflectClassRender(instance),
                 nextDepth(this.props.depth),
                 this.props.createFrameElement
             );
@@ -424,7 +424,7 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
         return this.renderedNode;
     }
 
-    protected readUserInstance(): ProbeClassInstance {
+    protected readUserInstance(): ReflectClassInstance {
         if (this.userInstance !== undefined) {
             return this.userInstance;
         }
@@ -445,8 +445,8 @@ const ProbeClassFrameBase = class extends React.Component<ProbeClassFrameProps, 
     }
 };
 
-const ProbeClassBoundaryFrame = class extends ProbeClassFrameBase {
-    public static getDerivedStateFromError(error: unknown): ProbeClassFrameState {
+const ReflectClassBoundaryFrame = class extends ReflectClassFrameBase {
+    public static getDerivedStateFromError(error: unknown): ReflectClassFrameState {
         return {
             boundaryErrorCause: error,
             revision: 0
@@ -462,12 +462,12 @@ const ProbeClassBoundaryFrame = class extends ProbeClassFrameBase {
             deleteCatchOnlyBoundaryRecovery(this.props.type, error);
         }
 
-        this.boundaryError = createProbeError(error, true);
+        this.boundaryError = createReflectError(error, true);
     }
 
     protected applyCatchOnlyBoundaryState(
-        instance: ProbeClassInstance,
-        type: ProbeClassComponent,
+        instance: ReflectClassInstance,
+        type: ReflectClassComponent,
         state: unknown,
         error: unknown
     ): unknown {
@@ -489,7 +489,7 @@ const ProbeClassBoundaryFrame = class extends ProbeClassFrameBase {
         return this.createCatchOnlyBoundaryState(type, recoveryKey, state);
     }
 
-    protected createCatchOnlyBoundaryState(type: ProbeClassComponent, key: string, state: unknown): unknown {
+    protected createCatchOnlyBoundaryState(type: ReflectClassComponent, key: string, state: unknown): unknown {
         const nextState = applyStateUpdates(readElementProps(this.props.element), state, this.pendingStateUpdates);
 
         writeCatchOnlyBoundaryRecovery(type, key, nextState);
@@ -498,8 +498,8 @@ const ProbeClassBoundaryFrame = class extends ProbeClassFrameBase {
     }
 
     protected override readBoundaryState(
-        instance: ProbeClassInstance,
-        type: ProbeClassComponent,
+        instance: ReflectClassInstance,
+        type: ReflectClassComponent,
         state: unknown
     ): unknown {
         const { boundaryErrorCause } = this.state;
@@ -509,7 +509,7 @@ const ProbeClassBoundaryFrame = class extends ProbeClassFrameBase {
         }
 
         this.appliedBoundaryErrorCause = boundaryErrorCause;
-        this.boundaryError = createProbeError(boundaryErrorCause, true);
+        this.boundaryError = createReflectError(boundaryErrorCause, true);
 
         if (typeof type.getDerivedStateFromError !== 'function') {
             return this.applyCatchOnlyBoundaryState(instance, type, state, boundaryErrorCause);
@@ -523,7 +523,7 @@ const ProbeClassBoundaryFrame = class extends ProbeClassFrameBase {
 };
 
 export function readClassFrameType(
-    type: ProbeClassComponent
-): React.ComponentType<ProbeClassFrameProps> {
-    return isErrorBoundary(type) ? ProbeClassBoundaryFrame : ProbeClassFrameBase;
+    type: ReflectClassComponent
+): React.ComponentType<ReflectClassFrameProps> {
+    return isErrorBoundary(type) ? ReflectClassBoundaryFrame : ReflectClassFrameBase;
 }

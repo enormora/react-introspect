@@ -1,67 +1,67 @@
 import React from 'react';
-import { isClassComponent, readClassFrameType } from './probe-class-frame.ts';
+import { isClassComponent, readClassFrameType } from './reflect-class-frame.ts';
 import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
     nextDepth,
-    type ProbeElement,
-    probeElementKeyMetadata,
-    type ProbeFrameDepth,
-    probeOpaqueHostType,
-    type ProbeTransformedNode,
-    probeValueMetadata,
+    type ReflectElement,
+    reflectElementKeyMetadata,
+    type ReflectFrameDepth,
+    reflectOpaqueHostType,
+    type ReflectTransformedNode,
+    reflectValueMetadata,
     readElementProps,
     readElementRef,
-    throwProbeRenderError
-} from './probe-frame-contract.ts';
-import { createUnsupportedReactValueError, isReactPortalValue } from './probe-unsupported-react.ts';
+    throwReflectRenderError
+} from './reflect-frame-contract.ts';
+import { createUnsupportedReactValueError, isReactPortalValue } from './reflect-unsupported-react.ts';
 
-type ProbeFrameProps = {
-    readonly createFrameElement: ProbeFrameElementFactory;
-    readonly depth: ProbeFrameDepth;
-    readonly element: ProbeElement;
-    readonly transformNode: ProbeTransformNode;
+type ReflectFrameProps = {
+    readonly createFrameElement: ReflectFrameElementFactory;
+    readonly depth: ReflectFrameDepth;
+    readonly element: ReflectElement;
+    readonly transformNode: ReflectTransformNode;
 };
 
-type ProbeFrameType = {
+type ReflectFrameType = {
     readonly $$typeof: symbol;
 };
 
-type ProbeMemoType = ProbeFrameType & {
+type ReflectMemoType = ReflectFrameType & {
     readonly type: unknown;
 };
 
-type ProbeForwardRefType = ProbeFrameType & {
+type ReflectForwardRefType = ReflectFrameType & {
     readonly render: (props: Readonly<Record<PropertyKey, unknown>>, ref: unknown) => React.ReactNode;
 };
 
-type ProbeFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
+type ReflectFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
 
-type ProbeFrameElementFactory = (element: ProbeElement, depth: ProbeFrameDepth) => React.ReactElement;
+type ReflectFrameElementFactory = (element: ReflectElement, depth: ReflectFrameDepth) => React.ReactElement;
 
-type ProbeTransformNode = (
+type ReflectTransformNode = (
     node: unknown,
-    depth: ProbeFrameDepth,
-    createFrameElement: ProbeFrameElementFactory
-) => ProbeTransformedNode;
+    depth: ReflectFrameDepth,
+    createFrameElement: ReflectFrameElementFactory
+) => ReflectTransformedNode;
 
-type ProbeSuspenseTransformRequest = {
-    readonly createFrameElement: ProbeFrameElementFactory;
-    readonly depth: ProbeFrameDepth;
-    readonly element: ProbeElement;
-    readonly transformedChildren: ProbeTransformedNode;
-    readonly transformNode: ProbeTransformNode;
+type ReflectSuspenseTransformRequest = {
+    readonly createFrameElement: ReflectFrameElementFactory;
+    readonly depth: ReflectFrameDepth;
+    readonly element: ReflectElement;
+    readonly transformedChildren: ReflectTransformedNode;
+    readonly transformNode: ReflectTransformNode;
 };
 
-type ProbeThenable = {
+type ReflectThenable = {
     readonly then: (
         resolve: (value: unknown) => void,
         reject: (reason: unknown) => void
     ) => unknown;
 };
 
-type ProbeLazyInitializer = (payload: unknown) => unknown;
+type ReflectLazyInitializer = (payload: unknown) => unknown;
 
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
@@ -80,32 +80,32 @@ function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: Pr
     return Object.hasOwn(value, property);
 }
 
-function hasReactType(value: unknown, type: symbol): value is ProbeFrameType {
+function hasReactType(value: unknown, type: symbol): value is ReflectFrameType {
     return isRecord(value) && value.$$typeof === type;
 }
 
-function isMemoType(value: unknown): value is ProbeMemoType {
+function isMemoType(value: unknown): value is ReflectMemoType {
     return hasReactType(value, memoType) && hasProperty(value, 'type');
 }
 
-function isForwardRefType(value: unknown): value is ProbeForwardRefType {
+function isForwardRefType(value: unknown): value is ReflectForwardRefType {
     return isRecord(value) &&
         value.$$typeof === forwardRefType &&
         hasProperty(value, 'render') &&
         typeof value.render === 'function';
 }
 
-function isLazyInitializer(value: unknown): value is ProbeLazyInitializer {
+function isLazyInitializer(value: unknown): value is ReflectLazyInitializer {
     return typeof value === 'function';
 }
 
-function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): ProbeLazyInitializer | undefined {
+function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): ReflectLazyInitializer | undefined {
     const initializer: unknown = Reflect.get(value, lazyInitializerKey);
 
     return isLazyInitializer(initializer) ? initializer : undefined;
 }
 
-function isLazyType(value: unknown): value is ProbeFrameType {
+function isLazyType(value: unknown): value is ReflectFrameType {
     return isRecord(value) &&
         value.$$typeof === lazyType &&
         hasProperty(value, lazyInitializerKey) &&
@@ -117,7 +117,7 @@ function isContextType(value: unknown): value is React.Context<unknown> {
     return hasReactType(value, contextType);
 }
 
-function isFunctionComponent(value: unknown): value is ProbeFunctionComponent {
+function isFunctionComponent(value: unknown): value is ReflectFunctionComponent {
     return typeof value === 'function';
 }
 
@@ -125,41 +125,41 @@ function isIterable(value: unknown): value is Iterable<unknown> {
     return isRecord(value) && typeof value[Symbol.iterator] === 'function';
 }
 
-function isThenable(value: unknown): value is ProbeThenable {
+function isThenable(value: unknown): value is ReflectThenable {
     return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
 }
 
-function isProbeElement(element: React.ReactElement): element is ProbeElement {
+function isReflectElement(element: React.ReactElement): element is ReflectElement {
     return isRecord(element.props);
 }
 
-function readElementChildren(element: ProbeElement): unknown {
+function readElementChildren(element: ReflectElement): unknown {
     return readElementProps(element).children;
 }
 
-function readActivityMode(element: ProbeElement): 'hidden' | 'visible' {
+function readActivityMode(element: ReflectElement): 'hidden' | 'visible' {
     return readElementProps(element).mode === 'hidden' ? 'hidden' : 'visible';
 }
 
-function canExecute(depth: ProbeFrameDepth): boolean {
+function canExecute(depth: ReflectFrameDepth): boolean {
     return depth === 'full' || depth > 0;
 }
 
 function createOpaqueHost(value: unknown): React.ReactElement {
-    return React.createElement(probeOpaqueHostType, {
-        [probeValueMetadata]: value
+    return React.createElement(reflectOpaqueHostType, {
+        [reflectValueMetadata]: value
     });
 }
 
-function createProbeElement(element: React.ReactElement): ProbeElement {
-    if (!isProbeElement(element)) {
-        throw new TypeError('Probe expected React element props to be an object.');
+function createReflectElement(element: React.ReactElement): ReflectElement {
+    if (!isReflectElement(element)) {
+        throw new TypeError('Reflect expected React element props to be an object.');
     }
 
     return element;
 }
 
-function readLazyType(type: ProbeFrameType): unknown {
+function readLazyType(type: ReflectFrameType): unknown {
     return readLazyInitializer(type)?.(Reflect.get(type, lazyPayloadKey));
 }
 
@@ -187,7 +187,7 @@ function executeWrappedElement(
     return isForwardRefType(type) ? type.render(props, ref) : createOpaqueHost(type);
 }
 
-function executeElement(element: ProbeElement): React.ReactNode {
+function executeElement(element: ReflectElement): React.ReactNode {
     const { type } = element;
     const props = readElementProps(element);
 
@@ -198,11 +198,11 @@ function executeElement(element: ProbeElement): React.ReactNode {
     return executeWrappedElement(type, props, readElementRef(element));
 }
 
-function executeProbeFrameElement(element: ProbeElement): React.ReactNode {
+function executeReflectFrameElement(element: ReflectElement): React.ReactNode {
     try {
         return unwrapThenableNode(executeElement(element));
     } catch (error) {
-        return throwProbeRenderError(error);
+        return throwReflectRenderError(error);
     }
 }
 
@@ -211,42 +211,42 @@ function isEmptyRenderable(node: unknown): boolean {
 }
 
 function cloneElementWithChildren(
-    element: ProbeElement,
-    children: ProbeTransformedNode
+    element: ReflectElement,
+    children: ReflectTransformedNode
 ): React.ReactElement {
     if (element.type === React.Fragment) {
         return React.createElement(React.Fragment, null, children);
     }
 
     return React.cloneElement(element, {
-        [probeElementKeyMetadata]: element.key
+        [reflectElementKeyMetadata]: element.key
     }, children);
 }
 
-function cloneSuspenseElement(request: ProbeSuspenseTransformRequest): React.ReactElement {
+function cloneSuspenseElement(request: ReflectSuspenseTransformRequest): React.ReactElement {
     const props = readElementProps(request.element);
 
     return React.cloneElement(request.element, {
-        [probeElementKeyMetadata]: request.element.key,
+        [reflectElementKeyMetadata]: request.element.key,
         fallback: request.transformNode(props.fallback, request.depth, request.createFrameElement)
     }, request.transformedChildren);
 }
 
-function cloneWrapperElement(element: ProbeElement, children: ProbeTransformedNode): React.ReactElement {
+function cloneWrapperElement(element: ReflectElement, children: ReflectTransformedNode): React.ReactElement {
     return React.cloneElement(element, {}, children);
 }
 
 function transformCollection(
     nodes: readonly unknown[],
-    depth: ProbeFrameDepth,
-    transformChildNode: ProbeTransformNode,
-    frameFactory: ProbeFrameElementFactory
-): readonly ProbeTransformedNode[] {
+    depth: ReflectFrameDepth,
+    transformChildNode: ReflectTransformNode,
+    frameFactory: ReflectFrameElementFactory
+): readonly ReflectTransformedNode[] {
     return nodes.map(function transformChild(node, index) {
         const transformedNode = transformChildNode(node, depth, frameFactory);
 
         return React.isValidElement(transformedNode)
-            ? React.cloneElement(transformedNode, { key: transformedNode.key ?? `probe-${index}` })
+            ? React.cloneElement(transformedNode, { key: transformedNode.key ?? `reflect-${index}` })
             : transformedNode;
     });
 }
@@ -272,9 +272,9 @@ function isRenderableElementType(type: unknown): boolean {
 }
 
 function transformComponentElement(
-    element: ProbeElement,
-    depth: ProbeFrameDepth,
-    frameFactory: ProbeFrameElementFactory
+    element: ReflectElement,
+    depth: ReflectFrameDepth,
+    frameFactory: ReflectFrameElementFactory
 ): React.ReactElement {
     if (canExecute(depth) && isExecutableComponentType(element.type)) {
         return frameFactory(element, depth);
@@ -283,7 +283,7 @@ function transformComponentElement(
     return createComponentHost(createComponentMetadata(element, 'depth'), createEmptyHost(undefined));
 }
 
-function transformPrimitiveNode(node: unknown): ProbeTransformedNode | undefined {
+function transformPrimitiveNode(node: unknown): ReflectTransformedNode | undefined {
     if (isEmptyRenderable(node)) {
         return createEmptyHost(node);
     }
@@ -296,10 +296,10 @@ function transformPrimitiveNode(node: unknown): ProbeTransformedNode | undefined
 }
 
 function transformRenderableElement(
-    element: ProbeElement,
-    depth: ProbeFrameDepth,
-    transformChildNode: ProbeTransformNode,
-    frameFactory: ProbeFrameElementFactory
+    element: ReflectElement,
+    depth: ReflectFrameDepth,
+    transformChildNode: ReflectTransformNode,
+    frameFactory: ReflectFrameElementFactory
 ): React.ReactElement {
     return cloneElementWithChildren(
         element,
@@ -308,10 +308,10 @@ function transformRenderableElement(
 }
 
 function transformSuspenseElement(
-    element: ProbeElement,
-    depth: ProbeFrameDepth,
-    transformChildNode: ProbeTransformNode,
-    frameFactory: ProbeFrameElementFactory
+    element: ReflectElement,
+    depth: ReflectFrameDepth,
+    transformChildNode: ReflectTransformNode,
+    frameFactory: ReflectFrameElementFactory
 ): React.ReactElement {
     return cloneSuspenseElement({
         createFrameElement: frameFactory,
@@ -323,10 +323,10 @@ function transformSuspenseElement(
 }
 
 function transformActivityElement(
-    element: ProbeElement,
-    depth: ProbeFrameDepth,
-    transformChildNode: ProbeTransformNode,
-    frameFactory: ProbeFrameElementFactory
+    element: ReflectElement,
+    depth: ReflectFrameDepth,
+    transformChildNode: ReflectTransformNode,
+    frameFactory: ReflectFrameElementFactory
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
@@ -335,10 +335,10 @@ function transformActivityElement(
 }
 
 function transformViewTransitionElement(
-    element: ProbeElement,
-    depth: ProbeFrameDepth,
-    transformChildNode: ProbeTransformNode,
-    frameFactory: ProbeFrameElementFactory
+    element: ReflectElement,
+    depth: ReflectFrameDepth,
+    transformChildNode: ReflectTransformNode,
+    frameFactory: ReflectFrameElementFactory
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined),
@@ -347,10 +347,10 @@ function transformViewTransitionElement(
 }
 
 function transformElement(
-    element: ProbeElement,
-    depth: ProbeFrameDepth,
-    transformChildNode: ProbeTransformNode,
-    frameFactory: ProbeFrameElementFactory
+    element: ReflectElement,
+    depth: ReflectFrameDepth,
+    transformChildNode: ReflectTransformNode,
+    frameFactory: ReflectFrameElementFactory
 ): React.ReactElement {
     const { type } = element;
 
@@ -375,9 +375,9 @@ function transformElement(
 
 function transformNode(
     node: unknown,
-    depth: ProbeFrameDepth,
-    frameFactory: ProbeFrameElementFactory
-): ProbeTransformedNode {
+    depth: ReflectFrameDepth,
+    frameFactory: ReflectFrameElementFactory
+): ReflectTransformedNode {
     if (isReactPortalValue(node)) {
         throw createUnsupportedReactValueError();
     }
@@ -389,7 +389,7 @@ function transformNode(
     }
 
     if (React.isValidElement(node)) {
-        return transformElement(createProbeElement(node), depth, transformNode, frameFactory);
+        return transformElement(createReflectElement(node), depth, transformNode, frameFactory);
     }
 
     if (Array.isArray(node)) {
@@ -401,18 +401,18 @@ function transformNode(
         : createOpaqueHost(node);
 }
 
-function ProbeFrame(props: ProbeFrameProps): React.ReactElement {
+function ReflectFrame(props: ReflectFrameProps): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(props.element, undefined),
         props.transformNode(
-            executeProbeFrameElement(props.element),
+            executeReflectFrameElement(props.element),
             nextDepth(props.depth),
             props.createFrameElement
         )
     );
 }
 
-function createFrameElement(element: ProbeElement, depth: ProbeFrameDepth): React.ReactElement {
+function createFrameElement(element: ReflectElement, depth: ReflectFrameDepth): React.ReactElement {
     if (isClassComponent(element.type)) {
         return React.createElement(readClassFrameType(element.type), {
             createFrameElement,
@@ -423,7 +423,7 @@ function createFrameElement(element: ProbeElement, depth: ProbeFrameDepth): Reac
         });
     }
 
-    return React.createElement(ProbeFrame, {
+    return React.createElement(ReflectFrame, {
         createFrameElement,
         depth,
         element,
@@ -431,13 +431,13 @@ function createFrameElement(element: ProbeElement, depth: ProbeFrameDepth): Reac
     });
 }
 
-export function createProbeRenderElement(
+export function createReflectRenderElement(
     element: React.ReactElement,
-    depth: ProbeFrameDepth
+    depth: ReflectFrameDepth
 ): React.ReactElement {
     if (isReactPortalValue(element)) {
         throw createUnsupportedReactValueError();
     }
 
-    return transformElement(createProbeElement(element), depth, transformNode, createFrameElement);
+    return transformElement(createReflectElement(element), depth, transformNode, createFrameElement);
 }

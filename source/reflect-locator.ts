@@ -1,24 +1,24 @@
 import type {
-    RuntimeProbeListLocator,
-    RuntimeProbeLocator,
-    RuntimeProbeNode,
-    RuntimeProbeView
-} from './probe-runtime-types.ts';
+    RuntimeReflectListLocator,
+    RuntimeReflectLocator,
+    RuntimeReflectNode,
+    RuntimeReflectView
+} from './reflect-runtime-types.ts';
 
 type LocatorTarget = {
     readonly selector: unknown;
-    readonly view: RuntimeProbeView;
+    readonly view: RuntimeReflectView;
 };
 
-function readLocatedNode(target: LocatorTarget): RuntimeProbeNode | undefined {
+function readLocatedNode(target: LocatorTarget): RuntimeReflectNode | undefined {
     return target.view.find(target.selector);
 }
 
-function readLocatedNodes(target: LocatorTarget): readonly RuntimeProbeNode[] {
+function readLocatedNodes(target: LocatorTarget): readonly RuntimeReflectNode[] {
     return Array.from(target.view.findAll(target.selector));
 }
 
-export function createProbeLocator(view: RuntimeProbeView, selector: unknown): RuntimeProbeLocator {
+export function createReflectLocator(view: RuntimeReflectView, selector: unknown): RuntimeReflectLocator {
     const target = { selector, view };
 
     return Object.freeze({
@@ -49,7 +49,7 @@ export function createProbeLocator(view: RuntimeProbeView, selector: unknown): R
     });
 }
 
-export function createProbeListLocator(view: RuntimeProbeView, selector: unknown): RuntimeProbeListLocator {
+export function createReflectListLocator(view: RuntimeReflectView, selector: unknown): RuntimeReflectListLocator {
     const target = { selector, view };
 
     return Object.freeze({

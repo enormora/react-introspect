@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { ProbeSnapshot, SnapshotNode } from './probe-snapshot-contract.ts';
-import { probe } from './react-probe.entry-point.ts';
+import type { ReflectSnapshot, SnapshotNode } from './reflect-snapshot-contract.ts';
+import { reflect } from './react-reflect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -102,8 +102,8 @@ function createMixedTree(): React.ReactElement {
     );
 }
 
-function createMixedSnapshot(): ProbeSnapshot {
-    const view = probe(createMixedTree(), { depth: 0 }) as unknown as { readonly currentSnapshot: ProbeSnapshot; };
+function createMixedSnapshot(): ReflectSnapshot {
+    const view = reflect(createMixedTree(), { depth: 0 }) as unknown as { readonly currentSnapshot: ReflectSnapshot; };
 
     return view.currentSnapshot;
 }
@@ -130,7 +130,7 @@ function assertSnapshotShape(scope: EqualScope, nodes: readonly SnapshotNode[]):
 }
 
 function assertGivenAndRenderedChildren(scope: EqualScope): void {
-    const view = probe(createMixedTree(), { depth: 0 });
+    const view = reflect(createMixedTree(), { depth: 0 });
     const section = requireValue(view.find('section'));
     const widget = requireValue(view.find(Widget));
 
@@ -144,7 +144,7 @@ function assertGivenAndRenderedChildren(scope: EqualScope): void {
 }
 
 function assertSelectorSemantics(scope: EqualScope): void {
-    const view = probe(createMixedTree(), { depth: 0 });
+    const view = reflect(createMixedTree(), { depth: 0 });
     const section = requireValue(view.find('section'));
 
     scope.assert.equal(view.find({ key: 'host' })?.path, section.path);
@@ -190,8 +190,8 @@ function assertSelectorSemantics(scope: EqualScope): void {
     );
 }
 
-function assertProbeList(scope: EqualScope): void {
-    const view = probe(createMixedTree(), { depth: 0 });
+function assertReflectList(scope: EqualScope): void {
+    const view = reflect(createMixedTree(), { depth: 0 });
     const renderedText = view.findAll('#text');
 
     scope.assert.equal(renderedText.length, 2);
@@ -209,7 +209,7 @@ function assertProbeList(scope: EqualScope): void {
 }
 
 function assertAcyclicPublicOutput(scope: EqualScope): void {
-    const view = probe(createMixedTree(), { depth: 0 });
+    const view = reflect(createMixedTree(), { depth: 0 });
     const serializedRoot = JSON.stringify(view.root);
 
     scope.assert.equal(typeof serializedRoot, 'string');
@@ -235,8 +235,8 @@ export const testNode = suite('snapshot tree model', [
 
         return scope.assert.collect();
     }),
-    test('provides stable list behavior over matching nodes', function verifyProbeList(scope) {
-        assertProbeList(scope);
+    test('provides stable list behavior over matching nodes', function verifyReflectList(scope) {
+        assertReflectList(scope);
 
         return scope.assert.collect();
     }),

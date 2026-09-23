@@ -1,10 +1,10 @@
-![React Probe](./banner.svg)
+![React Reflect](./banner.svg)
 
-# React Probe
+# React Reflect
 
 Simple component tests. No DOM. No globals. No compiler plugin. No browser.
 
-React Probe is for unit testing React components by their render surface.
+React Reflect is for unit testing React components by their render surface.
 
 You can ask:
 
@@ -39,7 +39,7 @@ You do not see what `Child` renders unless you opt in.
 ```tsx
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { probe } from 'react-probe';
+import { reflect } from 'react-reflect';
 
 type SaveButtonProps = {
     label: string;
@@ -63,7 +63,7 @@ const Toolbar: React.FC<{ saving: boolean; onSave(): void; }> = (props) => {
 test('passes props and events to children', () => {
     let saves = 0;
 
-    const view = probe(
+    const view = reflect(
         <Toolbar
             saving={true}
             onSave={() => {
@@ -91,7 +91,7 @@ test('passes props and events to children', () => {
 Go deeper when you want to inspect a child component's output:
 
 ```tsx
-const view = probe(<Toolbar saving={false} onSave={() => {}} />, {
+const view = reflect(<Toolbar saving={false} onSave={() => {}} />, {
     depth: 2
 });
 
@@ -103,10 +103,10 @@ assert.equal(button.textContent, 'Save');
 
 ## API By Example
 
-### `probe(element, options)`
+### `reflect(element, options)`
 
 ```tsx
-const view = probe(<ProfileCard user={user} />, {
+const view = reflect(<ProfileCard user={user} />, {
     depth: 1,
     idPrefix: 'profile-test-'
 });
@@ -114,16 +114,16 @@ const view = probe(<ProfileCard user={user} />, {
 
 Options:
 
-| Option        | Default     | What it does                                                  |
-| ------------- | ----------- | ------------------------------------------------------------- |
-| `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.         |
-| `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.   |
-| `idPrefix`    | generated   | Prefix passed to React for `useId`.                           |
-| `idGenerator` | none        | Rewrites React-generated ids in Probe snapshots after commit. |
-| `refs`        | none        | Injects fake host ref nodes.                                  |
-| `waitTimeout` | `1000`      | Default timeout for wait APIs.                                |
-| `strictMode`  | `true`      | Wraps the probe root in `React.StrictMode`.                   |
-| `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.      |
+| Option        | Default     | What it does                                                    |
+| ------------- | ----------- | --------------------------------------------------------------- |
+| `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.           |
+| `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.     |
+| `idPrefix`    | generated   | Prefix passed to React for `useId`.                             |
+| `idGenerator` | none        | Rewrites React-generated ids in Reflect snapshots after commit. |
+| `refs`        | none        | Injects fake host ref nodes.                                    |
+| `waitTimeout` | `1000`      | Default timeout for wait APIs.                                  |
+| `strictMode`  | `true`      | Wraps the Reflect root in `React.StrictMode`.                   |
+| `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.        |
 
 View properties are lazy views of the latest committed snapshot.
 
@@ -134,7 +134,7 @@ Node properties read the snapshot that produced that node. Query again after upd
 Returns the root node, or `undefined` after unmount.
 
 ```tsx
-const view = probe(<ProfileCard user={user} />);
+const view = reflect(<ProfileCard user={user} />);
 
 assert.equal(view.root?.type, ProfileCard);
 ```
@@ -146,7 +146,7 @@ Returns direct rendered children of the root.
 Use it when directness matters.
 
 ```tsx
-const view = probe(<Page />);
+const view = reflect(<Page />);
 
 assert.deepEqual(
     [ ...view.renderedChildren ].map((node) => node.type),
@@ -203,7 +203,7 @@ view.find({
 
 ### `view.findAll(typeOrSelector)`
 
-Returns a `ProbeList`.
+Returns a `ReflectList`.
 
 ```tsx
 const items = view.findAll('li');
@@ -218,7 +218,7 @@ assert.equal(view.findAll(Button).first, undefined);
 assert.equal(view.findAll(Tab).at(42), undefined);
 ```
 
-`ProbeList` is iterable:
+`ReflectList` is iterable:
 
 ```tsx
 for (const item of view.findAll(MenuItem)) {
@@ -438,7 +438,7 @@ Reasons:
 
 Returns concatenated text.
 
-Probe does not trim or collapse whitespace.
+Reflect does not trim or collapse whitespace.
 
 ```tsx
 const Label = () => {
@@ -449,7 +449,7 @@ const Label = () => {
     );
 };
 
-const view = probe(<Label />);
+const view = reflect(<Label />);
 
 assert.equal(view.textContent, 'Save changes');
 ```
@@ -508,7 +508,7 @@ assert.equal(panel.state.activityMode, 'hidden');
 Shape:
 
 ```ts
-type ProbeNodeState = {
+type ReflectNodeState = {
     rendered: boolean;
     visible: boolean;
     activityMode?: 'visible' | 'hidden';
@@ -521,7 +521,7 @@ type ProbeNodeState = {
 Returns the error associated with this node, or `undefined`.
 
 ```tsx
-const view = probe(
+const view = reflect(
     <Boundary>
         <Crashes />
     </Boundary>,
@@ -620,7 +620,7 @@ view.unmount();
 
 assert.equal(view.root, undefined);
 
-const nextView = probe(<ProfileCard user={user} />);
+const nextView = reflect(<ProfileCard user={user} />);
 ```
 
 ### `view.errors`
@@ -630,7 +630,7 @@ Returns all committed error records.
 Use `.at(-1)` for the latest one.
 
 ```tsx
-const view = probe(<Crashes />);
+const view = reflect(<Crashes />);
 
 const error = view.errors.at(-1);
 
@@ -640,22 +640,22 @@ assert.match(error.message, /boom/);
 assert.equal(view.errors.length, 1);
 ```
 
-Use `errorMode: 'throw'` when a thrown render error should escape `probe()`.
+Use `errorMode: 'throw'` when a thrown render error should escape `reflect()`.
 
 ```tsx
 assert.throws(() => {
-    probe(<Crashes />, { errorMode: 'throw' });
+    reflect(<Crashes />, { errorMode: 'throw' });
 }, /boom/);
 ```
 
 ### `view.warnings` and `view.hasWarnings`
 
-Probe throws on warnings by default.
+Reflect throws on warnings by default.
 
 Use `warningMode: 'capture'` when you want to assert them.
 
 ```tsx
-const view = probe(<List items={items} />, {
+const view = reflect(<List items={items} />, {
     warningMode: 'capture'
 });
 
@@ -663,13 +663,13 @@ assert.equal(view.hasWarnings, false);
 assert.deepEqual(view.warnings, []);
 ```
 
-Warnings include React recoverable errors and React warnings printed through `console.warn` or `console.error` while Probe owns the React work.
+Warnings include React recoverable errors and React warnings printed through `console.warn` or `console.error` while Reflect owns the React work.
 
 Non-React logs still pass through.
 
 ```tsx
 assert.throws(() => {
-    probe(<ListWithoutKeys items={items} />);
+    reflect(<ListWithoutKeys items={items} />);
 }, /React warning/);
 ```
 
@@ -705,7 +705,7 @@ await view.waitForRenderCount(target);
 
 ### `view.waitForIdle()`
 
-Waits until React work known to Probe is flushed.
+Waits until React work known to Reflect is flushed.
 
 ```tsx
 const button = view.find(Button);
@@ -735,7 +735,7 @@ await view.waitUntil(() => {
 Use host tag shorthand for the common case.
 
 ```tsx
-import { createFakeRefNode } from 'react-probe';
+import { createFakeRefNode } from 'react-reflect';
 
 const inputNode = createFakeRefNode({
     focusCalled: false,
@@ -744,7 +744,7 @@ const inputNode = createFakeRefNode({
     }
 });
 
-probe(<SearchBox autoFocus={true} />, {
+reflect(<SearchBox autoFocus={true} />, {
     refs: {
         input: inputNode
     }
@@ -755,18 +755,18 @@ assert.equal(inputNode.focusCalled, true);
 
 Object keys are host tag names.
 
-If a shorthand matches zero refs or more than one ref, Probe should throw a clear error.
+If a shorthand matches zero refs or more than one ref, Reflect should throw a clear error.
 
 Use `matchRefs()` when you need selectors.
 
 ```tsx
-import { createFakeRefNode, matchRefs } from 'react-probe';
+import { createFakeRefNode, matchRefs } from 'react-reflect';
 
 const emailInput = createFakeRefNode({ focus() {} });
 const passwordInput = createFakeRefNode({ focus() {} });
 const submitButton = createFakeRefNode({ click() {} });
 
-probe(<SignupForm />, {
+reflect(<SignupForm />, {
     refs: matchRefs([
         {
             type: 'input',
@@ -790,7 +790,7 @@ probe(<SignupForm />, {
 Use a factory for repeated refs.
 
 ```tsx
-probe(<FieldList />, {
+reflect(<FieldList />, {
     refs: matchRefs([
         {
             type: 'input',
@@ -814,7 +814,7 @@ const Panel = () => {
     return <Card theme={theme} />;
 };
 
-const view = probe(
+const view = reflect(
     <ThemeContext.Provider value='dark'>
         <Panel />
     </ThemeContext.Provider>,
@@ -831,7 +831,7 @@ assert.equal(card.props.theme, 'dark');
 
 Render props are user code.
 
-Probe does not call them unless the component under test calls them.
+Reflect does not call them unless the component under test calls them.
 
 ```tsx
 const List = (props: {
@@ -841,7 +841,7 @@ const List = (props: {
     return props.items.map((item) => props.children(item));
 };
 
-const view = probe(
+const view = reflect(
     <List items={[ 'a', 'b' ]}>
         {(item) => <Row item={item} />}
     </List>
@@ -867,7 +867,7 @@ class Counter extends React.Component<{ label: string; }, { count: number; }> {
     }
 }
 
-const view = probe(<Counter label='Clicks' />, { depth: 2 });
+const view = reflect(<Counter label='Clicks' />, { depth: 2 });
 
 const counter = view.find(CounterView);
 
@@ -885,7 +885,7 @@ assert.equal(updated.props.count, 1);
 Below the selected depth, a class component is still just a leaf.
 
 ```tsx
-const view = probe(<Toolbar />, { depth: 1 });
+const view = reflect(<Toolbar />, { depth: 1 });
 
 const legacyButton = view.find(LegacyButton);
 
@@ -896,7 +896,7 @@ assert.equal(legacyButton.renderedChildren.status, 'notRendered');
 
 ### Error boundaries
 
-Probe supports error boundaries as real component boundaries.
+Reflect supports error boundaries as real component boundaries.
 
 ```tsx
 class Boundary extends React.Component<React.PropsWithChildren, { failed: boolean; }> {
@@ -915,7 +915,7 @@ class Boundary extends React.Component<React.PropsWithChildren, { failed: boolea
     }
 }
 
-const view = probe(
+const view = reflect(
     <Boundary>
         <Crashes />
     </Boundary>,
@@ -939,7 +939,7 @@ assert.equal(view.errors.length, 1);
 Uncaught errors stay inspectable on the view.
 
 ```tsx
-const view = probe(<Crashes />);
+const view = reflect(<Crashes />);
 
 const error = view.errors.at(-1);
 
@@ -955,7 +955,7 @@ If a lazy component is not executed because of depth, it is just a component lea
 ```tsx
 const LazyDetails = React.lazy(loadDetails);
 
-const view = probe(<Page />, { depth: 1 });
+const view = reflect(<Page />, { depth: 1 });
 
 const details = view.find(LazyDetails);
 
@@ -963,10 +963,10 @@ assert.ok(details);
 assert.equal(details.renderedChildren.status, 'notRendered');
 ```
 
-If Probe needs to execute a lazy component, wait for it through Suspense.
+If Reflect needs to execute a lazy component, wait for it through Suspense.
 
 ```tsx
-const view = probe(<PageWithSuspense />, {
+const view = reflect(<PageWithSuspense />, {
     depth: 2
 });
 
@@ -990,7 +990,7 @@ const Profile = () => {
     return <UserCard user={user} />;
 };
 
-const view = probe(<Profile />);
+const view = reflect(<Profile />);
 
 await view.waitForIdle();
 
@@ -1009,7 +1009,7 @@ const userPromise = new Promise<User>((resolve) => {
     resolveUser = resolve;
 });
 
-const view = probe(<Profile userPromise={userPromise} />);
+const view = reflect(<Profile userPromise={userPromise} />);
 
 assert.equal(view.findAll(Loading).length, 1);
 
@@ -1027,7 +1027,7 @@ assert.equal(card.props.user.name, 'Ada');
 
 Async components are server-style React.
 
-Probe treats them like Suspense work.
+Reflect treats them like Suspense work.
 
 ```tsx
 async function Profile(props: { id: string; }) {
@@ -1036,7 +1036,7 @@ async function Profile(props: { id: string; }) {
     return <UserCard user={user} />;
 }
 
-const view = probe(<Profile id='1' />);
+const view = reflect(<Profile id='1' />);
 
 await view.waitForIdle();
 
@@ -1046,16 +1046,16 @@ assert.ok(card);
 assert.equal(card.props.user.id, '1');
 ```
 
-If the React version or runtime does not support async components here, Probe should fail with a clear unsupported error.
+If the React version or runtime does not support async components here, Reflect should fail with a clear unsupported error.
 
 ### View transitions
 
-Probe does not run browser view transitions.
+Reflect does not run browser view transitions.
 
 It can still test the render surface around React's transition components.
 
 ```tsx
-const view = probe(<Gallery />);
+const view = reflect(<Gallery />);
 
 const thumbnail = view.find(Thumbnail);
 
@@ -1072,10 +1072,10 @@ Use browser tests for animation and CSS transition behavior.
 
 ### `<Activity />`
 
-When the React version supports `Activity`, Probe treats it as a React wrapper.
+When the React version supports `Activity`, Reflect treats it as a React wrapper.
 
 ```tsx
-const view = probe(<SettingsPage />);
+const view = reflect(<SettingsPage />);
 
 const activity = view.find(React.Activity);
 
@@ -1095,7 +1095,7 @@ assert.equal(panel.visibility, 'hidden');
 
 ### `cache` and `cacheSignal`
 
-Probe uses a fresh React root per view.
+Reflect uses a fresh React root per view.
 
 That keeps cache state local to the test.
 
@@ -1110,7 +1110,7 @@ const Profile = (props: { id: string; }) => {
     return <UserCard user={user} />;
 };
 
-const view = probe(<Profile id='1' />);
+const view = reflect(<Profile id='1' />);
 
 await view.waitForIdle();
 
@@ -1133,7 +1133,7 @@ assert.equal(requestWasAborted, true);
 Use `idPrefix` for real React ids with a stable prefix.
 
 ```tsx
-const view = probe(<SignupForm />, {
+const view = reflect(<SignupForm />, {
     idPrefix: 'signup-'
 });
 
@@ -1146,12 +1146,12 @@ assert.ok(email);
 assert.match(email.props.id, /^signup-/);
 ```
 
-Use `idGenerator` when you want nice deterministic ids in Probe output.
+Use `idGenerator` when you want nice deterministic ids in Reflect output.
 
 ```tsx
 const ids = [ 'field-a', 'field-b' ];
 
-const view = probe(<SignupForm />, {
+const view = reflect(<SignupForm />, {
     idGenerator() {
         return ids.shift() ?? 'field-extra';
     }
@@ -1168,13 +1168,13 @@ assert.equal(secondInput.props.id, 'field-b');
 
 ### Use without JSX
 
-Probe accepts normal React elements. JSX is optional.
+Reflect accepts normal React elements. JSX is optional.
 
 ```ts
 import React from 'react';
-import { probe } from 'react-probe';
+import { reflect } from 'react-reflect';
 
-const view = probe(
+const view = reflect(
     React.createElement(Menu, {
         selectedId: 'settings'
     })
@@ -1188,7 +1188,7 @@ assert.equal(list.props.selectedId, 'settings');
 
 ## Unsupported React Concepts
 
-Probe should fail loudly for these until support is designed.
+Reflect should fail loudly for these until support is designed.
 
 ### Portals
 
@@ -1202,7 +1202,7 @@ const Modal = () => {
 };
 
 assert.throws(() => {
-    probe(<Modal />);
+    reflect(<Modal />);
 }, /portal/i);
 ```
 
@@ -1218,14 +1218,14 @@ Executing an unresolved lazy root needs Suspense.
 const LazyPage = React.lazy(loadPage);
 
 assert.throws(() => {
-    probe(<LazyPage />);
+    reflect(<LazyPage />);
 }, /suspense|lazy/i);
 ```
 
 Wrap it when you want to test the loading and loaded states.
 
 ```tsx
-const view = probe(
+const view = reflect(
     <React.Suspense fallback={<Spinner />}>
         <LazyPage />
     </React.Suspense>
@@ -1242,7 +1242,7 @@ assert.equal(view.findAll(Spinner).length, 1);
 
 Use it when you want to test what a user can see or do.
 
-React Probe is for smaller unit tests where the component contract is:
+React Reflect is for smaller unit tests where the component contract is:
 
 - rendered child components
 - props passed to them
@@ -1256,20 +1256,20 @@ React Probe is for smaller unit tests where the component contract is:
 
 It also tends to push tests toward host output.
 
-React Probe is shallow by default and component-first.
+React Reflect is shallow by default and component-first.
 
 ### `test-renderer`
 
 [`test-renderer`](https://github.com/mdjastrzebski/test-renderer) is useful for host elements.
 
-React Probe also inspects intermediate component nodes.
+React Reflect also inspects intermediate component nodes.
 
 ## FAQ
 
 <details>
 <summary>Why does <code>find()</code> not throw?</summary>
 
-Probe inspects.
+Reflect inspects.
 
 Your assertion library asserts.
 
@@ -1280,7 +1280,7 @@ assert.ok(button);
 assert.equal(button.props.label, 'Save');
 ```
 
-This keeps Probe useful with any assertion style.
+This keeps Reflect useful with any assertion style.
 
 </details>
 
@@ -1306,44 +1306,44 @@ A Maybe-like node makes `props.label` hard to type. It would need to return `str
 
 No.
 
-Probe only collects React diagnostics it can attribute to Probe-owned work.
+Reflect only collects React diagnostics it can attribute to Reflect-owned work.
 
 Normal app logs still pass through.
 
-If a warning looks like React output but cannot be attributed, Probe throws so the attribution can be fixed instead of silently hiding it.
+If a warning looks like React output but cannot be attributed, Reflect throws so the attribution can be fixed instead of silently hiding it.
 
 </details>
 
 <details>
-<summary>Why is <code>probe()</code> not async?</summary>
+<summary>Why is <code>reflect()</code> not async?</summary>
 
 Most unit tests do not suspend.
 
-`probe()` returns the first committed view synchronously.
+`reflect()` returns the first committed view synchronously.
 
 If React work is async, wait on the view:
 
 ```tsx
-const view = probe(<Profile userPromise={promise} />);
+const view = reflect(<Profile userPromise={promise} />);
 
 await view.waitForIdle();
 ```
 
-This avoids `await probe(...)` in thousands of simple tests.
+This avoids `await reflect(...)` in thousands of simple tests.
 
 </details>
 
 <details>
-<summary>How does <code>use(promise)</code> work with sync <code>probe()</code>?</summary>
+<summary>How does <code>use(promise)</code> work with sync <code>reflect()</code>?</summary>
 
 If a component suspends, React commits the nearest fallback if one exists.
 
-Probe publishes only committed snapshots.
+Reflect publishes only committed snapshots.
 
 When the promise resolves, React schedules another render.
 
 ```tsx
-const view = probe(<Profile userPromise={promise} />);
+const view = reflect(<Profile userPromise={promise} />);
 
 await view.waitForNextRender();
 ```
@@ -1353,24 +1353,24 @@ No partial suspended tree is exposed.
 </details>
 
 <details>
-<summary>Why is <code>idGenerator</code> only applied to Probe output?</summary>
+<summary>Why is <code>idGenerator</code> only applied to Reflect output?</summary>
 
 React owns `useId`.
 
-Probe does not monkey patch React and does not replace the dispatcher.
+Reflect does not monkey patch React and does not replace the dispatcher.
 
-So `idGenerator` maps React-generated ids inside Probe snapshots after commit. The component itself still saw React's real id during render.
+So `idGenerator` maps React-generated ids inside Reflect snapshots after commit. The component itself still saw React's real id during render.
 
 </details>
 
 <details>
-<summary>Does Probe replace browser tests?</summary>
+<summary>Does Reflect replace browser tests?</summary>
 
 No.
 
 Use browser tests for layout, real focus behavior, pointer events, CSS, animations, and view transitions.
 
-Use Probe for component contracts.
+Use Reflect for component contracts.
 
 </details>
 

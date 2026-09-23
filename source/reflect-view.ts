@@ -1,22 +1,22 @@
 import type React from 'react';
-import { createProbeDiagnostics } from './probe-diagnostics.ts';
-import { createProbeRenderElement } from './probe-frame.ts';
-import { createProbeList } from './probe-list.ts';
-import { createProbeListLocator, createProbeLocator } from './probe-locator.ts';
-import { createProbeNode, type SnapshotReader } from './probe-node.ts';
-import { createProbeReconcilerRoot } from './probe-reconciler.ts';
+import { createReflectDiagnostics } from './reflect-diagnostics.ts';
+import { createReflectRenderElement } from './reflect-frame.ts';
+import { createReflectList } from './reflect-list.ts';
+import { createReflectListLocator, createReflectLocator } from './reflect-locator.ts';
+import { createReflectNode, type SnapshotReader } from './reflect-node.ts';
+import { createReflectReconcilerRoot } from './reflect-reconciler.ts';
 import type {
-    RuntimeProbeList,
-    RuntimeProbeNode,
-    RuntimeProbeOptions,
-    RuntimeProbeView
-} from './probe-runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from './probe-selector.ts';
+    RuntimeReflectList,
+    RuntimeReflectNode,
+    RuntimeReflectOptions,
+    RuntimeReflectView
+} from './reflect-runtime-types.ts';
+import { nodeMatchesSelector, toSelector } from './reflect-selector.ts';
 import {
-    createEmptyProbeSnapshot,
-    type ProbeSnapshot,
+    createEmptyReflectSnapshot,
+    type ReflectSnapshot,
     type SnapshotNode
-} from './probe-snapshot-contract.ts';
+} from './reflect-snapshot-contract.ts';
 
 const defaultWaitTimeout = 1000;
 const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
@@ -25,21 +25,21 @@ const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
     return function createIdPrefix() {
         nextIdPrefixIndex += 1;
 
-        return `react-probe-${nextIdPrefixIndex}-`;
+        return `react-reflect-${nextIdPrefixIndex}-`;
     };
 })();
 
 function nodeList(
     reader: SnapshotReader,
-    snapshot: ProbeSnapshot,
+    snapshot: ReflectSnapshot,
     nodes: readonly SnapshotNode[]
-): RuntimeProbeList {
-    return createProbeList(nodes.map(function createNode(node) {
-        return createProbeNode(reader, snapshot, node);
+): RuntimeReflectList {
+    return createReflectList(nodes.map(function createNode(node) {
+        return createReflectNode(reader, snapshot, node);
     }));
 }
 
-function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
+function snapshotTreeNodes(snapshot: ReflectSnapshot): readonly SnapshotNode[] {
     function collect(node: SnapshotNode): readonly SnapshotNode[] {
         return [
             node,
@@ -50,18 +50,21 @@ function snapshotTreeNodes(snapshot: ProbeSnapshot): readonly SnapshotNode[] {
     return snapshot.root === undefined ? Object.freeze([]) : collect(snapshot.root);
 }
 
-export function createProbeView(element: React.ReactElement, options: RuntimeProbeOptions = {}): RuntimeProbeView {
-    let currentSnapshot = createEmptyProbeSnapshot(0);
+export function createReflectView(
+    element: React.ReactElement,
+    options: RuntimeReflectOptions = {}
+): RuntimeReflectView {
+    let currentSnapshot = createEmptyReflectSnapshot(0);
     const depth = options.depth ?? 1;
     const idPrefix = options.idPrefix ?? createDefaultIdPrefix();
-    const diagnostics = createProbeDiagnostics({
+    const diagnostics = createReflectDiagnostics({
         errorMode: options.errorMode ?? 'capture',
         warningMode: options.warningMode ?? 'throw'
     });
     const reconcilerRoot = diagnostics.run(function createRootWithDiagnostics() {
-        return createProbeReconcilerRoot({
+        return createReflectReconcilerRoot({
             diagnostics,
-            element: createProbeRenderElement(element, depth),
+            element: createReflectRenderElement(element, depth),
             idGenerator: options.idGenerator,
             idPrefix,
             publish(snapshot) {
@@ -81,26 +84,26 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
         }
     };
 
-    function rootNode(): RuntimeProbeNode | undefined {
+    function rootNode(): RuntimeReflectNode | undefined {
         const { root } = currentSnapshot;
 
-        return root === undefined ? undefined : createProbeNode(state, currentSnapshot, root);
+        return root === undefined ? undefined : createReflectNode(state, currentSnapshot, root);
     }
 
-    function findAll(selector: unknown): RuntimeProbeList {
+    function findAll(selector: unknown): RuntimeReflectList {
         const normalizedSelector = toSelector(selector);
         const nodes = snapshotTreeNodes(currentSnapshot)
             .map(function createNode(node) {
-                return createProbeNode(state, currentSnapshot, node);
+                return createReflectNode(state, currentSnapshot, node);
             })
             .filter(function isMatch(node) {
                 return nodeMatchesSelector(node, normalizedSelector);
             });
 
-        return createProbeList(nodes);
+        return createReflectList(nodes);
     }
 
-    const view: RuntimeProbeView = Object.freeze({
+    const view: RuntimeReflectView = Object.freeze({
         get currentSnapshot() {
             return currentSnapshot;
         },
@@ -117,7 +120,7 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
             const { root } = currentSnapshot;
 
             return root === undefined
-                ? createProbeList([])
+                ? createReflectList([])
                 : nodeList(state, currentSnapshot, root.renderedChildren);
         },
         get root() {
@@ -137,16 +140,16 @@ export function createProbeView(element: React.ReactElement, options: RuntimePro
             return rootNode()?.formatTree() ?? '';
         },
         locate(selector: unknown) {
-            return createProbeLocator(view, selector);
+            return createReflectLocator(view, selector);
         },
         locateAll(selector: unknown) {
-            return createProbeListLocator(view, selector);
+            return createReflectListLocator(view, selector);
         },
         unmount() {
             reconcilerRoot.unmount();
         },
         update(nextElement: React.ReactElement) {
-            reconcilerRoot.update(createProbeRenderElement(nextElement, depth));
+            reconcilerRoot.update(createReflectRenderElement(nextElement, depth));
         },
         async waitForIdle() {
             await reconcilerRoot.waitForIdle();

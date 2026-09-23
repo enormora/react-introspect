@@ -1,5 +1,5 @@
-import type { ProbeHostSchema, ProbeSelector } from './probe-public-types.ts';
-import type { RuntimeProbeNode } from './probe-runtime-types.ts';
+import type { ReflectHostSchema, ReflectSelector } from './reflect-public-types.ts';
+import type { RuntimeReflectNode } from './reflect-runtime-types.ts';
 
 const selectorFields = Object.freeze([
     'has',
@@ -18,7 +18,7 @@ function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown
     return typeof value === 'object' && value !== null;
 }
 
-function isSelectorObject(value: unknown): value is ProbeSelector {
+function isSelectorObject(value: unknown): value is ReflectSelector {
     return isRecord(value) && !hasProperty(value, '$$typeof') && selectorFields.some(function hasSelectorField(field) {
         return hasProperty(value, field);
     });
@@ -44,23 +44,23 @@ function matchesPartial(value: unknown, partial: unknown): boolean {
     });
 }
 
-function typeMatches<HostSchema extends ProbeHostSchema>(
-    node: RuntimeProbeNode,
-    selector: ProbeSelector<HostSchema>
+function typeMatches<HostSchema extends ReflectHostSchema>(
+    node: RuntimeReflectNode,
+    selector: ReflectSelector<HostSchema>
 ): boolean {
     return !hasProperty(selector, 'type') || selector.type === node.type;
 }
 
-function keyMatches<HostSchema extends ProbeHostSchema>(
-    node: RuntimeProbeNode,
-    selector: ProbeSelector<HostSchema>
+function keyMatches<HostSchema extends ReflectHostSchema>(
+    node: RuntimeReflectNode,
+    selector: ReflectSelector<HostSchema>
 ): boolean {
     return !hasProperty(selector, 'key') || selector.key === node.key;
 }
 
-function propsMatch<HostSchema extends ProbeHostSchema>(
-    node: RuntimeProbeNode,
-    selector: ProbeSelector<HostSchema>
+function propsMatch<HostSchema extends ReflectHostSchema>(
+    node: RuntimeReflectNode,
+    selector: ReflectSelector<HostSchema>
 ): boolean {
     return !hasProperty(selector, 'props') || matchesPartial(node.props, selector.props);
 }
@@ -71,9 +71,9 @@ function regexpMatches(pattern: RegExp, value: string): boolean {
     return freshPattern.test(value);
 }
 
-function textContentMatches<HostSchema extends ProbeHostSchema>(
-    node: RuntimeProbeNode,
-    selector: ProbeSelector<HostSchema>
+function textContentMatches<HostSchema extends ReflectHostSchema>(
+    node: RuntimeReflectNode,
+    selector: ReflectSelector<HostSchema>
 ): boolean {
     if (!hasProperty(selector, 'textContent')) {
         return true;
@@ -90,25 +90,25 @@ function textContentMatches<HostSchema extends ProbeHostSchema>(
         : regexpMatches(textContent, node.textContent);
 }
 
-function hasMatches<HostSchema extends ProbeHostSchema>(
-    node: RuntimeProbeNode,
-    selector: ProbeSelector<HostSchema>
+function hasMatches<HostSchema extends ReflectHostSchema>(
+    node: RuntimeReflectNode,
+    selector: ReflectSelector<HostSchema>
 ): boolean {
     return !hasProperty(selector, 'has') || node.find(selector.has) !== undefined;
 }
 
-function whereMatches<HostSchema extends ProbeHostSchema>(
-    node: RuntimeProbeNode,
-    selector: ProbeSelector<HostSchema>
+function whereMatches<HostSchema extends ReflectHostSchema>(
+    node: RuntimeReflectNode,
+    selector: ReflectSelector<HostSchema>
 ): boolean {
     const { where } = selector;
 
     return where === undefined || Reflect.apply(where, undefined, [ node ]) === true;
 }
 
-export function toSelector<HostSchema extends ProbeHostSchema>(
+export function toSelector<HostSchema extends ReflectHostSchema>(
     selector: unknown
-): ProbeSelector<HostSchema> {
+): ReflectSelector<HostSchema> {
     if (isSelectorObject(selector)) {
         return selector;
     }
@@ -116,9 +116,9 @@ export function toSelector<HostSchema extends ProbeHostSchema>(
     return { type: selector };
 }
 
-export function nodeMatchesSelector<HostSchema extends ProbeHostSchema>(
-    node: RuntimeProbeNode,
-    selector: ProbeSelector<HostSchema>
+export function nodeMatchesSelector<HostSchema extends ReflectHostSchema>(
+    node: RuntimeReflectNode,
+    selector: ReflectSelector<HostSchema>
 ): boolean {
     return typeMatches(node, selector) &&
         keyMatches(node, selector) &&

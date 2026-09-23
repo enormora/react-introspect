@@ -3,14 +3,14 @@ import {
     createIdNormalizer,
     normalizeSnapshotProps,
     normalizeSnapshotValue,
-    type ProbeIdNormalization
-} from './probe-id-normalization.ts';
+    type ReflectIdNormalization
+} from './reflect-id-normalization.ts';
 import type {
     ChildSnapshotsRequest,
     ChildSnapshotsResult,
     ElementNodeRequest,
     NodeIdAllocation,
-    ProbeSnapshot,
+    ReflectSnapshot,
     SnapshotBuild,
     SnapshotNodeInput,
     SnapshotNodeRequest,
@@ -24,7 +24,7 @@ import type {
     SourceElementNodeRequest,
     SourceElementRenderedChildrenRequest,
     SourceSnapshotNodeRequest
-} from './probe-snapshot-contract.ts';
+} from './reflect-snapshot-contract.ts';
 import {
     freezePropsWithoutChildren,
     getElementChildrenState,
@@ -33,7 +33,7 @@ import {
     getSourceElementKind,
     getTextContent,
     getTypeName
-} from './probe-snapshot-shape.ts';
+} from './reflect-snapshot-shape.ts';
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
@@ -412,13 +412,13 @@ const snapshotOperations = {
     }
 };
 
-export function createProbeSnapshotFromSource(
+export function createReflectSnapshotFromSource(
     children: readonly SnapshotSourceNode[],
     renderCount: number,
-    idNormalization: ProbeIdNormalization = { generator: undefined, prefix: '' }
-): ProbeSnapshot {
+    idNormalization: ReflectIdNormalization = { generator: undefined, prefix: '' }
+): ReflectSnapshot {
     if (children.length !== 1) {
-        return createProbeSnapshotFromSource(
+        return createReflectSnapshotFromSource(
             [
                 {
                     activityMode: undefined,

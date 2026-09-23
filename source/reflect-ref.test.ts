@@ -1,8 +1,8 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { ProbeFakeRefNode } from './probe-public-types.ts';
-import { createFakeRefNode, matchRefs } from './probe-ref.ts';
-import { probe } from './react-probe.entry-point.ts';
+import type { ReflectFakeRefNode } from './reflect-public-types.ts';
+import { createFakeRefNode, matchRefs } from './reflect-ref.ts';
+import { reflect } from './react-reflect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -39,7 +39,7 @@ function assertThrows(scope: EqualScope, action: () => void, message: string): v
     throw new Error('Expected action to throw.');
 }
 
-function createFocusNode(recordFocus: () => void): ProbeFakeRefNode<FocusNode> {
+function createFocusNode(recordFocus: () => void): ReflectFakeRefNode<FocusNode> {
     return createFakeRefNode({
         focus() {
             recordFocus();
@@ -118,7 +118,7 @@ function assertShorthandRef(scope: EqualScope): void {
         focusCount += 1;
     });
 
-    probe(React.createElement(AutoFocusInput), {
+    reflect(React.createElement(AutoFocusInput), {
         depth: 'full',
         refs: {
             input: inputNode
@@ -133,7 +133,7 @@ function assertCallbackRef(scope: EqualScope): void {
     const inputNode = createFakeRefNode({ tag: 'input' });
     let receivedNode: unknown = null;
 
-    probe(
+    reflect(
         React.createElement('input', {
             ref(node: unknown) {
                 receivedNode = node;
@@ -162,7 +162,7 @@ function assertMatchedRefs(scope: EqualScope): void {
         focused.push('submit');
     });
 
-    probe(React.createElement(SignupForm), {
+    reflect(React.createElement(SignupForm), {
         depth: 'full',
         refs: matchRefs([
             {
@@ -194,7 +194,7 @@ function assertMatchedRefs(scope: EqualScope): void {
 function assertFactoryRefs(scope: EqualScope): void {
     const names: string[] = [];
 
-    probe(React.createElement(SignupForm), {
+    reflect(React.createElement(SignupForm), {
         depth: 'full',
         refs: matchRefs([
             {
@@ -226,7 +226,7 @@ function assertForwardRef(scope: EqualScope): void {
     });
     const objectRef = React.createRef<FocusNode | null>();
 
-    probe(
+    reflect(
         React.createElement(ForwardedInput, {
             name: 'forwarded',
             ref: objectRef
@@ -246,7 +246,7 @@ function assertForwardRef(scope: EqualScope): void {
 function assertLeafRefIsNotInvoked(scope: EqualScope): void {
     const calls: unknown[] = [];
 
-    probe(
+    reflect(
         React.createElement(ParentWithLeafRef, {
             leafRef(node) {
                 calls.push(node);
@@ -266,7 +266,7 @@ function assertAmbiguityErrors(scope: EqualScope): void {
     });
 
     assertThrows(scope, function renderMissingShorthand() {
-        probe(
+        reflect(
             React.createElement('button', {
                 ref: React.createRef()
             }),
@@ -280,7 +280,7 @@ function assertAmbiguityErrors(scope: EqualScope): void {
     }, 'Ref shorthand input matched no host refs.');
 
     assertThrows(scope, function renderMultipleShorthand() {
-        probe(React.createElement(TwoInputs), {
+        reflect(React.createElement(TwoInputs), {
             depth: 'full',
             refs: {
                 input: inputNode
@@ -290,7 +290,7 @@ function assertAmbiguityErrors(scope: EqualScope): void {
     }, 'Ref shorthand input matched multiple host refs.');
 
     assertThrows(scope, function renderMultipleRuleMatches() {
-        probe(
+        reflect(
             React.createElement('input', {
                 name: 'email',
                 ref: React.createRef()

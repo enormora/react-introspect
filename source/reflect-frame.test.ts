@@ -1,9 +1,9 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { isProbeRenderError, probeComponentHostType, throwProbeRenderError } from './probe-frame-contract.ts';
-import { createProbeRenderElement } from './probe-frame.ts';
-import type { ProbeNode } from './probe-public-types.ts';
-import { probe } from './react-probe.entry-point.ts';
+import { isReflectRenderError, reflectComponentHostType, throwReflectRenderError } from './reflect-frame-contract.ts';
+import { createReflectRenderElement } from './reflect-frame.ts';
+import type { ReflectNode } from './reflect-public-types.ts';
+import { reflect } from './react-reflect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -193,13 +193,13 @@ function assertThrows(scope: EqualScope, action: () => void, message: string): v
 
 function catchThrown(value: unknown): void {
     try {
-        throwProbeRenderError(value);
+        throwReflectRenderError(value);
     } catch {
         Object.freeze({});
     }
 }
 
-function assertNotRendered(scope: EqualScope, node: ProbeNode): void {
+function assertNotRendered(scope: EqualScope, node: ReflectNode): void {
     scope.assert.deepEqual(node.renderedChildren, {
         reason: 'depth',
         status: 'notRendered'
@@ -209,7 +209,7 @@ function assertNotRendered(scope: EqualScope, node: ProbeNode): void {
 export const testNode = suite('execution shallow function components', [
     test('keeps child components visible but unexecuted at depth 1', function verifyDepthOne(scope) {
         const { Button, counts, Parent, Shell } = createDepthComponents();
-        const view = probe(React.createElement(Parent), {
+        const view = reflect(React.createElement(Parent), {
             strictMode: false
         });
         const shell = requireValue(view.find(Shell));
@@ -225,7 +225,7 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('executes one deeper component at depth 2', function verifyDepthTwo(scope) {
         const { Button, counts, Parent, Shell } = createDepthComponents();
-        const view = probe(React.createElement(Parent), {
+        const view = reflect(React.createElement(Parent), {
             depth: 2,
             strictMode: false
         });
@@ -242,7 +242,7 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('executes all function boundaries at full depth', function verifyFullDepth(scope) {
         const { counts, Parent } = createDepthComponents();
-        const view = probe(React.createElement(Parent), {
+        const view = reflect(React.createElement(Parent), {
             depth: 'full',
             strictMode: false
         });
@@ -255,7 +255,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('keeps hooks legal and updates through event props', function verifyHookUpdates(scope) {
-        const view = probe(React.createElement(Counter), {
+        const view = reflect(React.createElement(Counter), {
             strictMode: false
         });
         const button = requireValue(view.find('button'));
@@ -268,7 +268,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('transforms context providers and consumers', function verifyContext(scope) {
-        const view = probe(React.createElement(ContextRoot), {
+        const view = reflect(React.createElement(ContextRoot), {
             depth: 'full',
             strictMode: false
         });
@@ -278,7 +278,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('executes memo and forwardRef components', function verifyReactWrappers(scope) {
-        const view = probe(React.createElement(Wrapper), {
+        const view = reflect(React.createElement(Wrapper), {
             depth: 'full',
             strictMode: false
         });
@@ -290,7 +290,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('normalizes non-string primitive output', function verifyPrimitiveOutput(scope) {
-        const view = probe(React.createElement(BigIntValue), {
+        const view = reflect(React.createElement(BigIntValue), {
             strictMode: false
         });
 
@@ -299,7 +299,7 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('normalizes rich given children on component leaves', function verifyGivenChildEdges(scope) {
-        const view = probe(React.createElement(GivenChildrenRoot), {
+        const view = reflect(React.createElement(GivenChildrenRoot), {
             strictMode: false
         });
         const leaf = requireValue(view.find(GivenLeaf));
@@ -328,17 +328,17 @@ export const testNode = suite('execution shallow function components', [
         assertThrows(
             scope,
             function renderInvalidElement() {
-                createProbeRenderElement(invalidElement, 1);
+                createReflectRenderElement(invalidElement, 1);
             },
-            'Probe expected React element props to be an object.'
+            'Reflect expected React element props to be an object.'
         );
 
         return scope.assert.collect();
     }),
     test(
-        'marks user host nodes that collide with Probe internals unsupported',
+        'marks user host nodes that collide with Reflect internals unsupported',
         function verifyInternalHostCollision(scope) {
-            const view = probe(React.createElement(probeComponentHostType), {
+            const view = reflect(React.createElement(reflectComponentHostType), {
                 depth: 'full',
                 strictMode: false
             });
@@ -354,7 +354,7 @@ export const testNode = suite('execution shallow function components', [
         }
     ),
     test('records unsupported memo payloads as opaque output', function verifyUnsupportedMemoPayload(scope) {
-        const view = probe(React.createElement(OpaqueMemo as never), {
+        const view = reflect(React.createElement(OpaqueMemo as never), {
             strictMode: false
         });
 
@@ -364,7 +364,7 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('transforms Suspense fallback and fulfilled lazy frames', function verifyAsyncElementShapes(scope) {
         const LazyLabel = createFulfilledLazyType(PlainLabel);
-        const suspense = createProbeRenderElement(
+        const suspense = createReflectRenderElement(
             React.createElement(
                 React.Suspense,
                 { fallback: React.createElement('em', null, 'loading') },
@@ -373,7 +373,7 @@ export const testNode = suite('execution shallow function components', [
             'full'
         );
         const suspenseProps = suspense.props as Readonly<Record<PropertyKey, unknown>>;
-        const lazyView = probe(React.createElement(LazyLabel, { label: 'lazy' }), {
+        const lazyView = reflect(React.createElement(LazyLabel, { label: 'lazy' }), {
             depth: 'full',
             strictMode: false
         });
@@ -399,7 +399,7 @@ export const testNode = suite('execution shallow function components', [
             },
             [lazyPayloadKey]: Object.freeze({})
         } as unknown as React.FC<ButtonProps>;
-        const view = probe(React.createElement(VolatileLazy, { label: 'volatile' }), {
+        const view = reflect(React.createElement(VolatileLazy, { label: 'volatile' }), {
             depth: 'full',
             strictMode: false
         });
@@ -421,7 +421,7 @@ export const testNode = suite('execution shallow function components', [
             return thenable as never;
         }
 
-        const view = probe(React.createElement(ThenableLabel), {
+        const view = reflect(React.createElement(ThenableLabel), {
             depth: 'full',
             strictMode: false,
             warningMode: 'capture'
@@ -431,7 +431,7 @@ export const testNode = suite('execution shallow function components', [
 
         return scope.assert.collect();
     }),
-    test('does not mark functions or thenables as Probe render errors', function verifyRenderErrorMarker(scope) {
+    test('does not mark functions or thenables as Reflect render errors', function verifyRenderErrorMarker(scope) {
         const value = function value(): void {
             return undefined;
         };
@@ -443,8 +443,8 @@ export const testNode = suite('execution shallow function components', [
 
         catchThrown(thenable);
 
-        scope.assert.equal(isProbeRenderError(value), false);
-        scope.assert.equal(isProbeRenderError(thenable), false);
+        scope.assert.equal(isReflectRenderError(value), false);
+        scope.assert.equal(isReflectRenderError(thenable), false);
 
         return scope.assert.collect();
     })

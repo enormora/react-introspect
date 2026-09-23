@@ -10,7 +10,7 @@ on:
                 default: false
                 type: boolean
             confirmation:
-                description: 'Required when publish_now is true: type "publish react-probe".'
+                description: 'Required when publish_now is true: type "publish react-reflect".'
                 required: false
                 type: string
 
@@ -45,8 +45,8 @@ jobs:
               env:
                   CONFIRMATION: ${{ inputs.confirmation }}
               run: |
-                  if [ "${CONFIRMATION}" != "publish react-probe" ]; then
-                    echo "::error::Manual publish override requires confirmation: publish react-probe"
+                  if [ "${CONFIRMATION}" != "publish react-reflect" ]; then
+                    echo "::error::Manual publish override requires confirmation: publish react-reflect"
                     exit 1
                   fi
                   echo "should_publish=true" >> "$GITHUB_OUTPUT"

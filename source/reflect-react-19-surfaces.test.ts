@@ -1,8 +1,8 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { createIdNormalizer, normalizeSnapshotValue } from './probe-id-normalization.ts';
-import type { ProbeNode, ProbeView } from './probe-public-types.ts';
-import { probe } from './react-probe.entry-point.ts';
+import { createIdNormalizer, normalizeSnapshotValue } from './reflect-id-normalization.ts';
+import type { ReflectNode, ReflectView } from './reflect-public-types.ts';
+import { reflect } from './react-reflect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -51,7 +51,7 @@ function IdLabel(props: IdLabelProps): React.ReactNode {
     );
 }
 
-function assertHiddenActivityNode(scope: EqualScope, activity: ProbeNode): void {
+function assertHiddenActivityNode(scope: EqualScope, activity: ReflectNode): void {
     scope.assert.equal(activity.name, 'Activity');
     scope.assert.equal(activity.visibility, 'hidden');
     scope.assert.deepEqual(activity.state, {
@@ -62,13 +62,13 @@ function assertHiddenActivityNode(scope: EqualScope, activity: ProbeNode): void 
     });
 }
 
-function assertHiddenDescendant(scope: EqualScope, node: ProbeNode): void {
+function assertHiddenDescendant(scope: EqualScope, node: ReflectNode): void {
     scope.assert.equal(node.visibility, 'hidden');
     scope.assert.equal(node.state.reason, 'activity');
     scope.assert.equal(node.state.visible, false);
 }
 
-function assertVisibleActivity(scope: EqualScope, view: ProbeView): void {
+function assertVisibleActivity(scope: EqualScope, view: ReflectView): void {
     const activity = requireValue(view.find(React.Activity));
     const panel = requireValue(view.find(Panel));
     const section = requireValue(view.find('section'));
@@ -92,7 +92,7 @@ function createCyclicIdObject(id: string): Record<PropertyKey, unknown> {
 export const testNode = suite('React 19 special surfaces', [
     test('passes idPrefix through to React useId', function verifyIdPrefix(scope) {
         const renderedIds: string[] = [];
-        const view = probe<LabelHostSchema>(
+        const view = reflect<LabelHostSchema>(
             React.createElement(IdLabel, {
                 onId(id) {
                     renderedIds.push(id);
@@ -117,7 +117,7 @@ export const testNode = suite('React 19 special surfaces', [
     test('normalizes React ids in snapshots with idGenerator', function verifyIdGenerator(scope) {
         const renderedIds: string[] = [];
         const generatedIds: string[] = [];
-        const view = probe<LabelHostSchema>(
+        const view = reflect<LabelHostSchema>(
             React.createElement(IdLabel, {
                 onId(id) {
                     renderedIds.push(id);
@@ -136,7 +136,7 @@ export const testNode = suite('React 19 special surfaces', [
         const label = requireValue(view.find('label'));
         const renderedId = requireValue(renderedIds[0]);
 
-        scope.assert.equal(renderedId.startsWith('_react-probe-'), true);
+        scope.assert.equal(renderedId.startsWith('_react-reflect-'), true);
         scope.assert.deepEqual(generatedIds, [ renderedId ]);
         scope.assert.deepEqual(label.props, {
             htmlFor: 'field-1',
@@ -148,14 +148,14 @@ export const testNode = suite('React 19 special surfaces', [
         return scope.assert.collect();
     }),
     test('keeps unresolved generated ids and cuts cyclic props', function verifyIdNormalizerEdges(scope) {
-        const generatedId = '_react-probe-edge-r_0_';
+        const generatedId = '_react-reflect-edge-r_0_';
         const normalized = normalizeSnapshotValue(
             createCyclicIdObject(generatedId),
             createIdNormalizer({
                 generator() {
                     return undefined as never;
                 },
-                prefix: 'react-probe-edge-'
+                prefix: 'react-reflect-edge-'
             })
         ) as Record<PropertyKey, unknown>;
 
@@ -165,7 +165,7 @@ export const testNode = suite('React 19 special surfaces', [
         return scope.assert.collect();
     }),
     test('marks hidden Activity output and descendants invisible', function verifyHiddenActivity(scope) {
-        const view = probe(
+        const view = reflect(
             React.createElement(React.Activity, {
                 children: React.createElement(Panel),
                 mode: 'hidden'
@@ -187,7 +187,7 @@ export const testNode = suite('React 19 special surfaces', [
         return scope.assert.collect();
     }),
     test('updates Activity visibility when mode changes', function verifyActivityUpdate(scope) {
-        const view = probe(
+        const view = reflect(
             React.createElement(React.Activity, {
                 children: React.createElement(Panel),
                 mode: 'hidden'
@@ -210,7 +210,7 @@ export const testNode = suite('React 19 special surfaces', [
         return scope.assert.collect();
     }),
     test('updates Activity text visibility when mode changes', function verifyActivityTextUpdate(scope) {
-        const view = probe(
+        const view = reflect(
             React.createElement(React.Activity, {
                 children: 'loading',
                 mode: 'hidden'
@@ -237,7 +237,7 @@ export const testNode = suite('React 19 special surfaces', [
         return scope.assert.collect();
     }),
     test('records ViewTransition as a queryable wrapper surface', function verifyViewTransition(scope) {
-        const view = probe(
+        const view = reflect(
             React.createElement(
                 React.ViewTransition,
                 { name: 'profile-card' },

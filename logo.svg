@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 360 360" role="img" aria-labelledby="title description">
-  <title id="title">React Probe logo mark</title>
-  <desc id="description">A React-inspired atom mark combined with a magnifying probe.</desc>
+  <title id="title">React Reflect logo mark</title>
+  <desc id="description">A React-inspired atom mark combined with a magnifying glass.</desc>
   <style>
     .ink-fill {
       fill: #0F172A;
@@ -53,7 +53,7 @@
       <stop class="lens-mid" offset="0.58" stop-color="#D7F7FF"/>
       <stop class="lens-end" offset="1" stop-color="#9EEBFF"/>
     </linearGradient>
-    <linearGradient id="probe-gradient" x1="200" y1="221" x2="290" y2="311" gradientUnits="userSpaceOnUse">
+    <linearGradient id="reflect-gradient" x1="200" y1="221" x2="290" y2="311" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#42E6B2"/>
       <stop offset="1" stop-color="#61DAFB"/>
     </linearGradient>
@@ -68,7 +68,7 @@
     <circle class="ink-stroke" cx="204" cy="180" r="68" fill="url(#lens-gradient)" stroke-width="14"/>
     <circle class="lens-highlight" cx="184" cy="158" r="17"/>
     <path class="ink-stroke" d="M248.6 230.6 317.2 299.2" fill="none" stroke-width="28" stroke-linecap="round"/>
-    <path d="M248.6 230.6 317.2 299.2" fill="none" stroke="url(#probe-gradient)" stroke-width="13" stroke-linecap="round"/>
+    <path d="M248.6 230.6 317.2 299.2" fill="none" stroke="url(#reflect-gradient)" stroke-width="13" stroke-linecap="round"/>
     <path class="ink-stroke" d="M164 181.5h80" fill="none" stroke-width="10" stroke-linecap="round"/>
     <path class="ink-stroke" d="M176 157h56" fill="none" stroke-width="10" stroke-linecap="round"/>
     <path class="ink-stroke" d="M176 206h56" fill="none" stroke-width="10" stroke-linecap="round"/>

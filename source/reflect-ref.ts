@@ -1,32 +1,32 @@
 import type {
-    ProbeFakeRefNode,
-    ProbeHostSchema,
-    ProbeRefMatcher,
-    ProbeRefRule,
-    ProbeRefs,
-    ProbeRefShorthand,
-    ProbeRefTarget
-} from './probe-public-types.js';
+    ReflectFakeRefNode,
+    ReflectHostSchema,
+    ReflectRefMatcher,
+    ReflectRefRule,
+    ReflectRefs,
+    ReflectRefShorthand,
+    ReflectRefTarget
+} from './reflect-public-types.js';
 
 const matcherType = 'matchRefs';
 
-export type ProbeRefHostTarget = ProbeRefTarget<Readonly<Record<PropertyKey, unknown>>, string>;
+export type ReflectRefHostTarget = ReflectRefTarget<Readonly<Record<PropertyKey, unknown>>, string>;
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null;
 }
 
-export function createFakeRefNode<Node>(node: Node): ProbeFakeRefNode<Node> {
+export function createFakeRefNode<Node>(node: Node): ReflectFakeRefNode<Node> {
     return node;
 }
 
-function isProbeRefMatcher(value: unknown): value is ProbeRefMatcher {
+function isReflectRefMatcher(value: unknown): value is ReflectRefMatcher {
     return isRecord(value) && value.type === matcherType && Array.isArray(value.rules);
 }
 
-export function matchRefs<HostSchema extends ProbeHostSchema>(
-    rules: readonly ProbeRefRule<HostSchema>[]
-): ProbeRefMatcher<HostSchema> {
+export function matchRefs<HostSchema extends ReflectHostSchema>(
+    rules: readonly ReflectRefRule<HostSchema>[]
+): ReflectRefMatcher<HostSchema> {
     return Object.freeze({
         rules: Object.freeze(rules.slice()),
         type: matcherType
@@ -57,45 +57,45 @@ function matchesPartial(value: unknown, partial: unknown): boolean {
     });
 }
 
-function ruleTypeMatches(rule: ProbeRefRule, target: ProbeRefHostTarget): boolean {
+function ruleTypeMatches(rule: ReflectRefRule, target: ReflectRefHostTarget): boolean {
     return !hasProperty(rule, 'type') || rule.type === target.type;
 }
 
-function ruleKeyMatches(rule: ProbeRefRule, target: ProbeRefHostTarget): boolean {
+function ruleKeyMatches(rule: ReflectRefRule, target: ReflectRefHostTarget): boolean {
     return !hasProperty(rule, 'key') || rule.key === target.key;
 }
 
-function rulePropsMatch(rule: ProbeRefRule, target: ProbeRefHostTarget): boolean {
+function rulePropsMatch(rule: ReflectRefRule, target: ReflectRefHostTarget): boolean {
     return !hasProperty(rule, 'props') || matchesPartial(target.props, rule.props);
 }
 
-function ruleWhereMatches(rule: ProbeRefRule, target: ProbeRefHostTarget): boolean {
+function ruleWhereMatches(rule: ReflectRefRule, target: ReflectRefHostTarget): boolean {
     return rule.where === undefined || Reflect.apply(rule.where, undefined, [ target ]);
 }
 
-function ruleMatchesTarget(rule: ProbeRefRule, target: ProbeRefHostTarget): boolean {
+function ruleMatchesTarget(rule: ReflectRefRule, target: ReflectRefHostTarget): boolean {
     return ruleTypeMatches(rule, target) &&
         ruleKeyMatches(rule, target) &&
         rulePropsMatch(rule, target) &&
         ruleWhereMatches(rule, target);
 }
 
-function matchingRules(refs: ProbeRefMatcher, target: ProbeRefHostTarget): readonly ProbeRefRule[] {
+function matchingRules(refs: ReflectRefMatcher, target: ReflectRefHostTarget): readonly ReflectRefRule[] {
     return refs.rules.filter(function isMatchingRule(rule) {
         return ruleMatchesTarget(rule, target);
     });
 }
 
-function resolveMatchedRule(rule: ProbeRefRule, target: ProbeRefHostTarget): ProbeFakeRefNode {
+function resolveMatchedRule(rule: ReflectRefRule, target: ReflectRefHostTarget): ReflectFakeRefNode {
     return typeof rule.node === 'function'
         ? Reflect.apply(rule.node, undefined, [ target ])
         : rule.node;
 }
 
 function resolveShorthandRef(
-    refs: ProbeRefShorthand,
-    target: ProbeRefHostTarget
-): ProbeFakeRefNode | null {
+    refs: ReflectRefShorthand,
+    target: ReflectRefHostTarget
+): ReflectFakeRefNode | null {
     const node = refs[target.type];
 
     if (node === undefined) {
@@ -106,9 +106,9 @@ function resolveShorthandRef(
 }
 
 function resolveRuleRef(
-    refs: ProbeRefMatcher,
-    target: ProbeRefHostTarget
-): ProbeFakeRefNode | null {
+    refs: ReflectRefMatcher,
+    target: ReflectRefHostTarget
+): ReflectFakeRefNode | null {
     const rules = matchingRules(refs, target);
 
     if (rules.length > 1) {
@@ -120,7 +120,7 @@ function resolveRuleRef(
     return rule === undefined ? null : resolveMatchedRule(rule, target);
 }
 
-function countShorthandTargets(targets: readonly ProbeRefHostTarget[], type: string): number {
+function countShorthandTargets(targets: readonly ReflectRefHostTarget[], type: string): number {
     return targets
         .filter(function matchesType(target) {
             return target.type === type;
@@ -128,7 +128,7 @@ function countShorthandTargets(targets: readonly ProbeRefHostTarget[], type: str
         .length;
 }
 
-function shorthandTypes(refs: ProbeRefShorthand): readonly string[] {
+function shorthandTypes(refs: ReflectRefShorthand): readonly string[] {
     return Reflect.ownKeys(refs).filter(function isStringType(type): type is string {
         return typeof type === 'string';
     });
@@ -144,24 +144,24 @@ function validateShorthandTargetCount(type: string, targetCount: number): void {
     }
 }
 
-export function resolveProbeRef(
-    refs: ProbeRefs | undefined,
-    target: ProbeRefHostTarget
-): ProbeFakeRefNode | null {
+export function resolveReflectRef(
+    refs: ReflectRefs | undefined,
+    target: ReflectRefHostTarget
+): ReflectFakeRefNode | null {
     if (refs === undefined) {
         return null;
     }
 
-    return isProbeRefMatcher(refs)
+    return isReflectRefMatcher(refs)
         ? resolveRuleRef(refs, target)
         : resolveShorthandRef(refs, target);
 }
 
-export function validateProbeRefs(
-    refs: ProbeRefs | undefined,
-    targets: readonly ProbeRefHostTarget[]
+export function validateReflectRefs(
+    refs: ReflectRefs | undefined,
+    targets: readonly ReflectRefHostTarget[]
 ): void {
-    if (refs === undefined || isProbeRefMatcher(refs)) {
+    if (refs === undefined || isReflectRefMatcher(refs)) {
         return;
     }
 

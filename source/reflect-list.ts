@@ -1,7 +1,7 @@
-import type { RuntimeProbeList, RuntimeProbeNode } from './probe-runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from './probe-selector.ts';
+import type { RuntimeReflectList, RuntimeReflectNode } from './reflect-runtime-types.ts';
+import { nodeMatchesSelector, toSelector } from './reflect-selector.ts';
 
-export function createProbeList(nodes: readonly RuntimeProbeNode[]): RuntimeProbeList {
+export function createReflectList(nodes: readonly RuntimeReflectNode[]): RuntimeReflectList {
     const listNodes = Object.freeze(nodes.slice());
 
     return Object.freeze({
@@ -23,7 +23,7 @@ export function createProbeList(nodes: readonly RuntimeProbeNode[]): RuntimeProb
         filterBy(selector: unknown) {
             const normalizedSelector = toSelector(selector);
 
-            return createProbeList(listNodes.filter(function isMatch(node) {
+            return createReflectList(listNodes.filter(function isMatch(node) {
                 return nodeMatchesSelector(node, normalizedSelector);
             }));
         }

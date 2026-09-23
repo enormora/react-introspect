@@ -64,11 +64,11 @@ export const config = {
     },
     packages: [
         {
-            name: 'react-probe',
+            name: 'react-reflect',
             roots: {
                 main: {
-                    js: 'react-probe.entry-point.js',
-                    declarationFile: 'react-probe.entry-point.d.ts'
+                    js: 'react-reflect.entry-point.js',
+                    declarationFile: 'react-reflect.entry-point.d.ts'
                 }
             },
             additionalFiles: [

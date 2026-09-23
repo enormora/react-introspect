@@ -1,11 +1,11 @@
-import { createProbeList } from './probe-list.ts';
-import type { ProbeNodeState } from './probe-public-types.ts';
-import type { RuntimeProbeList, RuntimeProbeNode, RuntimeRenderedChildren } from './probe-runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from './probe-selector.ts';
-import type { ProbeSnapshot, SnapshotNode, SnapshotProps } from './probe-snapshot-contract.ts';
+import { createReflectList } from './reflect-list.ts';
+import type { ReflectNodeState } from './reflect-public-types.ts';
+import type { RuntimeReflectList, RuntimeReflectNode, RuntimeRenderedChildren } from './reflect-runtime-types.ts';
+import { nodeMatchesSelector, toSelector } from './reflect-selector.ts';
+import type { ReflectSnapshot, SnapshotNode, SnapshotProps } from './reflect-snapshot-contract.ts';
 
 export type SnapshotReader = {
-    readonly currentSnapshot: ProbeSnapshot;
+    readonly currentSnapshot: ReflectSnapshot;
     readonly act: (action: () => unknown) => unknown;
 };
 
@@ -68,7 +68,7 @@ function formatNode(node: SnapshotNode, depth: number): string {
     return `${prefix}${node.name}${children}`;
 }
 
-function nodeState(node: SnapshotNode): ProbeNodeState {
+function nodeState(node: SnapshotNode): ReflectNodeState {
     return Object.freeze({
         activityMode: node.activityMode,
         reason: node.renderedReason ?? (node.visibility === 'hidden' ? 'activity' : undefined),
@@ -77,22 +77,22 @@ function nodeState(node: SnapshotNode): ProbeNodeState {
     });
 }
 
-function findSnapshotNode(snapshot: ProbeSnapshot, id: number): SnapshotNode | undefined {
+function findSnapshotNode(snapshot: ReflectSnapshot, id: number): SnapshotNode | undefined {
     return snapshot.nodes.find(function hasNodeId(node) {
         return node.id === id;
     });
 }
 
-export function createProbeNode(
+export function createReflectNode(
     reader: SnapshotReader,
-    snapshot: ProbeSnapshot,
+    snapshot: ReflectSnapshot,
     node: SnapshotNode
-): RuntimeProbeNode {
+): RuntimeReflectNode {
     const context = { reader, snapshot };
 
-    function createNodeList(nodes: readonly SnapshotNode[]): RuntimeProbeList {
-        return createProbeList(nodes.map(function createChildNode(child) {
-            return createProbeNode(context.reader, context.snapshot, child);
+    function createNodeList(nodes: readonly SnapshotNode[]): RuntimeReflectList {
+        return createReflectList(nodes.map(function createChildNode(child) {
+            return createReflectNode(context.reader, context.snapshot, child);
         }));
     }
 
@@ -110,16 +110,16 @@ export function createProbeNode(
         };
     }
 
-    function descendants(): readonly RuntimeProbeNode[] {
+    function descendants(): readonly RuntimeReflectNode[] {
         return collectDescendants(node).map(function createDescendantNode(descendant) {
-            return createProbeNode(reader, snapshot, descendant);
+            return createReflectNode(reader, snapshot, descendant);
         });
     }
 
-    function findAll(selector: unknown): RuntimeProbeList {
+    function findAll(selector: unknown): RuntimeReflectList {
         const normalizedSelector = toSelector(selector);
 
-        return createProbeList(
+        return createReflectList(
             descendants().filter(function isMatch(descendant) {
                 return nodeMatchesSelector(descendant, normalizedSelector);
             })
@@ -177,7 +177,7 @@ export function createProbeNode(
             let parent = node.parentId === undefined ? undefined : findSnapshotNode(snapshot, node.parentId);
 
             while (parent !== undefined) {
-                const parentNode = createProbeNode(reader, snapshot, parent);
+                const parentNode = createReflectNode(reader, snapshot, parent);
 
                 if (nodeMatchesSelector(parentNode, normalizedSelector)) {
                     return parentNode;

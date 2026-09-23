@@ -11,7 +11,7 @@ export function isReactPortalValue(value: unknown): boolean {
 }
 
 export function createUnsupportedReactValueError(): Error {
-    return new TypeError('React Probe cannot represent portal output yet.');
+    return new TypeError('React Reflect cannot represent portal output yet.');
 }
 
 export function assertSupportedReactValue(value: unknown): void {

@@ -1,7 +1,7 @@
 {
-    "name": "react-probe",
+    "name": "react-reflect",
     "version": "0.0.0-dev",
-    "description": "Host-agnostic React component probing for unit tests",
+    "description": "Host-agnostic React component reflection for unit tests",
     "keywords": [
         "react",
         "test",
@@ -9,25 +9,25 @@
         "components",
         "shallow-rendering"
     ],
-    "homepage": "https://github.com/enormora/react-probe#readme",
+    "homepage": "https://github.com/enormora/react-reflect#readme",
     "bugs": {
-        "url": "https://github.com/enormora/react-probe/issues"
+        "url": "https://github.com/enormora/react-reflect/issues"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/enormora/react-probe.git"
+        "url": "git+https://github.com/enormora/react-reflect.git"
     },
     "license": "MIT",
     "author": "Mathias Schreck <schreck.mathias@gmail.com>",
     "type": "module",
     "exports": {
         ".": {
-            "types": "./source/react-probe.entry-point.ts",
-            "import": "./source/react-probe.entry-point.ts"
+            "types": "./source/react-reflect.entry-point.ts",
+            "import": "./source/react-reflect.entry-point.ts"
         }
     },
-    "main": "source/react-probe.entry-point.ts",
-    "types": "source/react-probe.entry-point.ts",
+    "main": "source/react-reflect.entry-point.ts",
+    "types": "source/react-reflect.entry-point.ts",
     "scripts": {
         "compile": "just compile",
         "lint": "just lint",

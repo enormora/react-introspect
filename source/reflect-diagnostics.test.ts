@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { createProbeDiagnostics, type ProbeDiagnostics } from './probe-diagnostics.ts';
-import { probe } from './react-probe.entry-point.ts';
+import { createReflectDiagnostics, type ReflectDiagnostics } from './reflect-diagnostics.ts';
+import { reflect } from './react-reflect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -31,7 +31,7 @@ function ThrowingComponent(): React.ReactNode {
 }
 
 function assertCapturedRootError(scope: EqualScope): void {
-    const view = probe(React.createElement(ThrowingComponent), {
+    const view = reflect(React.createElement(ThrowingComponent), {
         errorMode: 'capture',
         strictMode: false,
         warningMode: 'capture'
@@ -47,7 +47,7 @@ function assertCapturedRootError(scope: EqualScope): void {
 
 function assertThrownRootError(scope: EqualScope): void {
     const error = requireError(function renderThrowingComponent() {
-        probe(React.createElement(ThrowingComponent), {
+        reflect(React.createElement(ThrowingComponent), {
             errorMode: 'throw',
             strictMode: false,
             warningMode: 'capture'
@@ -57,14 +57,14 @@ function assertThrownRootError(scope: EqualScope): void {
     scope.assert.equal(error.message, 'render failed');
 }
 
-function createDiagnostics(warningMode: 'capture' | 'ignore' | 'throw'): ProbeDiagnostics {
-    return createProbeDiagnostics({
+function createDiagnostics(warningMode: 'capture' | 'ignore' | 'throw'): ReflectDiagnostics {
+    return createReflectDiagnostics({
         errorMode: 'capture',
         warningMode
     });
 }
 
-function recordRecoverableWarning(diagnostics: ProbeDiagnostics, message: string): void {
+function recordRecoverableWarning(diagnostics: ReflectDiagnostics, message: string): void {
     diagnostics.run(function recordWarning() {
         diagnostics.recordRecoverableError(new Error(message));
     });
@@ -102,7 +102,7 @@ function assertIgnoredRecoverableWarning(scope: EqualScope): void {
 function assertConsoleDiagnostics(scope: EqualScope): void {
     const diagnostics = createDiagnostics('capture');
 
-    diagnostics.recordConsoleDiagnostic('Warning: outside Probe');
+    diagnostics.recordConsoleDiagnostic('Warning: outside Reflect');
     diagnostics.run(function recordConsoleWarning() {
         diagnostics.recordConsoleDiagnostic([ 'Warning:', 'console warning' ]);
         diagnostics.recordConsoleDiagnostic('ordinary application output');
@@ -208,7 +208,7 @@ export const testNode = suite('diagnostics', [
 
         return scope.assert.collect();
     }),
-    test('captures React console diagnostics inside Probe context', function verifyConsoleWarnings(scope) {
+    test('captures React console diagnostics inside Reflect context', function verifyConsoleWarnings(scope) {
         assertConsoleDiagnostics(scope);
 
         return scope.assert.collect();
@@ -233,7 +233,7 @@ export const testNode = suite('diagnostics', [
 
         return scope.assert.collect();
     }),
-    test('keeps Probe diagnostics isolated', function verifyParallelWarnings(scope) {
+    test('keeps Reflect diagnostics isolated', function verifyParallelWarnings(scope) {
         assertDiagnosticsIsolation(scope);
 
         return scope.assert.collect();

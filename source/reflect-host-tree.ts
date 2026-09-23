@@ -1,69 +1,69 @@
 import {
-    probeComponentHostType,
-    type ProbeComponentMetadata,
-    probeComponentMetadata,
-    probeElementKeyMetadata,
-    probeEmptyHostType,
-    probeOpaqueHostType,
-    probeValueMetadata
-} from './probe-frame-contract.ts';
-import type { ProbeIdNormalization } from './probe-id-normalization.ts';
-import type { ProbeRefs } from './probe-public-types.ts';
-import { type ProbeRefHostTarget, resolveProbeRef, validateProbeRefs } from './probe-ref.ts';
+    reflectComponentHostType,
+    type ReflectComponentMetadata,
+    reflectComponentMetadata,
+    reflectElementKeyMetadata,
+    reflectEmptyHostType,
+    reflectOpaqueHostType,
+    reflectValueMetadata
+} from './reflect-frame-contract.ts';
+import type { ReflectIdNormalization } from './reflect-id-normalization.ts';
+import type { ReflectRefs } from './reflect-public-types.ts';
+import { type ReflectRefHostTarget, resolveReflectRef, validateReflectRefs } from './reflect-ref.ts';
 import {
-    createEmptyProbeSnapshot,
-    type ProbeSnapshot,
+    createEmptyReflectSnapshot,
+    type ReflectSnapshot,
     type SnapshotSourceNode
-} from './probe-snapshot-contract.ts';
-import { createProbeSnapshotFromSource } from './probe-snapshot.ts';
+} from './reflect-snapshot-contract.ts';
+import { createReflectSnapshotFromSource } from './reflect-snapshot.ts';
 
-export type ProbeHostProps = Readonly<Record<PropertyKey, unknown>>;
+export type ReflectHostProps = Readonly<Record<PropertyKey, unknown>>;
 
-export type ProbeHostParent = ProbeHostContainer | ProbeHostInstance;
+export type ReflectHostParent = ReflectHostContainer | ReflectHostInstance;
 
-export type ProbeHostChild = ProbeHostInstance | ProbeTextInstance;
+export type ReflectHostChild = ReflectHostInstance | ReflectTextInstance;
 
-type ProbeChildStore = {
-    readonly readChildren: () => readonly ProbeHostChild[];
-    readonly writeChildren: (children: readonly ProbeHostChild[]) => void;
+type ReflectChildStore = {
+    readonly readChildren: () => readonly ReflectHostChild[];
+    readonly writeChildren: (children: readonly ReflectHostChild[]) => void;
 };
 
-export type ProbeHostContainer = {
-    readonly readIdNormalization: () => ProbeIdNormalization;
-    readonly readRefs: () => ProbeRefs | undefined;
-    readonly publish: (snapshot: ProbeSnapshot) => void;
+export type ReflectHostContainer = {
+    readonly readIdNormalization: () => ReflectIdNormalization;
+    readonly readRefs: () => ReflectRefs | undefined;
+    readonly publish: (snapshot: ReflectSnapshot) => void;
     readonly readNextRenderCount: () => number;
     readonly readMounted: () => boolean;
     readonly writeMounted: (mounted: boolean) => void;
-} & ProbeChildStore;
+} & ReflectChildStore;
 
-export type ProbeHostInstance = {
-    readonly readProps: () => ProbeHostProps;
+export type ReflectHostInstance = {
+    readonly readProps: () => ReflectHostProps;
     readonly readPublicInstance: () => unknown;
     readonly readVisibility: () => 'hidden' | 'visible';
-    readonly refreshPublicInstance: (props: ProbeHostProps) => void;
+    readonly refreshPublicInstance: (props: ReflectHostProps) => void;
     readonly type: string;
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
-    readonly writeProps: (props: ProbeHostProps) => void;
-} & ProbeChildStore;
+    readonly writeProps: (props: ReflectHostProps) => void;
+} & ReflectChildStore;
 
-export type ProbeTextInstance = {
+export type ReflectTextInstance = {
     readonly readText: () => string;
     readonly readVisibility: () => 'hidden' | 'visible';
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
     readonly writeText: (text: string) => void;
 };
 
-export type ProbeHostContext = {
-    readonly refs: ProbeRefs | undefined;
+export type ReflectHostContext = {
+    readonly refs: ReflectRefs | undefined;
 };
 
 const internalHostTypes = Object.freeze([
-    probeComponentHostType,
-    probeEmptyHostType,
-    probeOpaqueHostType
+    reflectComponentHostType,
+    reflectEmptyHostType,
+    reflectOpaqueHostType
 ]);
-const probeComponentMetadataKeys = Object.freeze([
+const reflectComponentMetadataKeys = Object.freeze([
     'activityMode',
     'error',
     'givenChildren',
@@ -72,16 +72,16 @@ const probeComponentMetadataKeys = Object.freeze([
     'renderedReason',
     'type'
 ]);
-const parentByChild = new WeakMap<ProbeHostChild, ProbeHostParent>();
+const parentByChild = new WeakMap<ReflectHostChild, ReflectHostParent>();
 
-function createChildStore(): ProbeChildStore {
-    let currentChildren: readonly ProbeHostChild[] = [];
+function createChildStore(): ReflectChildStore {
+    let currentChildren: readonly ReflectHostChild[] = [];
 
     return Object.freeze({
         readChildren() {
             return currentChildren;
         },
-        writeChildren(children: readonly ProbeHostChild[]) {
+        writeChildren(children: readonly ReflectHostChild[]) {
             currentChildren = children;
         }
     });
@@ -99,12 +99,12 @@ function isPublicHostPropKey(key: PropertyKey): boolean {
     return key !== 'children' &&
         key !== 'key' &&
         key !== 'ref' &&
-        key !== probeComponentMetadata &&
-        key !== probeElementKeyMetadata &&
-        key !== probeValueMetadata;
+        key !== reflectComponentMetadata &&
+        key !== reflectElementKeyMetadata &&
+        key !== reflectValueMetadata;
 }
 
-function publicProps(props: ProbeHostProps): ProbeHostProps {
+function publicProps(props: ReflectHostProps): ReflectHostProps {
     const result: Record<PropertyKey, unknown> = {};
 
     for (const key of Reflect.ownKeys(props)) {
@@ -116,35 +116,35 @@ function publicProps(props: ProbeHostProps): ProbeHostProps {
     return Object.freeze(result);
 }
 
-function isProbeComponentMetadata(value: unknown): value is ProbeComponentMetadata {
+function isReflectComponentMetadata(value: unknown): value is ReflectComponentMetadata {
     return isRecord(value) &&
-        probeComponentMetadataKeys.every(function hasMetadataKey(key) {
+        reflectComponentMetadataKeys.every(function hasMetadataKey(key) {
             return hasProperty(value, key);
         });
 }
 
-function isTextInstance(child: ProbeHostChild): child is ProbeTextInstance {
+function isTextInstance(child: ReflectHostChild): child is ReflectTextInstance {
     return !Reflect.has(child, 'type');
 }
 
-function readSpecialValue(instance: ProbeHostInstance): unknown {
-    return instance.readProps()[probeValueMetadata];
+function readSpecialValue(instance: ReflectHostInstance): unknown {
+    return instance.readProps()[reflectValueMetadata];
 }
 
-function readHostKeyFromProps(props: ProbeHostProps): string | null {
-    const key = props[probeElementKeyMetadata];
+function readHostKeyFromProps(props: ReflectHostProps): string | null {
+    const key = props[reflectElementKeyMetadata];
 
     return typeof key === 'string' ? key : null;
 }
 
-function readHostKey(instance: ProbeHostInstance): string | null {
+function readHostKey(instance: ReflectHostInstance): string | null {
     return readHostKeyFromProps(instance.readProps());
 }
 
-function readComponentMetadata(instance: ProbeHostInstance): ProbeComponentMetadata {
-    const value = instance.readProps()[probeComponentMetadata];
+function readComponentMetadata(instance: ReflectHostInstance): ReflectComponentMetadata {
+    const value = instance.readProps()[reflectComponentMetadata];
 
-    if (!isProbeComponentMetadata(value)) {
+    if (!isReflectComponentMetadata(value)) {
         return Object.freeze({
             activityMode: undefined,
             error: undefined,
@@ -152,18 +152,18 @@ function readComponentMetadata(instance: ProbeHostInstance): ProbeComponentMetad
             key: null,
             props: Object.freeze({}),
             renderedReason: 'unsupported',
-            type: probeComponentHostType
+            type: reflectComponentHostType
         });
     }
 
     return value;
 }
 
-function isProbeInternalHostType(type: string): boolean {
+function isReflectInternalHostType(type: string): boolean {
     return internalHostTypes.includes(type);
 }
 
-function toRefTarget(type: string, props: ProbeHostProps): ProbeRefHostTarget {
+function toRefTarget(type: string, props: ReflectHostProps): ReflectRefHostTarget {
     return Object.freeze({
         key: readHostKeyFromProps(props),
         name: type,
@@ -173,25 +173,25 @@ function toRefTarget(type: string, props: ProbeHostProps): ProbeRefHostTarget {
 }
 
 function resolvePublicInstance(
-    refs: ProbeRefs | undefined,
+    refs: ReflectRefs | undefined,
     type: string,
-    props: ProbeHostProps
+    props: ReflectHostProps
 ): unknown {
-    if (isProbeInternalHostType(type)) {
+    if (isReflectInternalHostType(type)) {
         return null;
     }
 
-    return resolveProbeRef(refs, toRefTarget(type, props));
+    return resolveReflectRef(refs, toRefTarget(type, props));
 }
 
-function collectRefTargets(child: ProbeHostChild): readonly ProbeRefHostTarget[] {
+function collectRefTargets(child: ReflectHostChild): readonly ReflectRefHostTarget[] {
     if (isTextInstance(child)) {
         return Object.freeze([]);
     }
 
     const childTargets = child.readChildren().flatMap(collectRefTargets);
 
-    if (isProbeInternalHostType(child.type)) {
+    if (isReflectInternalHostType(child.type)) {
         return childTargets;
     }
 
@@ -201,7 +201,7 @@ function collectRefTargets(child: ProbeHostChild): readonly ProbeRefHostTarget[]
     ]);
 }
 
-function detachChild(child: ProbeHostChild): void {
+function detachChild(child: ReflectHostChild): void {
     const parent = parentByChild.get(child);
 
     if (parent === undefined) {
@@ -218,20 +218,20 @@ function detachChild(child: ProbeHostChild): void {
     parentByChild.delete(child);
 }
 
-function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
+function toSourceNode(child: ReflectHostChild): SnapshotSourceNode {
     if (isTextInstance(child)) {
         return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
     }
 
-    if (child.type === probeEmptyHostType || child.type === probeOpaqueHostType) {
+    if (child.type === reflectEmptyHostType || child.type === reflectOpaqueHostType) {
         return {
-            kind: child.type === probeEmptyHostType ? 'empty' : 'opaque',
+            kind: child.type === reflectEmptyHostType ? 'empty' : 'opaque',
             value: readSpecialValue(child),
             visibility: child.readVisibility()
         };
     }
 
-    if (child.type === probeComponentHostType) {
+    if (child.type === reflectComponentHostType) {
         const metadata = readComponentMetadata(child);
 
         return {
@@ -264,7 +264,7 @@ function toSourceNode(child: ProbeHostChild): SnapshotSourceNode {
     };
 }
 
-export function appendChild(parent: ProbeHostParent, child: ProbeHostChild): void {
+export function appendChild(parent: ReflectHostParent, child: ReflectHostChild): void {
     detachChild(child);
 
     const children = parent.readChildren();
@@ -276,16 +276,16 @@ export function appendChild(parent: ProbeHostParent, child: ProbeHostChild): voi
     parentByChild.set(child, parent);
 }
 
-export function clearContainer(container: ProbeHostContainer): void {
+export function clearContainer(container: ReflectHostContainer): void {
     container.writeChildren([]);
 }
 
 export function createHostContainer(
-    publish: (snapshot: ProbeSnapshot) => void,
+    publish: (snapshot: ReflectSnapshot) => void,
     readNextRenderCount: () => number,
-    idNormalization: ProbeIdNormalization,
-    refs: ProbeRefs | undefined
-): ProbeHostContainer {
+    idNormalization: ReflectIdNormalization,
+    refs: ReflectRefs | undefined
+): ReflectHostContainer {
     let mounted = true;
 
     return Object.freeze({
@@ -309,10 +309,10 @@ export function createHostContainer(
 
 export function createHostInstance(
     type: string,
-    props: ProbeHostProps,
+    props: ReflectHostProps,
     _root: unknown,
-    context: ProbeHostContext
-): ProbeHostInstance {
+    context: ReflectHostContext
+): ReflectHostInstance {
     let currentProps = props;
     let currentPublicInstance = resolvePublicInstance(context.refs, type, props);
     let currentVisibility: 'hidden' | 'visible' = 'visible';
@@ -328,20 +328,20 @@ export function createHostInstance(
         readVisibility() {
             return currentVisibility;
         },
-        refreshPublicInstance(nextProps: ProbeHostProps) {
+        refreshPublicInstance(nextProps: ReflectHostProps) {
             currentPublicInstance = resolvePublicInstance(context.refs, type, nextProps);
         },
         type,
         writeVisibility(visibility: 'hidden' | 'visible') {
             currentVisibility = visibility;
         },
-        writeProps(nextProps: ProbeHostProps) {
+        writeProps(nextProps: ReflectHostProps) {
             currentProps = nextProps;
         }
     });
 }
 
-export function createTextInstance(text: string): ProbeTextInstance {
+export function createTextInstance(text: string): ReflectTextInstance {
     let currentText = text;
     let currentVisibility: 'hidden' | 'visible' = 'visible';
 
@@ -361,18 +361,18 @@ export function createTextInstance(text: string): ProbeTextInstance {
     });
 }
 
-export function getChildHostContext(context: ProbeHostContext): ProbeHostContext {
+export function getChildHostContext(context: ReflectHostContext): ReflectHostContext {
     return context;
 }
 
-export function getRootHostContext(container: ProbeHostContainer): ProbeHostContext {
+export function getRootHostContext(container: ReflectHostContainer): ReflectHostContext {
     return Object.freeze({ refs: container.readRefs() });
 }
 
 export function insertBefore(
-    parent: ProbeHostParent,
-    child: ProbeHostChild,
-    beforeChild: ProbeHostChild
+    parent: ReflectHostParent,
+    child: ReflectHostChild,
+    beforeChild: ReflectHostChild
 ): void {
     detachChild(child);
 
@@ -382,7 +382,7 @@ export function insertBefore(
     parentByChild.set(child, parent);
 }
 
-export function removeChild(parent: ProbeHostParent, child: ProbeHostChild): void {
+export function removeChild(parent: ReflectHostParent, child: ReflectHostChild): void {
     const children = parent.readChildren();
     const index = children.indexOf(child);
 
@@ -393,36 +393,36 @@ export function removeChild(parent: ProbeHostParent, child: ProbeHostChild): voi
     parentByChild.delete(child);
 }
 
-export function toSnapshot(container: ProbeHostContainer): ProbeSnapshot {
+export function toSnapshot(container: ReflectHostContainer): ReflectSnapshot {
     if (!container.readMounted()) {
-        return createEmptyProbeSnapshot(container.readNextRenderCount());
+        return createEmptyReflectSnapshot(container.readNextRenderCount());
     }
 
-    return createProbeSnapshotFromSource(
+    return createReflectSnapshotFromSource(
         container.readChildren().map(toSourceNode),
         container.readNextRenderCount(),
         container.readIdNormalization()
     );
 }
 
-export function hideInstance(instance: ProbeHostInstance): void {
+export function hideInstance(instance: ReflectHostInstance): void {
     instance.writeVisibility('hidden');
 }
 
-export function hideTextInstance(instance: ProbeTextInstance): void {
+export function hideTextInstance(instance: ReflectTextInstance): void {
     instance.writeVisibility('hidden');
 }
 
-export function unhideInstance(instance: ProbeHostInstance): void {
+export function unhideInstance(instance: ReflectHostInstance): void {
     instance.writeVisibility('visible');
 }
 
-export function unhideTextInstance(instance: ProbeTextInstance): void {
+export function unhideTextInstance(instance: ReflectTextInstance): void {
     instance.writeVisibility('visible');
 }
 
-export function validateContainerRefs(container: ProbeHostContainer): void {
-    validateProbeRefs(
+export function validateContainerRefs(container: ReflectHostContainer): void {
+    validateReflectRefs(
         container.readRefs(),
         container.readChildren().flatMap(collectRefTargets)
     );

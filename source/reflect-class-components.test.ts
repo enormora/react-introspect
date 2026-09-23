@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { ProbeView } from './probe-public-types.ts';
-import { probe } from './react-probe.entry-point.ts';
+import type { ReflectView } from './reflect-public-types.ts';
+import { reflect } from './react-reflect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -158,9 +158,9 @@ type PanelFactory<Props> = {
 
 type RenderGateViews = {
     readonly gated: PanelFactory<GatedPanelProps>;
-    readonly gatedView: ProbeView;
+    readonly gatedView: ReflectView;
     readonly pure: PanelFactory<PurePanelProps>;
-    readonly pureView: ProbeView;
+    readonly pureView: ReflectView;
 };
 
 type CallbackStore = {
@@ -170,9 +170,9 @@ type CallbackStore = {
 
 type ClassRefState = {
     readonly callback: CallbackStore;
-    readonly callbackView: ProbeView;
+    readonly callbackView: ReflectView;
     readonly objectRef: React.RefObject<RefPanelInstance | null>;
-    readonly objectView: ProbeView;
+    readonly objectView: ReflectView;
 };
 
 function createForcedPanel(): PanelFactory<EmptyProps> {
@@ -357,7 +357,7 @@ const CatchOnlyBoundary = class extends React.Component<BoundaryProps, BoundaryS
 
 function assertLifecycle(scope: EqualScope): void {
     const recorder = createRecorder();
-    const view = probe(React.createElement(LifecyclePanel, { label: 'initial', recorder }), {
+    const view = reflect(React.createElement(LifecyclePanel, { label: 'initial', recorder }), {
         depth: 'full',
         strictMode: false
     });
@@ -379,7 +379,7 @@ function assertLifecycle(scope: EqualScope): void {
 }
 
 function assertStateUpdates(scope: EqualScope): void {
-    const view = probe(React.createElement(Counter), {
+    const view = reflect(React.createElement(Counter), {
         depth: 'full',
         strictMode: false
     });
@@ -391,7 +391,7 @@ function assertStateUpdates(scope: EqualScope): void {
 
 function assertForceUpdate(scope: EqualScope): void {
     const { Panel, readRenders } = createForcedPanel();
-    const view = probe(React.createElement(Panel), {
+    const view = reflect(React.createElement(Panel), {
         depth: 'full',
         strictMode: false
     });
@@ -408,12 +408,12 @@ function createRenderGateViews(): RenderGateViews {
 
     return Object.freeze({
         gated,
-        gatedView: probe(React.createElement(gated.Panel, { value: 'one' }), {
+        gatedView: reflect(React.createElement(gated.Panel, { value: 'one' }), {
             depth: 'full',
             strictMode: false
         }),
         pure,
-        pureView: probe(React.createElement(pure.Panel, { label: 'one' }), {
+        pureView: reflect(React.createElement(pure.Panel, { label: 'one' }), {
             depth: 'full',
             strictMode: false
         })
@@ -436,7 +436,7 @@ function assertRenderGates(scope: EqualScope): void {
 
 function assertErrorBoundary(scope: EqualScope): void {
     const recorder = createRecorder();
-    const view = probe(
+    const view = reflect(
         React.createElement(
             Boundary,
             { recorder },
@@ -459,7 +459,7 @@ function assertErrorBoundary(scope: EqualScope): void {
 
 function assertPrimitiveBoundaryState(scope: EqualScope): void {
     const recorder = createRecorder();
-    const view = probe(
+    const view = reflect(
         React.createElement(
             PrimitiveBoundary as never,
             { recorder },
@@ -479,7 +479,7 @@ function assertPrimitiveBoundaryState(scope: EqualScope): void {
 
 function assertCatchOnlyBoundary(scope: EqualScope): void {
     const recorder = createRecorder();
-    const view = probe(
+    const view = reflect(
         React.createElement(
             CatchOnlyBoundary,
             { recorder },
@@ -500,7 +500,7 @@ function assertCatchOnlyBoundary(scope: EqualScope): void {
 }
 
 function assertClassRenderError(scope: EqualScope): void {
-    const view = probe(React.createElement(BrokenClass, { label: 'broken' }), {
+    const view = reflect(React.createElement(BrokenClass, { label: 'broken' }), {
         depth: 'full',
         errorMode: 'capture',
         strictMode: false,
@@ -536,12 +536,12 @@ function createClassRefState(): ClassRefState {
 
     return Object.freeze({
         callback,
-        callbackView: probe(React.createElement(RefPanel, callbackProps), {
+        callbackView: reflect(React.createElement(RefPanel, callbackProps), {
             depth: 'full',
             strictMode: false
         }),
         objectRef,
-        objectView: probe(React.createElement(RefPanel, objectProps), {
+        objectView: reflect(React.createElement(RefPanel, objectProps), {
             depth: 'full',
             strictMode: false
         })
@@ -562,7 +562,7 @@ function assertClassRefs(scope: EqualScope): void {
 }
 
 function assertPrimitivePureState(scope: EqualScope): void {
-    const view = probe(React.createElement(PrimitivePureCounter), {
+    const view = reflect(React.createElement(PrimitivePureCounter), {
         depth: 'full',
         strictMode: false
     });
@@ -574,7 +574,7 @@ function assertPrimitivePureState(scope: EqualScope): void {
 }
 
 function assertObjectPureState(scope: EqualScope): void {
-    const view = probe(React.createElement(ObjectPureCounter), {
+    const view = reflect(React.createElement(ObjectPureCounter), {
         depth: 'full',
         strictMode: false
     });

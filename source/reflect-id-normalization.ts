@@ -1,7 +1,7 @@
 import React from 'react';
-import { createUnsupportedReactValueError, isReactPortalValue } from './probe-unsupported-react.ts';
+import { createUnsupportedReactValueError, isReactPortalValue } from './reflect-unsupported-react.ts';
 
-export type ProbeIdNormalization = {
+export type ReflectIdNormalization = {
     readonly generator: ((generatedId: string) => string) | undefined;
     readonly prefix: string;
 };
@@ -11,7 +11,7 @@ type SnapshotValueNormalizationState = {
 };
 
 type IdReplacementState = {
-    readonly normalization: ProbeIdNormalization;
+    readonly normalization: ReflectIdNormalization;
     readonly pattern: RegExp;
     readonly replacements: IdReplacementMap;
 };
@@ -141,7 +141,7 @@ const snapshotValueNormalizer = {
     }
 };
 
-export function createIdNormalizer(idNormalization: ProbeIdNormalization): (value: string) => string {
+export function createIdNormalizer(idNormalization: ReflectIdNormalization): (value: string) => string {
     const state: IdReplacementState = {
         normalization: idNormalization,
         pattern: createReactIdPattern(idNormalization.prefix),
