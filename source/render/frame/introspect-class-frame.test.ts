@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionView } from '../../public/introspect-public-types.ts';
-import { introspect } from '../../react-introspect.entry-point.ts';
+import { createIntrospectionView as introspect } from '../../runtime/view/introspect-view.ts';
 
 type EqualScope = {
     readonly assert: {

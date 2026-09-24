@@ -1,11 +1,15 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
+import type {
+    IntrospectionNode,
+    IntrospectionOptions,
+    IntrospectionView
+} from '../../public/introspect-public-types.ts';
+import { createIntrospectionView } from '../../runtime/view/introspect-view.ts';
 import {
     createIdNormalizer,
     normalizeSnapshotValue
 } from '../../snapshot/normalization/introspect-id-normalization.ts';
-import type { IntrospectionNode, IntrospectionView } from '../../public/introspect-public-types.ts';
-import { introspect } from '../../react-introspect.entry-point.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -21,6 +25,13 @@ type LabelHostSchema = {
         readonly title: string;
     };
 };
+
+function introspect<HostSchema extends Record<string, unknown>>(
+    element: React.ReactElement,
+    options: IntrospectionOptions<HostSchema>
+): IntrospectionView<HostSchema> {
+    return createIntrospectionView(element, options) as IntrospectionView<HostSchema>;
+}
 
 type IdLabelProps = {
     readonly onId: (id: string) => void;

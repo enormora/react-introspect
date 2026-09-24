@@ -132,6 +132,13 @@ export const testNode = suite('introspection locators', [
                 .message,
             'Cannot call a prop on a missing locator.'
         );
+        scope.assert.equal(
+            requireError(function sendMissingEvent() {
+                locator.sendEvent('click');
+            })
+                .message,
+            'Cannot send an event to a missing locator.'
+        );
 
         return scope.assert.collect();
     }),
@@ -144,6 +151,7 @@ export const testNode = suite('introspection locators', [
         scope.assert.equal(locator.first, first);
         scope.assert.equal(locator.last, second);
         scope.assert.equal(locator.at(1), second);
+        scope.assert.deepEqual(Array.from(locator), [ first, second ]);
 
         return scope.assert.collect();
     })

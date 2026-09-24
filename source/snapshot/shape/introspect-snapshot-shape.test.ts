@@ -35,6 +35,8 @@ function NamedComponent(): React.ReactNode {
     return null;
 }
 
+Reflect.set(NamedComponent, 'displayName', 'ShownComponent');
+
 export const testNode = suite('introspection snapshot shape', [
     test('derives text, public props, paths, and element kinds', function verifyShape(scope) {
         const children = [ createTextNode('Save'), createTextNode(' now') ];
@@ -75,7 +77,7 @@ export const testNode = suite('introspection snapshot shape', [
         scope.assert.equal(componentState.renderedChildren.length, 0);
         scope.assert.equal(componentState.renderedReason, 'depth');
         scope.assert.equal(componentState.textContent, 'child');
-        scope.assert.equal(getTypeName(NamedComponent), 'NamedComponent');
+        scope.assert.equal(getTypeName(NamedComponent), 'ShownComponent');
 
         return scope.assert.collect();
     })

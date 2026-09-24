@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
-import { introspect } from '../../react-introspect.entry-point.ts';
+import { createIntrospectionView as introspect } from '../../runtime/view/introspect-view.ts';
 import {
     isIntrospectionRenderError,
     introspectionComponentHostType,
@@ -454,5 +454,22 @@ export const testNode = suite('execution shallow function components', [
 
             return scope.assert.collect();
         }
-    )
+    ),
+    test('normalizes iterable output as rendered children', function verifyIterableOutput(scope) {
+        function IterableOutput(): Iterable<React.ReactNode> {
+            return new Set([
+                React.createElement('span', { key: 'one' }, 'One'),
+                React.createElement('span', { key: 'two' }, 'Two')
+            ]);
+        }
+
+        const view = introspect(React.createElement(IterableOutput), {
+            strictMode: false,
+            warningMode: 'capture'
+        });
+
+        scope.assert.equal(view.textContent, 'OneTwo');
+
+        return scope.assert.collect();
+    })
 ]);

@@ -5,10 +5,12 @@
     "extension": [".ts"],
     "src": ["source"],
     "exclude": [
+        "**/*.entry-point.ts",
         "source/**/*.entry-point.ts",
         "source/**/*.test.ts",
         "source/**/*.type-test.ts",
         "source/**/*-types.ts",
+        "tool-configurations/**",
         "target/**"
     ],
     "lines": 100,

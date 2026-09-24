@@ -1,4 +1,5 @@
 import { suite, test } from '@overkill-dev/test';
+import type { IntrospectionSelector } from '../../public/introspect-public-types.ts';
 import type { RuntimeIntrospectionNode } from '../types/introspect-runtime-types.ts';
 import { createIntrospectionList } from './introspect-list.ts';
 import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
@@ -79,6 +80,9 @@ export const testNode = suite('introspection selector', [
             true
         );
         scope.assert.equal(nodeMatchesSelector(node, { props: { title: 'Delete' } }), false);
+        const selectorWithUndefinedTextContent = { textContent: undefined } as unknown as IntrospectionSelector;
+
+        scope.assert.equal(nodeMatchesSelector(node, selectorWithUndefinedTextContent), true);
 
         return scope.assert.collect();
     })

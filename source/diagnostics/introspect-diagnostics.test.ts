@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { introspect } from '../react-introspect.entry-point.ts';
+import { createIntrospectionView as introspect } from '../runtime/view/introspect-view.ts';
 import { createIntrospectionDiagnostics, type IntrospectionDiagnostics } from './introspect-diagnostics.ts';
 
 type EqualScope = {

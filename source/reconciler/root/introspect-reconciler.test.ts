@@ -1,7 +1,11 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { IntrospectionNode, IntrospectionView } from '../../public/introspect-public-types.ts';
-import { introspect } from '../../react-introspect.entry-point.ts';
+import type {
+    IntrospectionNode,
+    IntrospectionOptions,
+    IntrospectionView
+} from '../../public/introspect-public-types.ts';
+import { createIntrospectionView } from '../../runtime/view/introspect-view.ts';
 
 type EqualScope = {
     readonly assert: {
@@ -15,6 +19,13 @@ type HostSchema = {
         readonly title: string;
     };
 };
+
+function introspect<Schema extends Record<string, unknown>>(
+    element: React.ReactElement,
+    options: IntrospectionOptions<Schema>
+): IntrospectionView<Schema> {
+    return createIntrospectionView(element, options) as IntrospectionView<Schema>;
+}
 
 type PageProps = {
     readonly title: string;

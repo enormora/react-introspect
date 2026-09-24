@@ -1,8 +1,8 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
-import { introspect } from '../../react-introspect.entry-point.ts';
+import { createIntrospectionView as introspect } from '../../runtime/view/introspect-view.ts';
+import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
 
 type EqualScope = {
     readonly assert: {
