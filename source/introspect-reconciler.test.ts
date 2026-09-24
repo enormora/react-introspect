@@ -20,6 +20,10 @@ type PageProps = {
     readonly title: string;
 };
 
+type PromiseReaderProps = {
+    readonly textPromise: React.Usable<string>;
+};
+
 class SuspenseThenableError extends Error {
     public constructor() {
         super('suspended');
@@ -66,12 +70,40 @@ function Clicker(): React.ReactNode {
     );
 }
 
+function Loading(): React.ReactNode {
+    return React.createElement('em', null, 'loading');
+}
+
+function PromiseReader(props: PromiseReaderProps): React.ReactNode {
+    const text = React.use(props.textPromise);
+
+    return React.createElement('span', null, text);
+}
+
+function ReadyPanel(): React.ReactNode {
+    return React.createElement('span', null, 'ready');
+}
+
 function RendersNull(): React.ReactNode {
     return null;
 }
 
 function Suspends(): React.ReactNode {
     throw new SuspenseThenableError();
+}
+
+function createFulfilledReactPromise(value: string): React.FulfilledReactPromise<string> {
+    return Object.assign(Promise.resolve(value), {
+        status: 'fulfilled' as const,
+        value
+    });
+}
+
+function createRejectedReactPromise(reason: Error): React.RejectedReactPromise<string> {
+    return Object.assign(Promise.resolve(''), {
+        reason,
+        status: 'rejected' as const
+    });
 }
 
 function assertFullRender(scope: EqualScope, view: IntrospectionView<HostSchema>): void {
@@ -301,6 +333,65 @@ function assertSuspendedInitialRoot(scope: EqualScope): void {
     );
 }
 
+function assertSuspenseReadyChildren(scope: EqualScope): void {
+    const view = introspect(
+        React.createElement(
+            React.Suspense,
+            { fallback: React.createElement(Loading) },
+            React.createElement(ReadyPanel)
+        ),
+        {
+            depth: 'full',
+            strictMode: false
+        }
+    );
+
+    scope.assert.equal(view.renderCount, 1);
+    scope.assert.equal(view.root?.type, ReadyPanel);
+    scope.assert.equal(view.find('em'), undefined);
+    scope.assert.equal(view.find(Loading), undefined);
+    scope.assert.equal(view.find(ReadyPanel)?.renderedChildren.status, 'rendered');
+    scope.assert.equal(view.find('span')?.textContent, 'ready');
+}
+
+function assertUseFulfilledPromise(scope: EqualScope): void {
+    const view = introspect(
+        React.createElement(
+            React.Suspense,
+            { fallback: React.createElement(Loading) },
+            React.createElement(PromiseReader, { textPromise: createFulfilledReactPromise('resolved') })
+        ),
+        {
+            depth: 'full',
+            strictMode: false
+        }
+    );
+
+    scope.assert.equal(view.renderCount, 1);
+    scope.assert.equal(view.find('em'), undefined);
+    scope.assert.equal(view.find(PromiseReader)?.renderedChildren.status, 'rendered');
+    scope.assert.equal(view.find('span')?.textContent, 'resolved');
+}
+
+function assertUseRejectedPromise(scope: EqualScope): void {
+    const error = new Error('load failed');
+    const view = introspect(
+        React.createElement(
+            React.Suspense,
+            { fallback: React.createElement(Loading) },
+            React.createElement(PromiseReader, { textPromise: createRejectedReactPromise(error) })
+        ),
+        {
+            depth: 'full',
+            errorMode: 'capture',
+            strictMode: false
+        }
+    );
+
+    scope.assert.equal(view.root, undefined);
+    scope.assert.equal(view.errors.at(-1)?.cause, error);
+}
+
 export const testNode = suite('custom reconciler host layer', [
     test('publishes host and text output after a synchronous commit', function verifySyncRender(scope) {
         const view = introspect<HostSchema>(React.createElement(Page, { title: 'world' }), {
@@ -388,6 +479,30 @@ export const testNode = suite('custom reconciler host layer', [
         'reports a suspended initial root clearly',
         function verifySuspendedInitialRoot(scope) {
             assertSuspendedInitialRoot(scope);
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'commits ready Suspense children without rendering fallback',
+        function verifySuspenseReadyChildren(scope) {
+            assertSuspenseReadyChildren(scope);
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'renders React.use fulfilled promise values',
+        function verifyUseFulfilledPromise(scope) {
+            assertUseFulfilledPromise(scope);
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'records React.use rejected promise errors',
+        function verifyUseRejectedPromise(scope) {
+            assertUseRejectedPromise(scope);
 
             return scope.assert.collect();
         }

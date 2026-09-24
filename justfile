@@ -37,10 +37,13 @@ test-unit-with-coverage:
 test-types:
     ./node_modules/.bin/tstyche --config tool-configurations/tstyche.json
 
+test-runtime-integration:
+    node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile runtime-integration
+
 test-package-smoke: compile
     node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile integration
 
-test: test-unit-with-coverage test-types test-package-smoke
+test: test-unit-with-coverage test-types test-runtime-integration test-package-smoke
 
 publish-dry-run: test-package-smoke
     packtory publish
