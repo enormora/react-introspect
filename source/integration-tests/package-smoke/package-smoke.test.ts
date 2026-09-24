@@ -3,12 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { suite, test } from '@overkill-dev/test';
-
-type EqualScope = {
-    readonly assert: {
-        readonly equal: (actual: unknown, expected: unknown) => void;
-    };
-};
+import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 
 type PackageManifest = {
     readonly bugs: {
@@ -78,31 +73,35 @@ async function readPackageManifest(): Promise<PackageManifest> {
     return JSON.parse(await fs.readFile(path.join(packageFolder, 'package.json'), 'utf8')) as PackageManifest;
 }
 
-async function assertManifest(scope: EqualScope): Promise<void> {
-    const manifest = await readPackageManifest();
+const assertPackagedFiles = defineCompositeAssertion({
+    async assert(check) {
+        const manifest = await readPackageManifest();
+        const packageExports = await import(
+            pathToFileURL(path.join(packageFolder, 'react-introspect.entry-point.js')).href
+        ) as PackageExports;
+        const React = await import('react') as ReactModule;
+        const view = packageExports.introspect(React.createElement('main', null, 'Smoke'));
 
-    scope.assert.equal(manifest.name, 'react-introspect');
-    scope.assert.equal(manifest.type, 'module');
-    scope.assert.equal(manifest.bugs.url, 'https://github.com/enormora/react-introspect/issues');
-    scope.assert.equal(manifest.homepage, 'https://github.com/enormora/react-introspect#readme');
-    scope.assert.equal(manifest.exports['.'].import, './react-introspect.entry-point.js');
-    scope.assert.equal(manifest.exports['.'].types, './react-introspect.entry-point.d.ts');
-}
+        await requirePackagedFile('LICENSE');
+        await requirePackagedFile('banner.svg');
+        await requirePackagedFile('logo.svg');
+        await requirePackagedFile('readme.md');
 
-async function assertRuntimeImport(scope: EqualScope): Promise<void> {
-    const packageExports = await import(
-        pathToFileURL(path.join(packageFolder, 'react-introspect.entry-point.js')).href
-    ) as PackageExports;
-    const React = await import('react') as ReactModule;
-
-    scope.assert.equal(typeof packageExports.createFakeRefNode, 'function');
-    scope.assert.equal(typeof packageExports.matchRefs, 'function');
-    scope.assert.equal(typeof packageExports.introspect, 'function');
-
-    const view = packageExports.introspect(React.createElement('main', null, 'Smoke'));
-
-    scope.assert.equal(view.find('main')?.textContent, 'Smoke');
-}
+        return check.group([
+            check.annotated('manifest name').equal(manifest.name, 'react-introspect'),
+            check.annotated('manifest type').equal(manifest.type, 'module'),
+            check.annotated('bugs URL').equal(manifest.bugs.url, 'https://github.com/enormora/react-introspect/issues'),
+            check.annotated('homepage').equal(manifest.homepage, 'https://github.com/enormora/react-introspect#readme'),
+            check.annotated('import entry').equal(manifest.exports['.'].import, './react-introspect.entry-point.js'),
+            check.annotated('type entry').equal(manifest.exports['.'].types, './react-introspect.entry-point.d.ts'),
+            check.annotated('createFakeRefNode export').function(packageExports.createFakeRefNode),
+            check.annotated('matchRefs export').function(packageExports.matchRefs),
+            check.annotated('introspect export').function(packageExports.introspect),
+            check.annotated('runtime render').equal(view.find('main')?.textContent, 'Smoke')
+        ]);
+    },
+    name: 'assertPackagedFiles'
+});
 
 async function writeConsumerProject(): Promise<void> {
     const nodeModulesFolder = path.join(consumerFolder, 'node_modules');
@@ -175,16 +174,7 @@ async function packPackage(): Promise<void> {
     ]);
 }
 
-async function assertPackagedFiles(scope: EqualScope): Promise<void> {
-    await requirePackagedFile('LICENSE');
-    await requirePackagedFile('banner.svg');
-    await requirePackagedFile('logo.svg');
-    await requirePackagedFile('readme.md');
-    await assertManifest(scope);
-    await assertRuntimeImport(scope);
-}
-
-async function assertConsumerTypes(): Promise<void> {
+async function checkConsumerTypes(): Promise<void> {
     await writeConsumerProject();
 
     await runProjectCommand('tsc', [
@@ -195,10 +185,10 @@ async function assertConsumerTypes(): Promise<void> {
 }
 
 export const testNode = suite('package smoke', [
-    test('packs and imports the published package shape', async function verifyPackagedArtifact(scope) {
+    test('packs and imports the published package shape', async function (scope) {
         await packPackage();
-        await assertPackagedFiles(scope);
-        await assertConsumerTypes();
+        await scope.assert(assertPackagedFiles);
+        await checkConsumerTypes();
 
         return scope.assert.collect();
     })

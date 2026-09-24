@@ -1,16 +1,9 @@
 import { suite, test } from '@overkill-dev/test';
+import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionOptions, IntrospectionView } from '../../public/introspect-public-types.ts';
 import { createIntrospectionView } from '../../runtime/view/introspect-view.ts';
 import type { IntrospectionSnapshot, SnapshotNode } from './introspect-snapshot-contract.ts';
-
-type EqualScope = {
-    readonly assert: {
-        readonly deepEqual: (actual: unknown, expected: unknown) => void;
-        readonly equal: (actual: unknown, expected: unknown) => void;
-        readonly match: (actual: string, expected: RegExp) => void;
-    };
-};
 
 type WidgetProps = React.PropsWithChildren<{
     readonly label: string;
@@ -70,12 +63,12 @@ function kindCounts(nodes: readonly SnapshotNode[]): Readonly<Record<SnapshotNod
     return Object.freeze(counts);
 }
 
-function assertUniqueNodeIds(scope: EqualScope, nodes: readonly SnapshotNode[]): void {
+function uniqueNodeIds(nodes: readonly SnapshotNode[]): number {
     const ids = nodes.map(function readId(node) {
         return node.id;
     });
 
-    scope.assert.equal(uniqueValues(ids).length, nodes.length);
+    return uniqueValues(ids).length;
 }
 
 function createMixedTree(): React.ReactElement {
@@ -118,140 +111,167 @@ function createMixedSnapshot(): IntrospectionSnapshot {
     return view.currentSnapshot;
 }
 
-function assertSnapshotShape(scope: EqualScope, nodes: readonly SnapshotNode[]): void {
-    const root = findSnapshotNode(nodes, 'fragment', 'Fragment');
-    const section = findSnapshotNode(nodes, 'host', 'section');
-    const strong = findSnapshotNode(nodes, 'host', 'strong');
-    const widget = findSnapshotNode(nodes, 'component', 'Widget');
+const assertSnapshotShape = defineCompositeAssertion({
+    assert(check, nodes: readonly SnapshotNode[]) {
+        const root = findSnapshotNode(nodes, 'fragment', 'Fragment');
+        const section = findSnapshotNode(nodes, 'host', 'section');
+        const strong = findSnapshotNode(nodes, 'host', 'strong');
+        const widget = findSnapshotNode(nodes, 'component', 'Widget');
 
-    assertUniqueNodeIds(scope, nodes);
-    scope.assert.equal(Object.isFrozen(root), true);
-    scope.assert.equal(section.parentId, root.id);
-    scope.assert.equal(strong.parentId, section.id);
-    scope.assert.equal(widget.parentId, root.id);
-    scope.assert.deepEqual(kindCounts(nodes), {
-        component: 1,
-        empty: 3,
-        fragment: 1,
-        host: 3,
-        opaque: 1,
-        text: 3
-    });
-}
-
-function assertGivenAndRenderedChildren(scope: EqualScope): void {
-    const view = introspect(createMixedTree(), { depth: 0 });
-    const section = requireValue(view.find('section'));
-    const widget = requireValue(view.find(Widget));
-
-    scope.assert.equal(section.renderedChildren.status, 'rendered');
-    scope.assert.equal(section.givenChildren.length, 2);
-    scope.assert.equal(widget.givenChildren.first?.type, 'em');
-    scope.assert.deepEqual(widget.renderedChildren, {
-        reason: 'depth',
-        status: 'notRendered'
-    });
-}
-
-function assertSelectorSemantics(scope: EqualScope): void {
-    const view = introspect(createMixedTree(), { depth: 0 });
-    const section = requireValue(view.find('section'));
-
-    scope.assert.equal(view.find({ key: 'host' })?.path, section.path);
-    scope.assert.equal(view.find({ textContent: 'Save now' })?.path, section.path);
-    scope.assert.equal(view.find({ textContent: /^Save\snow$/ })?.path, section.path);
-    scope.assert.equal(
-        view
-            .find({
-                props: {
-                    metadata: {
-                        actions: [
-                            { id: 'archive' }
-                        ]
-                    }
-                },
-                type: Widget
+        return check.group([
+            check.annotated('unique node ids').equal(uniqueNodeIds(nodes), nodes.length),
+            check.annotated('frozen root').true(Object.isFrozen(root)),
+            check.annotated('section parent').equal(section.parentId, root.id),
+            check.annotated('strong parent').equal(strong.parentId, section.id),
+            check.annotated('widget parent').equal(widget.parentId, root.id),
+            check.annotated('kind counts').deepEqual(kindCounts(nodes), {
+                component: 1,
+                empty: 3,
+                fragment: 1,
+                host: 3,
+                opaque: 1,
+                text: 3
             })
-            ?.name,
-        'Widget'
-    );
-    scope.assert.equal(
-        view
-            .find({
-                has: { type: 'strong' },
-                where(node) {
-                    return node.textContent === 'Save now';
-                }
+        ]);
+    },
+    name: 'assertSnapshotShape'
+});
+
+const assertGivenAndRenderedChildren = defineCompositeAssertion({
+    assert(check) {
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const section = requireValue(view.find('section'));
+        const widget = requireValue(view.find(Widget));
+
+        return check.group([
+            check.annotated('section rendered children').equal(section.renderedChildren.status, 'rendered'),
+            check.annotated('section given children').equal(section.givenChildren.length, 2),
+            check.annotated('widget given child').equal(widget.givenChildren.first?.type, 'em'),
+            check.annotated('widget rendered children').deepEqual(widget.renderedChildren, {
+                reason: 'depth',
+                status: 'notRendered'
             })
-            ?.type,
-        'section'
-    );
-    scope.assert.equal(requireValue(view.find('strong')).findClosest('main'), undefined);
-    scope.assert.equal(
-        view.find({
-            props: {
-                metadata: {
-                    group: 'secondary'
-                }
-            },
-            type: Widget
-        }),
-        undefined
-    );
-}
+        ]);
+    },
+    name: 'assertGivenAndRenderedChildren'
+});
 
-function assertIntrospectionList(scope: EqualScope): void {
-    const view = introspect(createMixedTree(), { depth: 0 });
-    const renderedText = view.findAll('#text');
+const assertSelectorSemantics = defineCompositeAssertion({
+    assert(check) {
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const section = requireValue(view.find('section'));
 
-    scope.assert.equal(renderedText.length, 2);
-    scope.assert.equal(renderedText.first?.textContent, 'Save ');
-    scope.assert.equal(renderedText.last?.textContent, 'now');
-    scope.assert.equal(renderedText.at(1)?.textContent, 'now');
-    scope.assert.deepEqual(
-        Array.from(renderedText, function readText(node) {
-            return node.textContent;
-        }),
-        [ 'Save ', 'now' ]
-    );
-    scope.assert.equal(view.findAll('#empty').length, 3);
-    scope.assert.equal(view.findAll('section').filterBy({ has: { type: 'strong' } }).length, 1);
-}
+        return check.group([
+            check.annotated('key selector').equal(view.find({ key: 'host' })?.path, section.path),
+            check.annotated('text selector').equal(view.find({ textContent: 'Save now' })?.path, section.path),
+            check.annotated('pattern selector').equal(view.find({ textContent: /^Save\snow$/ })?.path, section.path),
+            check.annotated('props selector').equal(
+                view
+                    .find({
+                        props: {
+                            metadata: {
+                                actions: [
+                                    { id: 'archive' }
+                                ]
+                            }
+                        },
+                        type: Widget
+                    })
+                    ?.name,
+                'Widget'
+            ),
+            check.annotated('has selector').equal(
+                view
+                    .find({
+                        has: { type: 'strong' },
+                        where(node) {
+                            return node.textContent === 'Save now';
+                        }
+                    })
+                    ?.type,
+                'section'
+            ),
+            check.annotated('missing closest').undefined(requireValue(view.find('strong')).findClosest('main')),
+            check.annotated('missing props selector').undefined(
+                view.find({
+                    props: {
+                        metadata: {
+                            group: 'secondary'
+                        }
+                    },
+                    type: Widget
+                })
+            )
+        ]);
+    },
+    name: 'assertSelectorSemantics'
+});
 
-function assertAcyclicPublicOutput(scope: EqualScope): void {
-    const view = introspect(createMixedTree(), { depth: 0 });
-    const serializedRoot = JSON.stringify(view.root);
+const assertIntrospectionList = defineCompositeAssertion({
+    assert(check) {
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const renderedText = view.findAll('#text');
 
-    scope.assert.equal(typeof serializedRoot, 'string');
-    scope.assert.match(requireValue(serializedRoot), /"name":"Fragment"/);
-}
+        return check.group([
+            check.annotated('rendered text count').equal(renderedText.length, 2),
+            check.annotated('first rendered text').equal(renderedText.first?.textContent, 'Save '),
+            check.annotated('last rendered text').equal(renderedText.last?.textContent, 'now'),
+            check.annotated('indexed rendered text').equal(renderedText.at(1)?.textContent, 'now'),
+            check.annotated('rendered text').deepEqual(
+                Array.from(renderedText, function readText(node) {
+                    return node.textContent;
+                }),
+                [ 'Save ', 'now' ]
+            ),
+            check.annotated('empty nodes').equal(view.findAll('#empty').length, 3),
+            check.annotated('filtered sections').equal(
+                view.findAll('section').filterBy({ has: { type: 'strong' } }).length,
+                1
+            )
+        ]);
+    },
+    name: 'assertIntrospectionList'
+});
+
+const assertAcyclicPublicOutput = defineCompositeAssertion({
+    assert(check) {
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const serializedRoot = JSON.stringify(view.root);
+
+        return check.group([
+            check.annotated('serialized type').string(serializedRoot),
+            check.annotated('fragment name').match(requireValue(serializedRoot), /"name":"Fragment"/)
+        ]);
+    },
+    name: 'assertAcyclicPublicOutput'
+});
 
 export const testNode = suite('snapshot tree model', [
-    test('builds frozen committed snapshots with node ids and kinds', function verifySnapshotShape(scope) {
+    test('builds frozen committed snapshots with node ids and kinds', function (scope) {
         const snapshot = createMixedSnapshot();
 
         scope.assert.equal(snapshot.renderCount, 1);
-        assertSnapshotShape(scope, snapshot.nodes);
+        scope.assert(assertSnapshotShape, snapshot.nodes);
 
         return scope.assert.collect();
     }),
-    test('normalizes given children and rendered children', function verifyChildSnapshots(scope) {
-        assertGivenAndRenderedChildren(scope);
+    test('normalizes given children and rendered children', function (scope) {
+        scope.assert(assertGivenAndRenderedChildren);
 
         return scope.assert.collect();
     }),
-    test('matches selectors against tree nodes', function verifySelectors(scope) {
-        assertSelectorSemantics(scope);
+    test('matches selectors against tree nodes', function (scope) {
+        scope.assert(assertSelectorSemantics);
 
         return scope.assert.collect();
     }),
-    test('provides stable list behavior over matching nodes', function verifyIntrospectionList(scope) {
-        assertIntrospectionList(scope);
+    test('provides stable list behavior over matching nodes', function (scope) {
+        scope.assert(assertIntrospectionList);
 
         return scope.assert.collect();
     }),
-    test('keeps public node output acyclic', function verifyPublicOutput(scope) {
-        assertAcyclicPublicOutput(scope);
+    test('keeps public node output acyclic', function (scope) {
+        scope.assert(assertAcyclicPublicOutput);
 
         return scope.assert.collect();
     })

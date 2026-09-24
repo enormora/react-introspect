@@ -1,13 +1,8 @@
 import * as timers from 'node:timers';
 import { suite, test } from '@overkill-dev/test';
+import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import { introspect, type IntrospectionView } from '../../react-introspect.entry-point.ts';
-
-type EqualScope = {
-    readonly assert: {
-        readonly equal: (actual: unknown, expected: unknown) => void;
-    };
-};
 
 type SuspenseResource = {
     readonly error: SuspenseThenableError;
@@ -114,12 +109,6 @@ async function actAsync(action: () => void): Promise<void> {
     }
 }
 
-function assertFallback(scope: EqualScope, view: IntrospectionView): void {
-    scope.assert.equal(view.find(Loading)?.renderedChildren.status, 'rendered');
-    scope.assert.equal(view.find('em')?.textContent, 'loading');
-    scope.assert.equal(view.find('span'), undefined);
-}
-
 function waitForRetry(view: IntrospectionView): PendingRetry {
     const renderCount = view.renderCount + 1;
 
@@ -129,41 +118,54 @@ function waitForRetry(view: IntrospectionView): PendingRetry {
     });
 }
 
-async function assertThrownPromiseRetry(scope: EqualScope): Promise<void> {
-    const resource = createSuspenseResource();
-    const view = introspect(
-        React.createElement(
-            React.Suspense,
-            { fallback: React.createElement(Loading) },
-            React.createElement(SuspendsUntilReady, { resource })
-        ),
-        {
-            depth: 'full',
-            strictMode: false,
-            waitTimeout: 50,
-            warningMode: 'capture'
-        }
-    );
+const assertThrownPromiseRetry = defineCompositeAssertion({
+    async assert(check) {
+        const resource = createSuspenseResource();
+        const view = introspect(
+            React.createElement(
+                React.Suspense,
+                { fallback: React.createElement(Loading) },
+                React.createElement(SuspendsUntilReady, { resource })
+            ),
+            {
+                depth: 'full',
+                strictMode: false,
+                waitTimeout: 50,
+                warningMode: 'capture'
+            }
+        );
 
-    assertFallback(scope, view);
-    const retry = waitForRetry(view);
+        const fallbackStatus = view.find(Loading)?.renderedChildren.status;
+        const fallbackText = view.find('em')?.textContent;
+        const fallbackReadyNode = view.find('span');
+        const retry = waitForRetry(view);
 
-    await actAsync(function resolveResource() {
-        resource.resolve();
-    });
-    await retry.wait;
+        await actAsync(function resolveResource() {
+            resource.resolve();
+        });
+        await retry.wait;
 
-    scope.assert.equal(view.renderCount, retry.renderCount);
-    scope.assert.equal(view.find('em'), undefined);
-    scope.assert.equal(view.find(SuspendsUntilReady)?.renderedChildren.status, 'rendered');
-    scope.assert.equal(view.find('span')?.textContent, 'ready');
-}
+        return check.group([
+            check.annotated('fallback status').equal(fallbackStatus, 'rendered'),
+            check.annotated('fallback text').equal(fallbackText, 'loading'),
+            check.annotated('fallback ready node').undefined(fallbackReadyNode),
+            check.annotated('retry render count').equal(view.renderCount, retry.renderCount),
+            check.annotated('fallback removed').undefined(view.find('em')),
+            check.annotated('ready component status').equal(
+                view.find(SuspendsUntilReady)?.renderedChildren.status,
+                'rendered'
+            ),
+            check.annotated('ready text').equal(view.find('span')?.textContent, 'ready')
+        ]);
+    },
+    name: 'assertThrownPromiseRetry'
+});
 
 export const testNode = suite('runtime integration', [
     test(
         'retries Suspense after a thrown promise resolves',
-        async function verifyThrownPromiseRetry(scope) {
-            await assertThrownPromiseRetry(scope);
+        async function (scope) {
+            await scope.assert(assertThrownPromiseRetry);
 
             return scope.assert.collect();
         }

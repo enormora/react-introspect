@@ -2,7 +2,7 @@ import { suite, test } from '@overkill-dev/test';
 import { createEmptyIntrospectionSnapshot } from './introspect-snapshot-contract.ts';
 
 export const testNode = suite('introspection snapshot contract', [
-    test('creates an immutable empty snapshot for a render count', function verifyEmptySnapshot(scope) {
+    test('creates an immutable empty snapshot for a render count', function (scope) {
         const snapshot = createEmptyIntrospectionSnapshot(3);
 
         scope.assert.equal(Object.isFrozen(snapshot), true);

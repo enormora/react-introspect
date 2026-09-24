@@ -1,16 +1,9 @@
 import { suite, test } from '@overkill-dev/test';
+import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import { createIntrospectionView as introspect } from '../../runtime/view/introspect-view.ts';
 import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
-
-type EqualScope = {
-    readonly assert: {
-        readonly deepEqual: (actual: unknown, expected: unknown) => void;
-        readonly equal: (actual: unknown, expected: unknown) => void;
-        readonly match: (actual: string, expected: RegExp) => void;
-    };
-};
 
 type ElementProp = {
     readonly key: string | null;
@@ -43,21 +36,6 @@ function requireValue<Value>(value: Value | undefined): Value {
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
     return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
-function assertThrowsPortalError(scope: EqualScope, action: () => void): void {
-    try {
-        action();
-    } catch (error) {
-        scope.assert.equal(
-            error instanceof Error ? error.message : String(error),
-            'React Introspect cannot represent portal output yet.'
-        );
-
-        return;
-    }
-
-    throw new Error('Expected action to throw.');
 }
 
 function createPortalValue(children: React.ReactNode): React.ReactElement {
@@ -123,56 +101,101 @@ function readElementProp(node: IntrospectionNode): ElementProp {
     return icon as ElementProp;
 }
 
-function assertNormalizedElementProp(scope: EqualScope, leaf: IntrospectionNode): void {
-    const icon = readElementProp(leaf);
+const assertPublicOutputIsIntrospectionOwned = defineCompositeAssertion({
+    assert(check) {
+        const leaf = requireValue(introspect(React.createElement(ElementPropRoot)).find(Leaf));
+        const icon = readElementProp(leaf);
+        const serialized = requireValue(JSON.stringify(leaf));
 
-    scope.assert.equal(icon.type, Icon);
-    scope.assert.deepEqual(icon.props, {
-        title: 'info'
-    });
-    scope.assert.deepEqual((leaf.props as Readonly<Record<PropertyKey, unknown>>).metadata, {
-        label: 'details',
-        self: '[Circular]'
-    });
-}
+        return check.group([
+            check.annotated('icon type').equal(icon.type, Icon),
+            check.annotated('icon props').deepEqual(icon.props, {
+                title: 'info'
+            }),
+            check.annotated('metadata').deepEqual(leaf.props.metadata, {
+                label: 'details',
+                self: '[Circular]'
+            }),
+            check.annotated('serialized type').string(serialized),
+            check.annotated('component name').match(serialized, /"name":"Leaf"/u),
+            check.annotated('reflect marker').false(serialized.includes('__reactReflect')),
+            check.annotated('internal marker').false(serialized.includes('react-introspect-internal')),
+            check.annotated('react type marker').false(serialized.includes('$$typeof')),
+            check.annotated('react owner').false(serialized.includes('_owner')),
+            check.annotated('react store').false(serialized.includes('_store'))
+        ]);
+    },
+    name: 'assertPublicOutputIsIntrospectionOwned'
+});
 
-function assertPublicSerialization(scope: EqualScope, leaf: IntrospectionNode): void {
-    const serialized = JSON.stringify(leaf);
-
-    scope.assert.equal(typeof serialized, 'string');
-    scope.assert.match(requireValue(serialized), /"name":"Leaf"/u);
-    scope.assert.equal(requireValue(serialized).includes('__reactReflect'), false);
-    scope.assert.equal(requireValue(serialized).includes('react-introspect-internal'), false);
-    scope.assert.equal(requireValue(serialized).includes('$$typeof'), false);
-    scope.assert.equal(requireValue(serialized).includes('_owner'), false);
-    scope.assert.equal(requireValue(serialized).includes('_store'), false);
-}
-
-function assertPublicOutputIsIntrospectionOwned(scope: EqualScope): void {
-    const leaf = requireValue(introspect(React.createElement(ElementPropRoot)).find(Leaf));
-
-    assertNormalizedElementProp(scope, leaf);
-    assertPublicSerialization(scope, leaf);
-}
-
-function assertPortalNormalizationFails(scope: EqualScope): void {
-    assertThrowsPortalError(scope, function normalizePortalValue() {
-        normalizeSnapshotValue(
-            createPortalValue(React.createElement('span', null, 'portal')),
-            String
+const assertPortalRootFails = defineCompositeAssertion({
+    assert(check) {
+        return check.throws(
+            function () {
+                introspect(createPortalValue(React.createElement('span', null, 'root')));
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
         );
-    });
-}
+    },
+    name: 'assertPortalRootFails'
+});
 
-function assertCircularArrayNormalization(scope: EqualScope): void {
-    const value: unknown[] = [];
+const assertPortalOutputFails = defineCompositeAssertion({
+    assert(check) {
+        return check.throws(
+            function () {
+                introspect(React.createElement(PortalOutput), {
+                    depth: 'full',
+                    strictMode: false
+                });
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+    },
+    name: 'assertPortalOutputFails'
+});
 
-    value.push(value);
+const assertPortalChildFails = defineCompositeAssertion({
+    assert(check) {
+        return check.throws(
+            function () {
+                introspect(React.createElement(PortalArrayChildRoot), {
+                    strictMode: false
+                });
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+    },
+    name: 'assertPortalChildFails'
+});
 
-    scope.assert.deepEqual(normalizeSnapshotValue(value, String), [
-        '[Circular]'
-    ]);
-}
+const assertPortalNormalizationFails = defineCompositeAssertion({
+    assert(check) {
+        return check.throws(
+            function () {
+                normalizeSnapshotValue(
+                    createPortalValue(React.createElement('span', null, 'portal')),
+                    String
+                );
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+    },
+    name: 'assertPortalNormalizationFails'
+});
+
+const assertCircularArrayNormalization = defineCompositeAssertion({
+    assert(check) {
+        const value: unknown[] = [];
+
+        value.push(value);
+
+        return check.deepEqual(normalizeSnapshotValue(value, String), [
+            '[Circular]'
+        ]);
+    },
+    name: 'assertCircularArrayNormalization'
+});
 
 function installThrowingBrowserGlobals(): () => void {
     const originals = browserGlobalKeys.map(function readOriginal(key) {
@@ -202,98 +225,104 @@ function installThrowingBrowserGlobals(): () => void {
     };
 }
 
-function assertBrowserGlobalsAreNotRequired(scope: EqualScope): void {
-    const restoreBrowserGlobals = installThrowingBrowserGlobals();
+const assertBrowserGlobalsAreNotRequired = defineCompositeAssertion({
+    assert(check) {
+        const restoreBrowserGlobals = installThrowingBrowserGlobals();
 
-    try {
-        const view = introspect(React.createElement('main', null, 'server-safe'));
+        try {
+            const view = introspect(React.createElement('main', null, 'server-safe'));
 
-        scope.assert.equal(view.textContent, 'server-safe');
-    } finally {
-        restoreBrowserGlobals();
-    }
-}
-
-function assertActEnvironmentRestored(scope: EqualScope): void {
-    const hadActEnvironment = Object.hasOwn(globalThis, actEnvironmentKey);
-    const previousActEnvironment: unknown = Reflect.get(globalThis, actEnvironmentKey);
-
-    try {
-        introspect(React.createElement('main', null, 'clean'));
-
-        scope.assert.equal(Object.hasOwn(globalThis, actEnvironmentKey), hadActEnvironment);
-        scope.assert.equal(Reflect.get(globalThis, actEnvironmentKey), previousActEnvironment);
-    } finally {
-        if (hadActEnvironment) {
-            Reflect.set(globalThis, actEnvironmentKey, previousActEnvironment);
-        } else {
-            Reflect.deleteProperty(globalThis, actEnvironmentKey);
+            return check.equal(view.textContent, 'server-safe');
+        } finally {
+            restoreBrowserGlobals();
         }
-    }
-}
+    },
+    name: 'assertBrowserGlobalsAreNotRequired'
+});
 
-function assertExistingActEnvironmentRestored(scope: EqualScope): void {
-    const hadActEnvironment = Object.hasOwn(globalThis, actEnvironmentKey);
-    const previousActEnvironment: unknown = Reflect.get(globalThis, actEnvironmentKey);
+const assertActEnvironmentRestored = defineCompositeAssertion({
+    assert(check) {
+        const hadActEnvironment = Object.hasOwn(globalThis, actEnvironmentKey);
+        const previousActEnvironment: unknown = Reflect.get(globalThis, actEnvironmentKey);
 
-    try {
-        Reflect.set(globalThis, actEnvironmentKey, 'existing');
-        introspect(React.createElement('main', null, 'clean'));
+        try {
+            introspect(React.createElement('main', null, 'clean'));
 
-        scope.assert.equal(Reflect.get(globalThis, actEnvironmentKey), 'existing');
-    } finally {
-        if (hadActEnvironment) {
-            Reflect.set(globalThis, actEnvironmentKey, previousActEnvironment);
-        } else {
-            Reflect.deleteProperty(globalThis, actEnvironmentKey);
+            return check.group([
+                check.annotated('own act environment').equal(
+                    Object.hasOwn(globalThis, actEnvironmentKey),
+                    hadActEnvironment
+                ),
+                check.annotated('act environment value').equal(
+                    Reflect.get(globalThis, actEnvironmentKey),
+                    previousActEnvironment
+                )
+            ]);
+        } finally {
+            if (hadActEnvironment) {
+                Reflect.set(globalThis, actEnvironmentKey, previousActEnvironment);
+            } else {
+                Reflect.deleteProperty(globalThis, actEnvironmentKey);
+            }
         }
-    }
-}
+    },
+    name: 'assertActEnvironmentRestored'
+});
+
+const assertExistingActEnvironmentRestored = defineCompositeAssertion({
+    assert(check) {
+        const hadActEnvironment = Object.hasOwn(globalThis, actEnvironmentKey);
+        const previousActEnvironment: unknown = Reflect.get(globalThis, actEnvironmentKey);
+
+        try {
+            Reflect.set(globalThis, actEnvironmentKey, 'existing');
+            introspect(React.createElement('main', null, 'clean'));
+
+            return check.equal(Reflect.get(globalThis, actEnvironmentKey), 'existing');
+        } finally {
+            if (hadActEnvironment) {
+                Reflect.set(globalThis, actEnvironmentKey, previousActEnvironment);
+            } else {
+                Reflect.deleteProperty(globalThis, actEnvironmentKey);
+            }
+        }
+    },
+    name: 'assertExistingActEnvironmentRestored'
+});
 
 export const testNode = suite('unsupported React concepts and hardening', [
-    test('fails clearly for portal roots', function verifyPortalRoot(scope) {
-        assertThrowsPortalError(scope, function renderPortalRoot() {
-            introspect(createPortalValue(React.createElement('span', null, 'root')));
-        });
-        assertPortalNormalizationFails(scope);
+    test('fails clearly for portal roots', function (scope) {
+        scope.assert(assertPortalRootFails);
+        scope.assert(assertPortalNormalizationFails);
 
         return scope.assert.collect();
     }),
-    test('fails clearly for portal render output', function verifyPortalOutput(scope) {
-        assertThrowsPortalError(scope, function renderPortalOutput() {
-            introspect(React.createElement(PortalOutput), {
-                depth: 'full',
-                strictMode: false
-            });
-        });
+    test('fails clearly for portal render output', function (scope) {
+        scope.assert(assertPortalOutputFails);
 
         return scope.assert.collect();
     }),
-    test('fails clearly for portal children captured in snapshots', function verifyPortalChildren(scope) {
-        assertThrowsPortalError(scope, function renderPortalChild() {
-            introspect(React.createElement(PortalArrayChildRoot), {
-                strictMode: false
-            });
-        });
+    test('fails clearly for portal children captured in snapshots', function (scope) {
+        scope.assert(assertPortalChildFails);
 
         return scope.assert.collect();
     }),
-    test('keeps public output acyclic and free of raw React internals', function verifyPublicOutput(scope) {
-        assertPublicOutputIsIntrospectionOwned(scope);
-        assertCircularArrayNormalization(scope);
+    test('keeps public output acyclic and free of raw React internals', function (scope) {
+        scope.assert(assertPublicOutputIsIntrospectionOwned);
+        scope.assert(assertCircularArrayNormalization);
 
         return scope.assert.collect();
     }),
-    test('restores React act global state after operations', function verifyActEnvironment(scope) {
-        assertActEnvironmentRestored(scope);
-        assertExistingActEnvironmentRestored(scope);
+    test('restores React act global state after operations', function (scope) {
+        scope.assert(assertActEnvironmentRestored);
+        scope.assert(assertExistingActEnvironmentRestored);
 
         return scope.assert.collect();
     }),
     test(
         'renders without DOM or browser globals',
-        function verifyBrowserGlobalIndependence(scope) {
-            assertBrowserGlobalsAreNotRequired(scope);
+        function (scope) {
+            scope.assert(assertBrowserGlobalsAreNotRequired);
 
             return scope.assert.collect();
         }

@@ -110,7 +110,7 @@ function requireError(action: () => void): Error {
 }
 
 export const testNode = suite('introspection locators', [
-    test('resolves nodes lazily through the owning view', function verifyLocator(scope) {
+    test('resolves nodes lazily through the owning view', function (scope) {
         const view = createView([ createNode('button') ]);
         const locator = createIntrospectionLocator(view, 'button');
 
@@ -121,7 +121,7 @@ export const testNode = suite('introspection locators', [
 
         return scope.assert.collect();
     }),
-    test('throws for missing locator commands', function verifyMissingLocator(scope) {
+    test('throws for missing locator commands', function (scope) {
         const locator = createIntrospectionLocator(createView([]), 'button');
 
         scope.assert.equal(locator.exists, false);
@@ -142,7 +142,7 @@ export const testNode = suite('introspection locators', [
 
         return scope.assert.collect();
     }),
-    test('returns list locator accessors from current matches', function verifyListLocator(scope) {
+    test('returns list locator accessors from current matches', function (scope) {
         const first = createNode('button');
         const second = createNode('button');
         const locator = createIntrospectionListLocator(createView([ first, second ]), 'button');

@@ -57,13 +57,13 @@ function createNode(): RuntimeIntrospectionNode {
 }
 
 export const testNode = suite('introspection selector', [
-    test('normalizes non-selector values to type selectors', function verifyToSelector(scope) {
+    test('normalizes non-selector values to type selectors', function (scope) {
         scope.assert.deepEqual(toSelector('button'), { type: 'button' });
         scope.assert.deepEqual(toSelector({ type: 'button' }), { type: 'button' });
 
         return scope.assert.collect();
     }),
-    test('matches type, key, props, text, child, and predicate selectors', function verifyMatches(scope) {
+    test('matches type, key, props, text, child, and predicate selectors', function (scope) {
         const node = createNode();
 
         scope.assert.equal(

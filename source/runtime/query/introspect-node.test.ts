@@ -99,7 +99,7 @@ function requireError(action: () => void): Error {
 }
 
 export const testNode = suite('introspection node', [
-    test('reads snapshot node properties and children', function verifyProperties(scope) {
+    test('reads snapshot node properties and children', function (scope) {
         const snapshot = createSnapshot();
         const node = createIntrospectionNode(
             createReader(snapshot, {
@@ -123,7 +123,7 @@ export const testNode = suite('introspection node', [
 
         return scope.assert.collect();
     }),
-    test('calls props, sends events, finds parents, and formats trees', function verifyActions(scope) {
+    test('calls props, sends events, finds parents, and formats trees', function (scope) {
         const snapshot = createSnapshot();
         const reader = createReader(snapshot, {
             read() {
@@ -141,7 +141,7 @@ export const testNode = suite('introspection node', [
 
         return scope.assert.collect();
     }),
-    test('reports non-callable prop calls clearly', function verifyNonCallableProps(scope) {
+    test('reports non-callable prop calls clearly', function (scope) {
         const snapshot = createSnapshot();
         const node = createIntrospectionNode(
             createReader(snapshot, {
@@ -163,7 +163,7 @@ export const testNode = suite('introspection node', [
 
         return scope.assert.collect();
     }),
-    test('reports stale nodes after newer snapshots', function verifyStaleState(scope) {
+    test('reports stale nodes after newer snapshots', function (scope) {
         const snapshot = createSnapshot();
         const node = createIntrospectionNode(
             createReader(snapshot, {

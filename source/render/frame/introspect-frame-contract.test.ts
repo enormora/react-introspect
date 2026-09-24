@@ -22,7 +22,7 @@ function catchThrown(value: unknown): unknown {
 }
 
 export const testNode = suite('introspection frame contract', [
-    test('creates public component metadata from React elements', function verifyMetadata(scope) {
+    test('creates public component metadata from React elements', function (scope) {
         const element = React.createElement('button', {
             children: 'Save',
             key: 'save',
@@ -40,7 +40,7 @@ export const testNode = suite('introspection frame contract', [
 
         return scope.assert.collect();
     }),
-    test('wraps metadata and opaque values in internal hosts', function verifyHosts(scope) {
+    test('wraps metadata and opaque values in internal hosts', function (scope) {
         const metadata = createComponentMetadata(React.createElement('span'), undefined);
         const componentHost = createComponentHost(metadata, 'child') as React.ReactElement<
             Readonly<Record<PropertyKey, unknown>>
@@ -52,7 +52,7 @@ export const testNode = suite('introspection frame contract', [
 
         return scope.assert.collect();
     }),
-    test('tracks render errors without marking thenables', function verifyRenderErrors(scope) {
+    test('tracks render errors without marking thenables', function (scope) {
         const error = new Error('failed');
         const thenable = {
             then() {
@@ -67,7 +67,7 @@ export const testNode = suite('introspection frame contract', [
 
         return scope.assert.collect();
     }),
-    test('decrements numeric depth and preserves full depth', function verifyDepth(scope) {
+    test('decrements numeric depth and preserves full depth', function (scope) {
         scope.assert.equal(nextDepth('full'), 'full');
         scope.assert.equal(nextDepth(2), 1);
         scope.assert.equal(nextDepth(0), 0);
