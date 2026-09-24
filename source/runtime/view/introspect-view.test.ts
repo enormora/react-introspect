@@ -44,6 +44,9 @@ export const testNode = suite('introspection view', [
         scope.assert.equal(view.textContent, 'Two');
 
         view.unmount();
+        scope.assert.equal(view.formatTree(), '');
+        scope.assert.equal(view.hasWarnings, false);
+        scope.assert.equal(view.renderedChildren.length, 0);
         scope.assert.equal(view.root, undefined);
 
         return scope.assert.collect();

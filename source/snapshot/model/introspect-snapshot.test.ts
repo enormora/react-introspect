@@ -1,6 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { introspect } from '../../react-introspect.entry-point.ts';
+import type { IntrospectionOptions, IntrospectionView } from '../../public/introspect-public-types.ts';
+import { createIntrospectionView } from '../../runtime/view/introspect-view.ts';
 import type { IntrospectionSnapshot, SnapshotNode } from './introspect-snapshot-contract.ts';
 
 type EqualScope = {
@@ -20,6 +21,13 @@ type WidgetProps = React.PropsWithChildren<{
         readonly group: string;
     };
 }>;
+
+function introspect(
+    element: React.ReactElement,
+    options: IntrospectionOptions
+): IntrospectionView {
+    return createIntrospectionView(element, options) as IntrospectionView;
+}
 
 function Widget(props: WidgetProps): React.ReactNode {
     Reflect.ownKeys(props);

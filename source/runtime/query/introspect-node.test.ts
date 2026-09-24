@@ -88,6 +88,16 @@ function requireValue<Value>(value: Value | undefined): Value {
     return value;
 }
 
+function requireError(action: () => void): Error {
+    try {
+        action();
+    } catch (error) {
+        return error instanceof Error ? error : new Error(String(error));
+    }
+
+    throw new Error('Expected action to throw.');
+}
+
 export const testNode = suite('introspection node', [
     test('reads snapshot node properties and children', function verifyProperties(scope) {
         const snapshot = createSnapshot();
@@ -126,7 +136,30 @@ export const testNode = suite('introspection node', [
         scope.assert.equal(button.sendEvent('click', 'primary'), 'clicked:primary');
         scope.assert.equal(button.callProp('onClick', 'direct'), 'clicked:direct');
         scope.assert.equal(label.findClosest('button')?.name, 'button');
+        scope.assert.equal(button.findClosest('form'), undefined);
         scope.assert.equal(button.formatTree(), 'button\n  span');
+
+        return scope.assert.collect();
+    }),
+    test('reports non-callable prop calls clearly', function verifyNonCallableProps(scope) {
+        const snapshot = createSnapshot();
+        const node = createIntrospectionNode(
+            createReader(snapshot, {
+                read() {
+                    return 1;
+                }
+            }),
+            snapshot,
+            requireValue(snapshot.nodes[0])
+        );
+
+        scope.assert.equal(
+            requireError(function callTitle() {
+                node.callProp('title');
+            })
+                .message,
+            'Prop title is not callable.'
+        );
 
         return scope.assert.collect();
     }),
