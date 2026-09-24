@@ -6,12 +6,12 @@ import type {
     IntrospectionRefMatcher,
     IntrospectionRefRule,
     IntrospectionView
-} from './introspect-public-types.js';
+} from './public/introspect-public-types.js';
 import {
     createFakeRefNode as createFakeRefNodeImplementation,
     matchRefs as matchRefsImplementation
-} from './introspect-ref.ts';
-import { createIntrospectionView } from './introspect-view.ts';
+} from './refs/introspect-ref.ts';
+import { createIntrospectionView } from './runtime/view/introspect-view.ts';
 
 export type {
     GivenChildren,
@@ -33,7 +33,7 @@ export type {
     IntrospectionView,
     IntrospectionWarning,
     RenderedChildren
-} from './introspect-public-types.js';
+} from './public/introspect-public-types.js';
 
 export function introspect<HostSchema extends Record<string, unknown> = Record<string, unknown>>(
     element: React.ReactElement,

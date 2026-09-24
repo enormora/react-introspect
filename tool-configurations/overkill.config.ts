@@ -10,7 +10,10 @@ export const config = defineConfig({
             },
             testFamily: 'microtest',
             files: {
-                exclude: [ 'source/package-smoke.test.ts', 'source/runtime-integration.test.ts' ],
+                exclude: [
+                    'source/package/smoke/package-smoke.test.ts',
+                    'source/reconciler/runtime/introspect-runtime-integration.test.ts'
+                ],
                 include: [ 'source/**/*.test.ts' ]
             },
             timeouts: {
@@ -24,7 +27,10 @@ export const config = defineConfig({
             },
             testFamily: 'microtest',
             files: {
-                exclude: [ 'source/package-smoke.test.ts', 'source/runtime-integration.test.ts' ],
+                exclude: [
+                    'source/package/smoke/package-smoke.test.ts',
+                    'source/reconciler/runtime/introspect-runtime-integration.test.ts'
+                ],
                 include: [ 'source/**/*.test.ts' ]
             },
             timeouts: {
@@ -38,7 +44,7 @@ export const config = defineConfig({
             },
             testFamily: 'integration',
             files: {
-                include: [ 'source/package-smoke.test.ts' ]
+                include: [ 'source/package/smoke/package-smoke.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000,
@@ -53,7 +59,7 @@ export const config = defineConfig({
             },
             testFamily: 'integration',
             files: {
-                include: [ 'source/runtime-integration.test.ts' ]
+                include: [ 'source/reconciler/runtime/introspect-runtime-integration.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000,
