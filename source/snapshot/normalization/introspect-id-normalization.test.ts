@@ -7,7 +7,7 @@ import {
 } from './introspect-id-normalization.ts';
 
 export const testNode = suite('introspection id normalization', [
-    test('replaces generated React ids consistently', function verifyIdReplacement(scope) {
+    test('replaces generated React ids consistently', function (scope) {
         const normalizeId = createIdNormalizer({
             generator(generatedId) {
                 return generatedId.endsWith('_a_') ? 'first-id' : 'next-id';
@@ -20,7 +20,7 @@ export const testNode = suite('introspection id normalization', [
 
         return scope.assert.collect();
     }),
-    test('normalizes props, React elements, and circular values', function verifyValueNormalization(scope) {
+    test('normalizes props, React elements, and circular values', function (scope) {
         const value: Record<string, unknown> = { id: '_test-r_a_' };
 
         value.self = value;
@@ -50,7 +50,7 @@ export const testNode = suite('introspection id normalization', [
             }
         });
         scope.assert.equal(
-            normalizeSnapshotValue('unchanged', function normalizeId(valueToNormalize) {
+            normalizeSnapshotValue('unchanged', function (valueToNormalize) {
                 return valueToNormalize;
             }),
             'unchanged'

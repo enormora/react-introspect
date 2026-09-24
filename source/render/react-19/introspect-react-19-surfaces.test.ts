@@ -1,4 +1,5 @@
 import { suite, test } from '@overkill-dev/test';
+import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type {
     IntrospectionNode,
@@ -10,13 +11,6 @@ import {
     createIdNormalizer,
     normalizeSnapshotValue
 } from '../../snapshot/normalization/introspect-id-normalization.ts';
-
-type EqualScope = {
-    readonly assert: {
-        readonly deepEqual: (actual: unknown, expected: unknown) => void;
-        readonly equal: (actual: unknown, expected: unknown) => void;
-    };
-};
 
 type LabelHostSchema = {
     readonly label: {
@@ -65,33 +59,48 @@ function IdLabel(props: IdLabelProps): React.ReactNode {
     );
 }
 
-function assertHiddenActivityNode(scope: EqualScope, activity: IntrospectionNode): void {
-    scope.assert.equal(activity.name, 'Activity');
-    scope.assert.equal(activity.visibility, 'hidden');
-    scope.assert.deepEqual(activity.state, {
-        activityMode: 'hidden',
-        reason: 'activity',
-        rendered: true,
-        visible: false
-    });
-}
+const assertHiddenActivityNode = defineCompositeAssertion({
+    assert(check, activity: IntrospectionNode) {
+        return check.group([
+            check.annotated('activity name').equal(activity.name, 'Activity'),
+            check.annotated('activity visibility').equal(activity.visibility, 'hidden'),
+            check.annotated('activity state').deepEqual(activity.state, {
+                activityMode: 'hidden',
+                reason: 'activity',
+                rendered: true,
+                visible: false
+            })
+        ]);
+    },
+    name: 'assertHiddenActivityNode'
+});
 
-function assertHiddenDescendant(scope: EqualScope, node: IntrospectionNode): void {
-    scope.assert.equal(node.visibility, 'hidden');
-    scope.assert.equal(node.state.reason, 'activity');
-    scope.assert.equal(node.state.visible, false);
-}
+const assertHiddenDescendant = defineCompositeAssertion({
+    assert(check, node: IntrospectionNode) {
+        return check.group([
+            check.annotated('visibility').equal(node.visibility, 'hidden'),
+            check.annotated('reason').equal(node.state.reason, 'activity'),
+            check.annotated('visible state').false(node.state.visible)
+        ]);
+    },
+    name: 'assertHiddenDescendant'
+});
 
-function assertVisibleActivity(scope: EqualScope, view: IntrospectionView): void {
-    const activity = requireValue(view.find(React.Activity));
-    const panel = requireValue(view.find(Panel));
-    const section = requireValue(view.find('section'));
+const assertVisibleActivity = defineCompositeAssertion({
+    assert(check, view: IntrospectionView) {
+        const activity = requireValue(view.find(React.Activity));
+        const panel = requireValue(view.find(Panel));
+        const section = requireValue(view.find('section'));
 
-    scope.assert.equal(activity.visibility, 'visible');
-    scope.assert.equal(activity.state.activityMode, 'visible');
-    scope.assert.equal(panel.visibility, 'visible');
-    scope.assert.equal(section.visibility, 'visible');
-}
+        return check.group([
+            check.annotated('activity visibility').equal(activity.visibility, 'visible'),
+            check.annotated('activity mode').equal(activity.state.activityMode, 'visible'),
+            check.annotated('panel visibility').equal(panel.visibility, 'visible'),
+            check.annotated('section visibility').equal(section.visibility, 'visible')
+        ]);
+    },
+    name: 'assertVisibleActivity'
+});
 
 function createCyclicIdObject(id: string): Record<PropertyKey, unknown> {
     const value: Record<PropertyKey, unknown> = {};
@@ -104,7 +113,7 @@ function createCyclicIdObject(id: string): Record<PropertyKey, unknown> {
 }
 
 export const testNode = suite('React 19 special surfaces', [
-    test('passes idPrefix through to React useId', function verifyIdPrefix(scope) {
+    test('passes idPrefix through to React useId', function (scope) {
         const renderedIds: string[] = [];
         const view = introspect<LabelHostSchema>(
             React.createElement(IdLabel, {
@@ -128,7 +137,7 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('normalizes React ids in snapshots with idGenerator', function verifyIdGenerator(scope) {
+    test('normalizes React ids in snapshots with idGenerator', function (scope) {
         const renderedIds: string[] = [];
         const generatedIds: string[] = [];
         const view = introspect<LabelHostSchema>(
@@ -161,7 +170,7 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('keeps unresolved generated ids and cuts cyclic props', function verifyIdNormalizerEdges(scope) {
+    test('keeps unresolved generated ids and cuts cyclic props', function (scope) {
         const generatedId = '_react-introspect-edge-r_0_';
         const normalized = normalizeSnapshotValue(
             createCyclicIdObject(generatedId),
@@ -178,7 +187,7 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('marks hidden Activity output and descendants invisible', function verifyHiddenActivity(scope) {
+    test('marks hidden Activity output and descendants invisible', function (scope) {
         const view = introspect(
             React.createElement(React.Activity, {
                 children: React.createElement(Panel),
@@ -193,14 +202,14 @@ export const testNode = suite('React 19 special surfaces', [
         const panel = requireValue(view.find(Panel));
         const section = requireValue(view.find('section'));
 
-        assertHiddenActivityNode(scope, activity);
-        assertHiddenDescendant(scope, panel);
-        assertHiddenDescendant(scope, section);
+        scope.assert(assertHiddenActivityNode, activity);
+        scope.assert(assertHiddenDescendant, panel);
+        scope.assert(assertHiddenDescendant, section);
         scope.assert.equal(view.formatTree(), 'Activity\n  Panel\n    section\n      #text');
 
         return scope.assert.collect();
     }),
-    test('updates Activity visibility when mode changes', function verifyActivityUpdate(scope) {
+    test('updates Activity visibility when mode changes', function (scope) {
         const view = introspect(
             React.createElement(React.Activity, {
                 children: React.createElement(Panel),
@@ -219,11 +228,11 @@ export const testNode = suite('React 19 special surfaces', [
         }));
 
         scope.assert.equal(hiddenActivity.isStale, true);
-        assertVisibleActivity(scope, view);
+        scope.assert(assertVisibleActivity, view);
 
         return scope.assert.collect();
     }),
-    test('updates Activity text visibility when mode changes', function verifyActivityTextUpdate(scope) {
+    test('updates Activity text visibility when mode changes', function (scope) {
         const view = introspect(
             React.createElement(React.Activity, {
                 children: 'loading',
@@ -250,7 +259,7 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('records ViewTransition as a queryable wrapper surface', function verifyViewTransition(scope) {
+    test('records ViewTransition as a queryable wrapper surface', function (scope) {
         const view = introspect(
             React.createElement(
                 React.ViewTransition,

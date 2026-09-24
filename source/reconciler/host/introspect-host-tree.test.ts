@@ -1,4 +1,5 @@
 import { suite, test } from '@overkill-dev/test';
+import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import {
     appendChild,
@@ -12,13 +13,6 @@ import {
     toSnapshot,
     unhideTextInstance
 } from './introspect-host-tree.ts';
-
-type EqualScope = {
-    readonly assert: {
-        readonly deepEqual: (actual: unknown, expected: unknown) => void;
-        readonly equal: (actual: unknown, expected: unknown) => void;
-    };
-};
 
 function createContainer(): IntrospectionHostContainer {
     return createHostContainer(
@@ -41,36 +35,44 @@ function requireValue<Value>(value: Value | undefined): Value {
     return value;
 }
 
-function assertTreeOrder(scope: EqualScope): void {
-    const container = createContainer();
-    const first = createHostInstance('span', { title: 'first' }, undefined, { refs: undefined });
-    const second = createHostInstance('strong', { title: 'second' }, undefined, { refs: undefined });
+const assertTreeOrder = defineCompositeAssertion({
+    assert(check) {
+        const container = createContainer();
+        const first = createHostInstance('span', { title: 'first' }, undefined, { refs: undefined });
+        const second = createHostInstance('strong', { title: 'second' }, undefined, { refs: undefined });
 
-    appendChild(container, second);
-    insertBefore(container, first, second);
+        appendChild(container, second);
+        insertBefore(container, first, second);
 
-    const snapshot = toSnapshot(container);
-    const root = requireValue(snapshot.root);
+        const snapshot = toSnapshot(container);
+        const root = requireValue(snapshot.root);
 
-    scope.assert.deepEqual(
-        root.renderedChildren.map(function readName(node) {
-            return node.name;
-        }),
-        [ 'span', 'strong' ]
-    );
-}
+        return check.deepEqual(
+            root.renderedChildren.map(function readName(node) {
+                return node.name;
+            }),
+            [ 'span', 'strong' ]
+        );
+    },
+    name: 'assertTreeOrder'
+});
 
-function assertDetachedChildMoves(scope: EqualScope): void {
-    const firstParent = createHostInstance('section', {}, undefined, { refs: undefined });
-    const secondParent = createHostInstance('article', {}, undefined, { refs: undefined });
-    const child = createTextInstance('moved');
+const assertDetachedChildMoves = defineCompositeAssertion({
+    assert(check) {
+        const firstParent = createHostInstance('section', {}, undefined, { refs: undefined });
+        const secondParent = createHostInstance('article', {}, undefined, { refs: undefined });
+        const child = createTextInstance('moved');
 
-    appendChild(firstParent, child);
-    appendChild(secondParent, child);
+        appendChild(firstParent, child);
+        appendChild(secondParent, child);
 
-    scope.assert.equal(firstParent.readChildren().length, 0);
-    scope.assert.equal(secondParent.readChildren()[0], child);
-}
+        return check.group([
+            check.annotated('first parent children').equal(firstParent.readChildren().length, 0),
+            check.annotated('second parent child').equal(secondParent.readChildren()[0], child)
+        ]);
+    },
+    name: 'assertDetachedChildMoves'
+});
 
 function createButtonSnapshot(): IntrospectionSnapshot {
     const container = createContainer();
@@ -86,7 +88,7 @@ function createButtonSnapshot(): IntrospectionSnapshot {
 }
 
 export const testNode = suite('introspection host tree', [
-    test('publishes host children as snapshot nodes', function verifySnapshot(scope) {
+    test('publishes host children as snapshot nodes', function (scope) {
         const snapshot = createButtonSnapshot();
         const root = requireValue(snapshot.root);
 
@@ -97,13 +99,13 @@ export const testNode = suite('introspection host tree', [
 
         return scope.assert.collect();
     }),
-    test('maintains parent child order and detach state', function verifyChildManagement(scope) {
-        assertTreeOrder(scope);
-        assertDetachedChildMoves(scope);
+    test('maintains parent child order and detach state', function (scope) {
+        scope.assert(assertTreeOrder);
+        scope.assert(assertDetachedChildMoves);
 
         return scope.assert.collect();
     }),
-    test('updates text visibility in snapshots', function verifyTextVisibility(scope) {
+    test('updates text visibility in snapshots', function (scope) {
         const container = createContainer();
         const text = createTextInstance('status');
 
@@ -118,7 +120,7 @@ export const testNode = suite('introspection host tree', [
 
         return scope.assert.collect();
     }),
-    test('removes children from parents', function verifyRemove(scope) {
+    test('removes children from parents', function (scope) {
         const container = createContainer();
         const text = createTextInstance('removed');
 

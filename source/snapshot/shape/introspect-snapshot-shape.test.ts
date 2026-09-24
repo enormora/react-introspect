@@ -38,7 +38,7 @@ function NamedComponent(): React.ReactNode {
 Reflect.set(NamedComponent, 'displayName', 'ShownComponent');
 
 export const testNode = suite('introspection snapshot shape', [
-    test('derives text, public props, paths, and element kinds', function verifyShape(scope) {
+    test('derives text, public props, paths, and element kinds', function (scope) {
         const children = [ createTextNode('Save'), createTextNode(' now') ];
 
         scope.assert.equal(getTextContent(children), 'Save now');
@@ -67,7 +67,7 @@ export const testNode = suite('introspection snapshot shape', [
 
         return scope.assert.collect();
     }),
-    test('marks component children as not rendered at shallow depth', function verifyChildrenState(scope) {
+    test('marks component children as not rendered at shallow depth', function (scope) {
         const child = createTextNode('child');
         const hostState = getElementChildrenState('button', [ child ]);
         const componentState = getElementChildrenState(NamedComponent, [ child ]);

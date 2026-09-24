@@ -1,15 +1,9 @@
 import { suite, test } from '@overkill-dev/test';
+import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionFakeRefNode } from '../public/introspect-public-types.ts';
 import { createIntrospectionView as introspect } from '../runtime/view/introspect-view.ts';
 import { createFakeRefNode, matchRefs } from './introspect-ref.ts';
-
-type EqualScope = {
-    readonly assert: {
-        readonly deepEqual: (actual: unknown, expected: unknown) => void;
-        readonly equal: (actual: unknown, expected: unknown) => void;
-    };
-};
 
 type FocusNode = {
     readonly focus: () => void;
@@ -26,18 +20,6 @@ type ParentWithLeafRefProps = {
 type LeafProps = {
     readonly marker: 'leaf';
 };
-
-function assertThrows(scope: EqualScope, action: () => void, message: string): void {
-    try {
-        action();
-    } catch (error) {
-        scope.assert.equal(error instanceof Error ? error.message : String(error), message);
-
-        return;
-    }
-
-    throw new Error('Expected action to throw.');
-}
 
 function createFocusNode(recordFocus: () => void): IntrospectionFakeRefNode<FocusNode> {
     return createFakeRefNode({
@@ -112,163 +94,36 @@ function ParentWithLeafRef(props: ParentWithLeafRefProps): React.ReactNode {
     });
 }
 
-function assertShorthandRef(scope: EqualScope): void {
-    let focusCount = 0;
-    const inputNode = createFocusNode(function recordFocus() {
-        focusCount += 1;
-    });
+const assertShorthandRef = defineCompositeAssertion({
+    assert(check) {
+        let focusCount = 0;
+        const inputNode = createFocusNode(function recordFocus() {
+            focusCount += 1;
+        });
 
-    introspect(React.createElement(AutoFocusInput), {
-        depth: 'full',
-        refs: {
-            input: inputNode
-        },
-        strictMode: false
-    });
-
-    scope.assert.equal(focusCount, 1);
-}
-
-function assertCallbackRef(scope: EqualScope): void {
-    const inputNode = createFakeRefNode({ tag: 'input' });
-    let receivedNode: unknown = null;
-
-    introspect(
-        React.createElement('input', {
-            ref(node: unknown) {
-                receivedNode = node;
-            }
-        }),
-        {
-            refs: {
-                input: inputNode
-            },
-            strictMode: false
-        }
-    );
-
-    scope.assert.equal(receivedNode, inputNode);
-}
-
-function assertMatchedRefs(scope: EqualScope): void {
-    const focused: string[] = [];
-    const emailNode = createFocusNode(function focusEmail() {
-        focused.push('email');
-    });
-    const passwordNode = createFocusNode(function focusPassword() {
-        focused.push('password');
-    });
-    const submitNode = createFocusNode(function focusSubmit() {
-        focused.push('submit');
-    });
-
-    introspect(React.createElement(SignupForm), {
-        depth: 'full',
-        refs: matchRefs([
-            {
-                node: emailNode,
-                props: { tags: [ 'email' ] },
-                type: 'input',
-                where(target) {
-                    return target.name === 'input';
-                }
-            },
-            {
-                node: passwordNode,
-                props: { name: 'password' },
-                type: 'input'
-            },
-            {
-                key: 'submit',
-                node: submitNode,
-                props: { type: 'submit' },
-                type: 'button'
-            }
-        ]),
-        strictMode: false
-    });
-
-    scope.assert.deepEqual(focused, [ 'email', 'password', 'submit' ]);
-}
-
-function assertFactoryRefs(scope: EqualScope): void {
-    const names: string[] = [];
-
-    introspect(React.createElement(SignupForm), {
-        depth: 'full',
-        refs: matchRefs([
-            {
-                node(target) {
-                    const targetProps = target.props as Readonly<Record<PropertyKey, unknown>>;
-
-                    return createFocusNode(function focusTarget() {
-                        names.push(String(targetProps.name ?? targetProps.type));
-                    });
-                },
-                type: 'input'
-            },
-            {
-                node: createFocusNode(function focusSubmit() {
-                    names.push('submit');
-                }),
-                type: 'button'
-            }
-        ]),
-        strictMode: false
-    });
-
-    scope.assert.deepEqual(names, [ 'email', 'password', 'submit' ]);
-}
-
-function assertForwardRef(scope: EqualScope): void {
-    const inputNode = createFocusNode(function noop() {
-        return undefined;
-    });
-    const objectRef = React.createRef<FocusNode | null>();
-
-    introspect(
-        React.createElement(ForwardedInput, {
-            name: 'forwarded',
-            ref: objectRef
-        }),
-        {
+        introspect(React.createElement(AutoFocusInput), {
             depth: 'full',
             refs: {
                 input: inputNode
             },
             strictMode: false
-        }
-    );
+        });
 
-    scope.assert.equal(objectRef.current, inputNode);
-}
+        return check.equal(focusCount, 1);
+    },
+    name: 'assertShorthandRef'
+});
 
-function assertLeafRefIsNotInvoked(scope: EqualScope): void {
-    const calls: unknown[] = [];
+const assertCallbackRef = defineCompositeAssertion({
+    assert(check) {
+        const inputNode = createFakeRefNode({ tag: 'input' });
+        let receivedNode: unknown = null;
 
-    introspect(
-        React.createElement(ParentWithLeafRef, {
-            leafRef(node) {
-                calls.push(node);
-            }
-        }),
-        {
-            strictMode: false
-        }
-    );
-
-    scope.assert.deepEqual(calls, []);
-}
-
-function assertAmbiguityErrors(scope: EqualScope): void {
-    const inputNode = createFocusNode(function noop() {
-        return undefined;
-    });
-
-    assertThrows(scope, function renderMissingShorthand() {
         introspect(
-            React.createElement('button', {
-                ref: React.createRef()
+            React.createElement('input', {
+                ref(node: unknown) {
+                    receivedNode = node;
+                }
             }),
             {
                 refs: {
@@ -277,74 +132,231 @@ function assertAmbiguityErrors(scope: EqualScope): void {
                 strictMode: false
             }
         );
-    }, 'Ref shorthand input matched no host refs.');
 
-    assertThrows(scope, function renderMultipleShorthand() {
-        introspect(React.createElement(TwoInputs), {
+        return check.equal(receivedNode, inputNode);
+    },
+    name: 'assertCallbackRef'
+});
+
+const assertMatchedRefs = defineCompositeAssertion({
+    assert(check) {
+        const focused: string[] = [];
+        const emailNode = createFocusNode(function focusEmail() {
+            focused.push('email');
+        });
+        const passwordNode = createFocusNode(function focusPassword() {
+            focused.push('password');
+        });
+        const submitNode = createFocusNode(function focusSubmit() {
+            focused.push('submit');
+        });
+
+        introspect(React.createElement(SignupForm), {
             depth: 'full',
-            refs: {
-                input: inputNode
-            },
+            refs: matchRefs([
+                {
+                    node: emailNode,
+                    props: { tags: [ 'email' ] },
+                    type: 'input',
+                    where(target) {
+                        return target.name === 'input';
+                    }
+                },
+                {
+                    node: passwordNode,
+                    props: { name: 'password' },
+                    type: 'input'
+                },
+                {
+                    key: 'submit',
+                    node: submitNode,
+                    props: { type: 'submit' },
+                    type: 'button'
+                }
+            ]),
             strictMode: false
         });
-    }, 'Ref shorthand input matched multiple host refs.');
 
-    assertThrows(scope, function renderMultipleRuleMatches() {
+        return check.deepEqual(focused, [ 'email', 'password', 'submit' ]);
+    },
+    name: 'assertMatchedRefs'
+});
+
+const assertFactoryRefs = defineCompositeAssertion({
+    assert(check) {
+        const names: string[] = [];
+
+        introspect(React.createElement(SignupForm), {
+            depth: 'full',
+            refs: matchRefs([
+                {
+                    node(target) {
+                        const targetProps = target.props as Readonly<Record<PropertyKey, unknown>>;
+
+                        return createFocusNode(function focusTarget() {
+                            names.push(String(targetProps.name ?? targetProps.type));
+                        });
+                    },
+                    type: 'input'
+                },
+                {
+                    node: createFocusNode(function focusSubmit() {
+                        names.push('submit');
+                    }),
+                    type: 'button'
+                }
+            ]),
+            strictMode: false
+        });
+
+        return check.deepEqual(names, [ 'email', 'password', 'submit' ]);
+    },
+    name: 'assertFactoryRefs'
+});
+
+const assertForwardRef = defineCompositeAssertion({
+    assert(check) {
+        const inputNode = createFocusNode(function noop() {
+            return undefined;
+        });
+        const objectRef = React.createRef<FocusNode | null>();
+
         introspect(
-            React.createElement('input', {
-                name: 'email',
-                ref: React.createRef()
+            React.createElement(ForwardedInput, {
+                name: 'forwarded',
+                ref: objectRef
             }),
             {
-                refs: matchRefs([
-                    {
-                        node: inputNode,
-                        type: 'input'
-                    },
-                    {
-                        node: inputNode,
-                        props: { name: 'email' }
-                    }
-                ]),
+                depth: 'full',
+                refs: {
+                    input: inputNode
+                },
                 strictMode: false
             }
         );
-    }, 'Ref target input matches multiple ref rules.');
-}
+
+        return check.equal(objectRef.current, inputNode);
+    },
+    name: 'assertForwardRef'
+});
+
+const assertLeafRefIsNotInvoked = defineCompositeAssertion({
+    assert(check) {
+        const calls: unknown[] = [];
+
+        introspect(
+            React.createElement(ParentWithLeafRef, {
+                leafRef(node) {
+                    calls.push(node);
+                }
+            }),
+            {
+                strictMode: false
+            }
+        );
+
+        return check.deepEqual(calls, []);
+    },
+    name: 'assertLeafRefIsNotInvoked'
+});
+
+const assertAmbiguityErrors = defineCompositeAssertion({
+    assert(check) {
+        const inputNode = createFocusNode(function noop() {
+            return undefined;
+        });
+
+        return check.group([
+            check.throws(
+                function () {
+                    introspect(
+                        React.createElement('button', {
+                            ref: React.createRef()
+                        }),
+                        {
+                            refs: {
+                                input: inputNode
+                            },
+                            strictMode: false
+                        }
+                    );
+                },
+                { message: 'Ref shorthand input matched no host refs.' }
+            ),
+            check.throws(
+                function () {
+                    introspect(React.createElement(TwoInputs), {
+                        depth: 'full',
+                        refs: {
+                            input: inputNode
+                        },
+                        strictMode: false
+                    });
+                },
+                { message: 'Ref shorthand input matched multiple host refs.' }
+            ),
+            check.throws(
+                function () {
+                    introspect(
+                        React.createElement('input', {
+                            name: 'email',
+                            ref: React.createRef()
+                        }),
+                        {
+                            refs: matchRefs([
+                                {
+                                    node: inputNode,
+                                    type: 'input'
+                                },
+                                {
+                                    node: inputNode,
+                                    props: { name: 'email' }
+                                }
+                            ]),
+                            strictMode: false
+                        }
+                    );
+                },
+                { message: 'Ref target input matches multiple ref rules.' }
+            )
+        ]);
+    },
+    name: 'assertAmbiguityErrors'
+});
 
 export const testNode = suite('refs', [
-    test('injects shorthand fake refs into host object refs', function verifyShorthandRef(scope) {
-        assertShorthandRef(scope);
+    test('injects shorthand fake refs into host object refs', function (scope) {
+        scope.assert(assertShorthandRef);
 
         return scope.assert.collect();
     }),
-    test('passes fake host nodes to callback refs', function verifyCallbackRef(scope) {
-        assertCallbackRef(scope);
+    test('passes fake host nodes to callback refs', function (scope) {
+        scope.assert(assertCallbackRef);
 
         return scope.assert.collect();
     }),
-    test('matches selector rules for host refs', function verifyMatchedRefs(scope) {
-        assertMatchedRefs(scope);
+    test('matches selector rules for host refs', function (scope) {
+        scope.assert(assertMatchedRefs);
 
         return scope.assert.collect();
     }),
-    test('creates factory fake nodes per matched target', function verifyFactoryRefs(scope) {
-        assertFactoryRefs(scope);
+    test('creates factory fake nodes per matched target', function (scope) {
+        scope.assert(assertFactoryRefs);
 
         return scope.assert.collect();
     }),
-    test('passes an executed forwardRef ref through to its host output', function verifyForwardRef(scope) {
-        assertForwardRef(scope);
+    test('passes an executed forwardRef ref through to its host output', function (scope) {
+        scope.assert(assertForwardRef);
 
         return scope.assert.collect();
     }),
-    test('does not invoke refs on non-rendered component leaves', function verifyLeafRef(scope) {
-        assertLeafRefIsNotInvoked(scope);
+    test('does not invoke refs on non-rendered component leaves', function (scope) {
+        scope.assert(assertLeafRefIsNotInvoked);
 
         return scope.assert.collect();
     }),
-    test('reports ambiguous or missing ref rules', function verifyRefErrors(scope) {
-        assertAmbiguityErrors(scope);
+    test('reports ambiguous or missing ref rules', function (scope) {
+        scope.assert(assertAmbiguityErrors);
 
         return scope.assert.collect();
     })

@@ -44,7 +44,7 @@ function createNode(name: string, textContent: string): RuntimeIntrospectionNode
 }
 
 export const testNode = suite('introspection list', [
-    test('exposes stable indexed and iterable access', function verifyListAccess(scope) {
+    test('exposes stable indexed and iterable access', function (scope) {
         const first = createNode('button', 'Save');
         const last = createNode('span', 'Done');
         const list = createIntrospectionList([ first, last ]);
@@ -56,7 +56,7 @@ export const testNode = suite('introspection list', [
 
         return scope.assert.collect();
     }),
-    test('filters by selectors', function verifyFilter(scope) {
+    test('filters by selectors', function (scope) {
         const list = createIntrospectionList([
             createNode('button', 'Save'),
             createNode('span', 'Done')

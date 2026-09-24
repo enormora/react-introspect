@@ -23,13 +23,13 @@ function requireError(action: () => void): Error {
 }
 
 export const testNode = suite('unsupported React values', [
-    test('identifies React portal records', function verifyPortalDetection(scope) {
+    test('identifies React portal records', function (scope) {
         scope.assert.equal(isReactPortalValue(createPortalValue()), true);
         scope.assert.equal(isReactPortalValue({ $$typeof: Symbol.for('react.element') }), false);
 
         return scope.assert.collect();
     }),
-    test('throws a stable portal error for nested children', function verifyNestedPortal(scope) {
+    test('throws a stable portal error for nested children', function (scope) {
         const error = requireError(function validateValue() {
             assertSupportedReactValue(React.createElement(
                 'div',

@@ -12,7 +12,7 @@ function Button(props: ButtonProps): React.ReactNode {
 }
 
 export const testNode = suite('introspection view', [
-    test('creates queryable views from React elements', function verifyView(scope) {
+    test('creates queryable views from React elements', function (scope) {
         const view = createIntrospectionView(
             React.createElement(Button, {
                 label: 'Save',
@@ -34,7 +34,7 @@ export const testNode = suite('introspection view', [
 
         return scope.assert.collect();
     }),
-    test('updates and unmounts the current snapshot', function verifyUpdate(scope) {
+    test('updates and unmounts the current snapshot', function (scope) {
         const view = createIntrospectionView(React.createElement('span', null, 'One'), {
             strictMode: false,
             warningMode: 'capture'
