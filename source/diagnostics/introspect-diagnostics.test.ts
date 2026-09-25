@@ -2,7 +2,22 @@ import { suite, test } from '@overkill-dev/test';
 import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import { createIntrospectionView as introspect } from '../runtime/view/introspect-view.ts';
-import { createIntrospectionDiagnostics, type IntrospectionDiagnostics } from './introspect-diagnostics.ts';
+import {
+    createIntrospectionDiagnostics,
+    type IntrospectionConsoleDiagnostics,
+    type IntrospectionDiagnostics
+} from './introspect-diagnostics.ts';
+import { createNodeConsoleDiagnostics } from './introspect-node-console-diagnostics.ts';
+
+type ConsoleDiagnosticPublisher = {
+    readonly publish: (message: unknown) => void;
+    readonly source: IntrospectionConsoleDiagnostics;
+};
+
+type NodeConsoleSubscription = readonly [
+    name: string,
+    record: (message: unknown) => void
+];
 
 function requireError(action: () => unknown): Error {
     try {
@@ -53,11 +68,38 @@ const assertThrownRootError = defineCompositeAssertion({
     name: 'assertThrownRootError'
 });
 
-function createDiagnostics(warningMode: 'capture' | 'ignore' | 'throw'): IntrospectionDiagnostics {
+function createConsoleDiagnosticPublisher(): ConsoleDiagnosticPublisher {
+    let records: readonly ((message: unknown) => void)[] = Object.freeze([]);
+
+    return Object.freeze({
+        publish(message) {
+            for (const record of records) {
+                record(message);
+            }
+        },
+        source: Object.freeze({
+            subscribe(record: (message: unknown) => void) {
+                records = Object.freeze([
+                    ...records,
+                    record
+                ]);
+            }
+        })
+    });
+}
+
+function createDiagnostics(
+    warningMode: 'capture' | 'ignore' | 'throw',
+    consoleDiagnostics: IntrospectionConsoleDiagnostics
+): IntrospectionDiagnostics {
     return createIntrospectionDiagnostics({
         errorMode: 'capture',
         warningMode
-    });
+    }, consoleDiagnostics);
+}
+
+function createIsolatedDiagnostics(warningMode: 'capture' | 'ignore' | 'throw'): IntrospectionDiagnostics {
+    return createDiagnostics(warningMode, createConsoleDiagnosticPublisher().source);
 }
 
 function recordRecoverableWarning(diagnostics: IntrospectionDiagnostics, message: string): void {
@@ -68,7 +110,7 @@ function recordRecoverableWarning(diagnostics: IntrospectionDiagnostics, message
 
 const assertCapturedRecoverableWarning = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('capture');
+        const diagnostics = createIsolatedDiagnostics('capture');
 
         recordRecoverableWarning(diagnostics, 'recoverable warning');
 
@@ -83,7 +125,7 @@ const assertCapturedRecoverableWarning = defineCompositeAssertion({
 
 const assertDefaultRecoverableWarningThrow = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('throw');
+        const diagnostics = createIsolatedDiagnostics('throw');
         const error = requireError(function renderWarningComponent() {
             recordRecoverableWarning(diagnostics, 'recoverable warning');
         });
@@ -98,7 +140,7 @@ const assertDefaultRecoverableWarningThrow = defineCompositeAssertion({
 
 const assertIgnoredRecoverableWarning = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('ignore');
+        const diagnostics = createIsolatedDiagnostics('ignore');
 
         recordRecoverableWarning(diagnostics, 'recoverable warning');
 
@@ -112,12 +154,13 @@ const assertIgnoredRecoverableWarning = defineCompositeAssertion({
 
 const assertConsoleDiagnostics = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('capture');
+        const consoleDiagnostics = createConsoleDiagnosticPublisher();
+        const diagnostics = createDiagnostics('capture', consoleDiagnostics.source);
 
-        diagnostics.recordConsoleDiagnostic('Warning: outside Introspection');
+        consoleDiagnostics.publish('Warning: outside Introspection');
         diagnostics.run(function recordConsoleWarning() {
-            diagnostics.recordConsoleDiagnostic([ 'Warning:', 'console warning' ]);
-            diagnostics.recordConsoleDiagnostic('ordinary application output');
+            consoleDiagnostics.publish([ 'Warning:', 'console warning' ]);
+            consoleDiagnostics.publish('ordinary application output');
         });
 
         return check.group([
@@ -131,10 +174,11 @@ const assertConsoleDiagnostics = defineCompositeAssertion({
 
 const assertStringWarningThrow = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('throw');
+        const consoleDiagnostics = createConsoleDiagnosticPublisher();
+        const diagnostics = createDiagnostics('throw', consoleDiagnostics.source);
         const error = requireError(function recordStringWarning() {
             diagnostics.run(function recordConsoleWarning() {
-                diagnostics.recordConsoleDiagnostic('Warning: string warning');
+                consoleDiagnostics.publish('Warning: string warning');
             });
         });
 
@@ -143,9 +187,47 @@ const assertStringWarningThrow = defineCompositeAssertion({
     name: 'assertStringWarningThrow'
 });
 
+const assertNodeConsoleDiagnosticsSubscription = defineCompositeAssertion({
+    assert(check) {
+        let subscriptions: readonly NodeConsoleSubscription[] = Object.freeze([]);
+        let messages: readonly unknown[] = Object.freeze([]);
+        const consoleDiagnostics = createNodeConsoleDiagnostics(Object.freeze({
+            subscribe(name: string, record: (message: unknown) => void) {
+                subscriptions = Object.freeze([
+                    ...subscriptions,
+                    [ name, record ]
+                ]);
+            }
+        }));
+
+        consoleDiagnostics.subscribe(function recordMessage(message) {
+            messages = Object.freeze([
+                ...messages,
+                message
+            ]);
+        });
+        subscriptions[0]?.[1]('error message');
+        subscriptions[1]?.[1]([ 'warn', 'message' ]);
+
+        return check.group([
+            check.annotated('channel names').deepEqual(
+                subscriptions.map(function readName(subscription) {
+                    return subscription[0];
+                }),
+                [ 'console.error', 'console.warn' ]
+            ),
+            check.annotated('messages').deepEqual(messages, [
+                'error message',
+                [ 'warn', 'message' ]
+            ])
+        ]);
+    },
+    name: 'assertNodeConsoleDiagnosticsSubscription'
+});
+
 const assertCaughtErrorsAreNotDoubleReported = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('capture');
+        const diagnostics = createIsolatedDiagnostics('capture');
 
         diagnostics.run(function recordCaughtError() {
             diagnostics.recordCaughtError(new Error('handled'));
@@ -161,7 +243,7 @@ const assertCaughtErrorsAreNotDoubleReported = defineCompositeAssertion({
 
 const assertDuplicateErrorsAreDeduped = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('capture');
+        const diagnostics = createIsolatedDiagnostics('capture');
         const error = new Error('same failure');
 
         diagnostics.run(function recordDuplicateErrors() {
@@ -179,7 +261,7 @@ const assertDuplicateErrorsAreDeduped = defineCompositeAssertion({
 
 const assertRootCallbackMapping = defineCompositeAssertion({
     assert(check) {
-        const diagnostics = createDiagnostics('capture');
+        const diagnostics = createIsolatedDiagnostics('capture');
 
         diagnostics.recordCaughtError(new Error('handled failure'));
         diagnostics.recordRecoverableError(new Error('recoverable failure'));
@@ -197,8 +279,8 @@ const assertRootCallbackMapping = defineCompositeAssertion({
 
 const assertDiagnosticsIsolation = defineCompositeAssertion({
     assert(check) {
-        const first = createDiagnostics('capture');
-        const second = createDiagnostics('capture');
+        const first = createIsolatedDiagnostics('capture');
+        const second = createIsolatedDiagnostics('capture');
 
         recordRecoverableWarning(first, 'first warning');
         recordRecoverableWarning(second, 'second warning');
@@ -254,6 +336,11 @@ export const testNode = suite('diagnostics', [
     }),
     test('throws string console warnings in throw mode', function (scope) {
         scope.assert(assertStringWarningThrow);
+
+        return scope.assert.collect();
+    }),
+    test('subscribes the Node console diagnostic channels', function (scope) {
+        scope.assert(assertNodeConsoleDiagnosticsSubscription);
 
         return scope.assert.collect();
     }),

@@ -56,6 +56,16 @@ function Loading(): React.ReactNode {
     return React.createElement('em', null, 'loading');
 }
 
+const warningContext = React.createContext('context value');
+const unsupportedConsumerWarning = 'Calling useContext(Context.Consumer) is not supported and will cause bugs. ' +
+    'Did you mean to call useContext(Context) instead?';
+
+function ReadsConsumerContext(): React.ReactNode {
+    const value = React.useContext(warningContext.Consumer as never);
+
+    return React.createElement('span', null, String(value));
+}
+
 function SuspendsUntilReady(props: SuspendsUntilReadyProps): React.ReactNode {
     if (!props.resource.readReady()) {
         throw props.resource.error;
@@ -162,6 +172,26 @@ const assertThrownPromiseRetry = defineCompositeAssertion({
 });
 
 export const testNode = suite('runtime integration', [
+    test(
+        'captures React console warnings from the real diagnostic channel',
+        function (scope) {
+            const view = introspect(React.createElement(ReadsConsumerContext), {
+                depth: 'full',
+                strictMode: false,
+                warningMode: 'capture'
+            });
+
+            scope.assert.deepEqual(view.warnings, [
+                {
+                    cause: unsupportedConsumerWarning,
+                    message: unsupportedConsumerWarning
+                }
+            ]);
+            scope.assert.equal(view.textContent, 'undefined');
+
+            return scope.assert.collect();
+        }
+    ),
     test(
         'retries Suspense after a thrown promise resolves',
         async function (scope) {
