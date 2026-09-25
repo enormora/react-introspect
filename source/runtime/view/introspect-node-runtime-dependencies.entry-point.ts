@@ -5,7 +5,7 @@ import type {
     IntrospectionBrowserEnvironment,
     IntrospectionMicrotasks,
     IntrospectionRuntimeDependencies
-} from './introspect-runtime-dependencies.ts';
+} from './introspect-runtime-dependencies-types.ts';
 
 const reactActEnvironmentKey = 'IS_REACT_ACT_ENVIRONMENT';
 

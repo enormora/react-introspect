@@ -3,11 +3,9 @@ import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
-import {
-    createUnitRuntimeDependencies,
-    type IntrospectionRuntimeDependencies
-} from '../../runtime/view/introspect-runtime-dependencies.ts';
-import { createIntrospectionView as introspect } from '../../runtime/view/introspect-view.ts';
+import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
+import { createUnitRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.test.ts';
+import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
 
 type ElementProp = {

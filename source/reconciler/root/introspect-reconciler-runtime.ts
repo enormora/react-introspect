@@ -1,51 +1,61 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.ts';
+import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
 
 type IntrospectionTimeoutIdentifier = ReturnType<IntrospectionRuntimeDependencies['clock']['setTimeout']>;
 
-const runtimeStorage = new AsyncLocalStorage<IntrospectionRuntimeDependencies>();
+export type IntrospectionReconcilerRuntime = {
+    readonly cancelTimeout: (timeoutIdentifier: IntrospectionTimeoutIdentifier) => void;
+    readonly enter: (runtime: IntrospectionRuntimeDependencies) => void;
+    readonly readEventTimestamp: () => number;
+    readonly run: <Result>(runtime: IntrospectionRuntimeDependencies, action: () => Result) => Result;
+    readonly scheduleMicrotask: (action: () => void) => void;
+    readonly scheduleTimeout: <HandlerArguments extends readonly unknown[]>(
+        handler: (...handlerArguments: HandlerArguments) => void,
+        delayInMilliseconds: number,
+        ...handlerArguments: HandlerArguments
+    ) => IntrospectionTimeoutIdentifier;
+};
 
-function currentRuntime(): IntrospectionRuntimeDependencies {
-    const runtime = runtimeStorage.getStore();
+export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerRuntime {
+    const runtimeStorage = new AsyncLocalStorage<IntrospectionRuntimeDependencies>();
 
-    if (runtime === undefined) {
-        throw new Error('Expected Introspection runtime dependencies.');
+    function currentRuntime(): IntrospectionRuntimeDependencies {
+        const runtime = runtimeStorage.getStore();
+
+        if (runtime === undefined) {
+            throw new Error('Expected Introspection runtime dependencies.');
+        }
+
+        return runtime;
     }
 
-    return runtime;
-}
+    function runWithRuntime<Result>(
+        runtime: IntrospectionRuntimeDependencies,
+        action: () => Result
+    ): Result {
+        return runtimeStorage.run(runtime, action);
+    }
 
-export function enterIntrospectionRuntime(runtime: IntrospectionRuntimeDependencies): void {
-    runtimeStorage.enterWith(runtime);
-}
+    return Object.freeze({
+        cancelTimeout(timeoutIdentifier) {
+            currentRuntime().clock.clearTimeout(timeoutIdentifier);
+        },
+        enter(runtime) {
+            runtimeStorage.enterWith(runtime);
+        },
+        readEventTimestamp() {
+            return currentRuntime().clock.currentUnixEpochMilliseconds;
+        },
+        run: runWithRuntime,
+        scheduleMicrotask(action) {
+            const runtime = currentRuntime();
 
-export function runWithIntrospectionRuntime<Result>(
-    runtime: IntrospectionRuntimeDependencies,
-    action: () => Result
-): Result {
-    return runtimeStorage.run(runtime, action);
-}
-
-export function cancelIntrospectionTimeout(timeoutIdentifier: IntrospectionTimeoutIdentifier): void {
-    currentRuntime().clock.clearTimeout(timeoutIdentifier);
-}
-
-export function readIntrospectionEventTimestamp(): number {
-    return currentRuntime().clock.currentUnixEpochMilliseconds;
-}
-
-export function scheduleIntrospectionMicrotask(action: () => void): void {
-    const runtime = currentRuntime();
-
-    runtime.microtasks.schedule(function runMicrotask() {
-        runWithIntrospectionRuntime(runtime, action);
+            runtime.microtasks.schedule(function runMicrotask() {
+                runWithRuntime(runtime, action);
+            });
+        },
+        scheduleTimeout(handler, delayInMilliseconds, ...handlerArguments) {
+            return currentRuntime().clock.setTimeout(handler, delayInMilliseconds, ...handlerArguments);
+        }
     });
-}
-
-export function scheduleIntrospectionTimeout<HandlerArguments extends readonly unknown[]>(
-    handler: (...handlerArguments: HandlerArguments) => void,
-    delayInMilliseconds: number,
-    ...handlerArguments: HandlerArguments
-): IntrospectionTimeoutIdentifier {
-    return currentRuntime().clock.setTimeout(handler, delayInMilliseconds, ...handlerArguments);
 }

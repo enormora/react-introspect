@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { createIntrospectionView } from './introspect-view.ts';
+import { createUnitIntrospectionView } from './introspect-unit-view.test.ts';
 
 type ButtonProps = {
     readonly label: string;
@@ -13,7 +13,7 @@ function Button(props: ButtonProps): React.ReactNode {
 
 export const testNode = suite('introspection view', [
     test('creates queryable views from React elements', function (scope) {
-        const view = createIntrospectionView(
+        const view = createUnitIntrospectionView(
             React.createElement(Button, {
                 label: 'Save',
                 onPress() {
@@ -35,7 +35,7 @@ export const testNode = suite('introspection view', [
         return scope.assert.collect();
     }),
     test('updates and unmounts the current snapshot', function (scope) {
-        const view = createIntrospectionView(React.createElement('span', null, 'One'), {
+        const view = createUnitIntrospectionView(React.createElement('span', null, 'One'), {
             strictMode: false,
             warningMode: 'capture'
         });

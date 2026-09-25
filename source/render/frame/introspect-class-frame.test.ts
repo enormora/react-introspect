@@ -2,7 +2,7 @@ import { suite, test } from '@overkill-dev/test';
 import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionView } from '../../public/introspect-public-types.ts';
-import { createIntrospectionView as introspect } from '../../runtime/view/introspect-view.ts';
+import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 
 type Recorder = {
     readonly entries: readonly string[];

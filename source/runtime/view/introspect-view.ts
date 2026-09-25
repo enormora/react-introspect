@@ -15,7 +15,7 @@ import {
     findIntrospectionNodes,
     type SnapshotReader
 } from '../query/introspect-node.ts';
-import { createIntrospectionReconcilerRoot } from '../../reconciler/root/introspect-reconciler.ts';
+import type { IntrospectionReconcilerModule } from '../../reconciler/root/introspect-reconciler.ts';
 import type {
     RuntimeIntrospectionList,
     RuntimeIntrospectionNode,
@@ -25,17 +25,20 @@ import type {
 import {
     createEmptyIntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import {
-    createUnitRuntimeDependencies,
-    type IntrospectionRuntimeDependencies
-} from './introspect-runtime-dependencies.ts';
+
+export type IntrospectionViewModule = {
+    readonly createView: (
+        element: React.ReactElement,
+        options: RuntimeIntrospectionOptions
+    ) => RuntimeIntrospectionView;
+};
+
+export type IntrospectionViewModuleDependencies = {
+    readonly consoleDiagnostics: IntrospectionConsoleDiagnostics;
+    readonly reconciler: IntrospectionReconcilerModule;
+};
 
 const defaultWaitTimeout = 1000;
-const isolatedConsoleDiagnostics: IntrospectionConsoleDiagnostics = Object.freeze({
-    subscribe() {
-        return undefined;
-    }
-});
 const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
     let nextIdPrefixIndex = 0;
 
@@ -53,18 +56,17 @@ function diagnosticsOptions(options: RuntimeIntrospectionOptions): Introspection
     };
 }
 
-export function createIntrospectionView(
+function createIntrospectionViewWithDependencies(
     element: React.ReactElement,
-    options: RuntimeIntrospectionOptions = {},
-    consoleDiagnostics: IntrospectionConsoleDiagnostics = isolatedConsoleDiagnostics,
-    runtimeDependencies: IntrospectionRuntimeDependencies = createUnitRuntimeDependencies()
+    options: RuntimeIntrospectionOptions,
+    dependencies: IntrospectionViewModuleDependencies
 ): RuntimeIntrospectionView {
     let currentSnapshot = createEmptyIntrospectionSnapshot(0);
     const depth = options.depth ?? 1;
     const idPrefix = options.idPrefix ?? createDefaultIdPrefix();
-    const diagnostics = createIntrospectionDiagnostics(diagnosticsOptions(options), consoleDiagnostics);
+    const diagnostics = createIntrospectionDiagnostics(diagnosticsOptions(options), dependencies.consoleDiagnostics);
     const reconcilerRoot = diagnostics.run(function createRootWithDiagnostics() {
-        return createIntrospectionReconcilerRoot({
+        return dependencies.reconciler.createRoot({
             diagnostics,
             element: createIntrospectionRenderElement(element, depth),
             idGenerator: options.idGenerator,
@@ -73,7 +75,6 @@ export function createIntrospectionView(
                 currentSnapshot = snapshot;
             },
             refs: options.refs,
-            runtime: runtimeDependencies,
             strictMode: options.strictMode ?? true,
             waitTimeout: options.waitTimeout ?? defaultWaitTimeout
         });
@@ -158,4 +159,14 @@ export function createIntrospectionView(
     });
 
     return view;
+}
+
+export function createIntrospectionViewModule(
+    dependencies: IntrospectionViewModuleDependencies
+): IntrospectionViewModule {
+    return Object.freeze({
+        createView(element, options) {
+            return createIntrospectionViewWithDependencies(element, options, dependencies);
+        }
+    });
 }

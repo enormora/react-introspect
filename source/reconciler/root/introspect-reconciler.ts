@@ -1,5 +1,5 @@
 import type React from 'react';
-import createReconciler, { type ReconcilerRoot } from 'react-reconciler';
+import createReconciler, { type ReconcilerInstance, type ReconcilerRoot } from 'react-reconciler';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-frame-contract.ts';
 import {
@@ -28,14 +28,10 @@ import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.ts';
+import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
 import {
-    cancelIntrospectionTimeout,
-    enterIntrospectionRuntime,
-    readIntrospectionEventTimestamp,
-    runWithIntrospectionRuntime,
-    scheduleIntrospectionMicrotask,
-    scheduleIntrospectionTimeout
+    createIntrospectionReconcilerRuntime,
+    type IntrospectionReconcilerRuntime
 } from './introspect-reconciler-runtime.ts';
 
 type Waiter = {
@@ -50,12 +46,11 @@ type IntrospectionReconcilerRootOptions = {
     readonly idPrefix: string;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly refs: IntrospectionRefs | undefined;
-    readonly runtime: IntrospectionRuntimeDependencies;
     readonly strictMode: boolean;
     readonly waitTimeout: number;
 };
 
-export type IntrospectionReconcilerRoot = {
+type IntrospectionReconcilerRoot = {
     readonly act: (action: () => unknown) => unknown;
     readonly unmount: () => void;
     readonly update: (element: React.ReactElement) => void;
@@ -63,6 +58,14 @@ export type IntrospectionReconcilerRoot = {
     readonly waitForNextRender: () => Promise<void>;
     readonly waitForRenderCount: (count: number) => Promise<void>;
     readonly waitUntil: (predicate: () => boolean) => Promise<void>;
+};
+
+export type IntrospectionReconcilerModule = {
+    readonly createRoot: (options: IntrospectionReconcilerRootOptions) => IntrospectionReconcilerRoot;
+};
+
+export type IntrospectionReconcilerModuleDependencies = {
+    readonly runtime: IntrospectionRuntimeDependencies;
 };
 
 const defaultEventPriority = 32;
@@ -91,7 +94,7 @@ function prepareForCommit(): null {
     return null;
 }
 
-function createIntrospectionReconcilerHostConfig(): unknown {
+function createIntrospectionReconcilerHostConfig(reconcilerRuntime: IntrospectionReconcilerRuntime): unknown {
     return {
         NotPendingTransition: null,
         HostTransitionContext: {
@@ -103,7 +106,7 @@ function createIntrospectionReconcilerHostConfig(): unknown {
         appendInitialChild: appendChild,
         applyViewTransitionName: noop,
         beforeActiveInstanceBlur: noop,
-        cancelTimeout: cancelIntrospectionTimeout,
+        cancelTimeout: reconcilerRuntime.cancelTimeout,
         cancelRootViewTransitionName: noop,
         cancelViewTransitionName: noop,
         clearActivityBoundary: noop,
@@ -150,13 +153,13 @@ function createIntrospectionReconcilerHostConfig(): unknown {
         removeChildFromContainer: removeHostChild.bind(undefined),
         resetAfterCommit: publishContainerSnapshot,
         resetFormInstance: noop,
-        resolveEventTimeStamp: readIntrospectionEventTimestamp,
+        resolveEventTimeStamp: reconcilerRuntime.readEventTimestamp,
         resolveEventType: returnNull,
         resolveUpdatePriority: getDefaultEventPriority,
         restoreRootViewTransitionName: noop,
         restoreViewTransitionName: noop,
-        scheduleMicrotask: scheduleIntrospectionMicrotask,
-        scheduleTimeout: scheduleIntrospectionTimeout,
+        scheduleMicrotask: reconcilerRuntime.scheduleMicrotask,
+        scheduleTimeout: reconcilerRuntime.scheduleTimeout,
         setCurrentUpdatePriority: noop,
         shouldAttemptEagerTransition: alwaysFalse,
         shouldSetTextContent: alwaysFalse,
@@ -176,14 +179,21 @@ function createIntrospectionReconcilerHostConfig(): unknown {
     };
 }
 
-const renderer = createReconciler(createIntrospectionReconcilerHostConfig());
+type IntrospectionReconcilerModuleState = {
+    readonly reconcilerRuntime: IntrospectionReconcilerRuntime;
+    readonly runtime: IntrospectionRuntimeDependencies;
+};
+
+const reconcilerRuntime = createIntrospectionReconcilerRuntime();
+const renderer = createReconciler(createIntrospectionReconcilerHostConfig(reconcilerRuntime));
 
 function createReconcilerContainer(
+    rendererInstance: ReconcilerInstance,
     container: IntrospectionHostContainer,
     diagnostics: IntrospectionDiagnostics,
     strictMode: boolean
 ): ReconcilerRoot {
-    return renderer.createContainer(
+    return rendererInstance.createContainer(
         container,
         1,
         null,
@@ -206,6 +216,7 @@ type IntrospectionReconcilerState = {
 
 type IntrospectionReconcilerSession = {
     readonly container: IntrospectionHostContainer;
+    readonly moduleState: IntrospectionReconcilerModuleState;
     readonly options: IntrospectionReconcilerRootOptions;
     readonly root: Readonly<Record<string, unknown>>;
     readonly state: IntrospectionReconcilerState;
@@ -249,6 +260,7 @@ function createSessionContainer(
 }
 
 function createIntrospectionReconcilerSession(
+    moduleState: IntrospectionReconcilerModuleState,
     options: IntrospectionReconcilerRootOptions
 ): IntrospectionReconcilerSession {
     let renderCount = 0;
@@ -268,13 +280,14 @@ function createIntrospectionReconcilerSession(
         }
     });
     const container = createSessionContainer(options, state);
-    enterIntrospectionRuntime(options.runtime);
-    const root = runWithIntrospectionRuntime(options.runtime, function createContainerWithRuntime() {
-        return createReconcilerContainer(container, options.diagnostics, options.strictMode);
+    moduleState.reconcilerRuntime.enter(moduleState.runtime);
+    const root = moduleState.reconcilerRuntime.run(moduleState.runtime, function createContainerWithRuntime() {
+        return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
 
     return Object.freeze({
         container,
+        moduleState,
         options,
         root,
         state
@@ -283,8 +296,8 @@ function createIntrospectionReconcilerSession(
 
 function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
     return session.options.diagnostics.run(function actWithDiagnostics() {
-        return runWithIntrospectionRuntime(session.options.runtime, function actWithRuntime() {
-            return session.options.runtime.actEnvironment.act(function runAction() {
+        return session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function actWithRuntime() {
+            return session.moduleState.runtime.actEnvironment.act(function runAction() {
                 const result = action();
 
                 renderer.flushSyncWork();
@@ -298,10 +311,13 @@ function actSession(session: IntrospectionReconcilerSession, action: () => unkno
 
 async function waitForIdleSession(session: IntrospectionReconcilerSession): Promise<void> {
     await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-        await runWithIntrospectionRuntime(session.options.runtime, async function flushMicrotasksWithRuntime() {
-            await session.options.runtime.microtasks.flush();
-        });
-        runWithIntrospectionRuntime(session.options.runtime, function flushWithRuntime() {
+        await session.moduleState.reconcilerRuntime.run(
+            session.moduleState.runtime,
+            async function flushMicrotasksWithRuntime() {
+                await session.moduleState.runtime.microtasks.flush();
+            }
+        );
+        session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function flushWithRuntime() {
             renderer.flushPassiveEffects();
             settleWaiters(session.state);
         });
@@ -388,8 +404,8 @@ function renderRootElement(
     session: IntrospectionReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
-    runWithIntrospectionRuntime(session.options.runtime, function renderWithRuntime() {
-        session.options.runtime.actEnvironment.act(function renderElement() {
+    session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function renderWithRuntime() {
+        session.moduleState.runtime.actEnvironment.act(function renderElement() {
             updateRootElement(session, element);
             renderer.flushSyncWork();
             renderer.flushPassiveEffects();
@@ -437,10 +453,11 @@ async function waitForRenderCountSession(session: IntrospectionReconcilerSession
     });
 }
 
-export function createIntrospectionReconcilerRoot(
+function createIntrospectionReconcilerRoot(
+    moduleState: IntrospectionReconcilerModuleState,
     options: IntrospectionReconcilerRootOptions
 ): IntrospectionReconcilerRoot {
-    const session = createIntrospectionReconcilerSession(options);
+    const session = createIntrospectionReconcilerSession(moduleState, options);
 
     flushElement(session, options.element);
 
@@ -465,6 +482,21 @@ export function createIntrospectionReconcilerRoot(
         },
         async waitUntil(predicate: () => boolean) {
             return waitForSession(session, predicate);
+        }
+    });
+}
+
+export function createIntrospectionReconcilerModule(
+    dependencies: IntrospectionReconcilerModuleDependencies
+): IntrospectionReconcilerModule {
+    const moduleState = Object.freeze({
+        reconcilerRuntime,
+        runtime: dependencies.runtime
+    });
+
+    return Object.freeze({
+        createRoot(options) {
+            return createIntrospectionReconcilerRoot(moduleState, options);
         }
     });
 }
