@@ -41,12 +41,10 @@ export function freezePropsWithoutChildren(props: SnapshotProps): SnapshotProps 
 }
 
 export function getElementChildrenState(type: unknown, children: readonly SnapshotNode[]): ElementChildrenState {
-    const renderedChildren = rendersOwnChildren(type) ? children : Object.freeze([]);
-
     return {
-        renderedChildren,
+        renderedChildren: children,
         renderedReason: rendersOwnChildren(type) ? undefined : 'depth',
-        textContent: getTextContent(renderedChildren.length > 0 ? renderedChildren : children)
+        textContent: getTextContent(children)
     };
 }
 

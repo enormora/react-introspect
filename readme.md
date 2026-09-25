@@ -34,6 +34,8 @@ You still see `Child`.
 
 You still see the props and children `Parent` gave to `Child`.
 
+Queries search everything `Parent` returned, including elements nested inside `Child`.
+
 You do not see what `Child` renders unless you opt in.
 
 ```tsx
@@ -446,17 +448,30 @@ assert.equal(givenButton.type, Button);
 
 Returns what the node rendered at the selected depth.
 
-```tsx
-const child = view.find(Child);
+A component below the selected depth does not execute. It passes the children it was given through, the way a shallow renderer does. That keeps everything the executed component built in the tree.
 
-assert.ok(child);
-assert.deepEqual(child.renderedChildren, {
-    status: 'notRendered',
-    reason: 'depth'
-});
+```tsx
+const Page = () => (
+    <PageLayout>
+        <SaveButton label='Save' />
+    </PageLayout>
+);
+
+const view = introspect(<Page />);
+
+const layout = view.find(PageLayout);
+
+assert.ok(layout);
+assert.equal(layout.renderedChildren.status, 'rendered');
+assert.equal(layout.state.reason, 'depth');
+
+assert.ok(view.find(SaveButton));
+assert.equal(view.find('button'), undefined);
 ```
 
-When rendered:
+`node.state` still tells you the component did not execute.
+
+When executed:
 
 ```tsx
 const card = view.find(Card);
@@ -473,7 +488,6 @@ Statuses:
 
 Reasons:
 
-- `'depth'`
 - `'suspended'`
 - `'errored'`
 - `'unsupported'`
@@ -948,7 +962,7 @@ const legacyButton = view.find(LegacyButton);
 
 assert.ok(legacyButton);
 assert.equal(legacyButton.props.label, 'Save');
-assert.equal(legacyButton.renderedChildren.status, 'notRendered');
+assert.equal(legacyButton.state.rendered, false);
 ```
 
 ### Error boundaries
@@ -1017,7 +1031,7 @@ const view = introspect(<Page />, { depth: 1 });
 const details = view.find(LazyDetails);
 
 assert.ok(details);
-assert.equal(details.renderedChildren.status, 'notRendered');
+assert.equal(details.state.rendered, false);
 ```
 
 If React Introspect needs to execute a lazy component, wait for it through Suspense.

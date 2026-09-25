@@ -153,10 +153,12 @@ export const testNode = suite('snapshot tree model', [
         scope.assert.equal(section.renderedChildren.status, 'rendered');
         scope.assert.equal(section.givenChildren.length, 2);
         scope.assert.equal(widget.givenChildren.first?.type, 'em');
-        scope.assert.deepEqual(widget.renderedChildren, {
-            reason: 'depth',
-            status: 'notRendered'
-        });
+        scope.assert.equal(widget.renderedChildren.status, 'rendered');
+        scope.assert.equal(widget.state.reason, 'depth');
+        scope.assert.equal(
+            widget.renderedChildren.status === 'rendered' ? widget.renderedChildren.nodes.first?.type : undefined,
+            'em'
+        );
 
         return scope.assert.collect();
     }),
@@ -229,15 +231,15 @@ export const testNode = suite('snapshot tree model', [
         const view = introspect(createMixedTree(), { depth: 0 });
         const renderedText = view.findAll('#text');
 
-        scope.assert.equal(renderedText.length, 2);
+        scope.assert.equal(renderedText.length, 3);
         scope.assert.equal(renderedText.first?.textContent, 'Save ');
-        scope.assert.equal(renderedText.last?.textContent, 'now');
+        scope.assert.equal(renderedText.last?.textContent, 'given');
         scope.assert.equal(renderedText.at(1)?.textContent, 'now');
         scope.assert.deepEqual(
             Array.from(renderedText, function readText(node) {
                 return node.textContent;
             }),
-            [ 'Save ', 'now' ]
+            [ 'Save ', 'now', 'given' ]
         );
         scope.assert.equal(view.findAll('#empty').length, 3);
         scope.assert.equal(view.findAll('section').filterBy({ has: { type: 'strong' } }).length, 1);

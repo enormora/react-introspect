@@ -69,7 +69,7 @@ export const testNode = suite('introspection snapshot shape', [
 
         return scope.assert.collect();
     }),
-    test('marks component children as not rendered at shallow depth', function (scope) {
+    test('passes component children through at shallow depth', function (scope) {
         const shownComponent = createShownComponent();
         const child = createTextNode('child');
         const hostState = getElementChildrenState('button', [ child ]);
@@ -82,7 +82,7 @@ export const testNode = suite('introspection snapshot shape', [
             hostRenderedChildren: hostState.renderedChildren.length,
             hostRenderedReason: hostState.renderedReason
         }, {
-            componentRenderedChildren: 0,
+            componentRenderedChildren: 1,
             componentRenderedReason: 'depth',
             componentTextContent: 'child',
             hostRenderedChildren: 1,

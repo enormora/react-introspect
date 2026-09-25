@@ -185,15 +185,52 @@ function catchThrown(value: unknown): void {
     }
 }
 
-const assertNotRendered = defineCompositeAssertion({
-    assert(check, node: IntrospectionNode) {
-        return check.deepEqual(node.renderedChildren, {
-            reason: 'depth',
-            status: 'notRendered'
+function readRenderedChildTypes(node: IntrospectionNode): readonly unknown[] | 'notRendered' {
+    const { renderedChildren } = node;
+
+    return renderedChildren.status === 'rendered'
+        ? Array.from(renderedChildren.nodes, function readType(child) {
+            return child.type;
+        })
+        : 'notRendered';
+}
+
+const assertUnexecutedPassThrough = defineCompositeAssertion({
+    assert(check, node: IntrospectionNode, childTypes: readonly unknown[]) {
+        return check.deepEqual({
+            renderedChildTypes: readRenderedChildTypes(node),
+            state: node.state,
+            visibility: node.visibility
+        }, {
+            renderedChildTypes: childTypes,
+            state: { activityMode: undefined, reason: 'depth', rendered: false, visible: true },
+            visibility: 'notRendered'
         });
     },
-    name: 'assertNotRendered'
+    name: 'assertUnexecutedPassThrough'
 });
+
+function Form(props: React.PropsWithChildren): React.ReactNode {
+    return React.createElement('form', null, props.children);
+}
+
+function PageLayout(props: React.PropsWithChildren): React.ReactNode {
+    return React.createElement('main', null, props.children);
+}
+
+function NestedGivenPage(): React.ReactNode {
+    return React.createElement(
+        PageLayout,
+        null,
+        React.createElement(
+            Form,
+            null,
+            React.createElement(PlainLabel, { label: 'Save' }),
+            React.createElement('span', null, 'a'),
+            React.createElement('span', null, 'b')
+        )
+    );
+}
 
 export const testNode = suite('execution shallow function components', [
     test('keeps child components visible but unexecuted at depth 1', function (scope) {
@@ -203,12 +240,53 @@ export const testNode = suite('execution shallow function components', [
         });
         const shell = requireValue(view.find(Shell));
 
-        scope.assert.equal(counts.readParentRenders(), 1);
-        scope.assert.equal(counts.readShellRenders(), 0);
-        scope.assert.equal(counts.readButtonRenders(), 0);
-        scope.assert.equal(shell.givenChildren.first?.type, Button);
-        scope.assert.equal(view.find(Button), undefined);
-        scope.assert(assertNotRendered, shell);
+        scope.assert.deepEqual({
+            buttonLabel: view.find(Button)?.props.label,
+            givenType: shell.givenChildren.first?.type,
+            hostButton: view.find('button'),
+            renders: [ counts.readParentRenders(), counts.readShellRenders(), counts.readButtonRenders() ],
+            tree: view.formatTree()
+        }, {
+            buttonLabel: 'Save',
+            givenType: Button,
+            hostButton: undefined,
+            renders: [ 1, 0, 0 ],
+            tree: 'Parent\n  Shell\n    Button\n      #empty'
+        });
+        scope.assert(assertUnexecutedPassThrough, shell, [ Button ]);
+
+        return scope.assert.collect();
+    }),
+    test('searches nested children handed to unexecuted components', function (scope) {
+        const view = introspect(React.createElement(NestedGivenPage), {
+            strictMode: false
+        });
+        const form = requireValue(view.find(Form));
+
+        scope.assert.deepEqual({
+            formPath: form.path,
+            formSpans: form.findAll('span').length,
+            hostOutput: [ view.find('main'), view.find('form') ],
+            label: view.find(PlainLabel)?.path,
+            tree: view.formatTree()
+        }, {
+            formPath: 'NestedGivenPage > PageLayout[0] > Form[0]',
+            formSpans: 2,
+            hostOutput: [ undefined, undefined ],
+            label: 'NestedGivenPage > PageLayout[0] > Form[0] > PlainLabel[0]',
+            tree: [
+                'NestedGivenPage',
+                '  PageLayout',
+                '    Form',
+                '      PlainLabel',
+                '        #empty',
+                '      span',
+                '        #text',
+                '      span',
+                '        #text'
+            ]
+                .join('\n')
+        });
 
         return scope.assert.collect();
     }),
@@ -225,7 +303,7 @@ export const testNode = suite('execution shallow function components', [
         scope.assert.equal(counts.readButtonRenders(), 0);
         scope.assert.equal(requireValue(view.find(Shell)).renderedChildren.status, 'rendered');
         scope.assert.equal(button.props.label, 'Save');
-        scope.assert(assertNotRendered, button);
+        scope.assert(assertUnexecutedPassThrough, button, [ '#empty' ]);
 
         return scope.assert.collect();
     }),

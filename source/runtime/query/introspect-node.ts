@@ -105,7 +105,7 @@ export function createIntrospectionNode(
     }
 
     function readRenderedChildren(): RuntimeRenderedChildren {
-        if (node.renderedReason !== undefined) {
+        if (node.renderedReason !== undefined && node.renderedReason !== 'depth') {
             return {
                 reason: node.renderedReason,
                 status: 'notRendered'
