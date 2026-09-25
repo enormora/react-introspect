@@ -195,9 +195,7 @@ const snapshotOperations = {
             ...childrenRequest,
             givenChildrenResult
         });
-        const renderedChildren = request.element.renderedReason === undefined
-            ? renderedChildrenResult.nodes
-            : Object.freeze([]);
+        const renderedChildren = renderedChildrenResult.nodes;
         const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildrenResult.nodes;
 
         return pushSnapshotNode(renderedChildrenResult.build, {
@@ -238,6 +236,10 @@ const snapshotOperations = {
             });
     },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): ChildSnapshotsResult {
+        if (request.element.renderedReason === 'depth') {
+            return request.givenChildrenResult;
+        }
+
         if (request.element.renderedReason !== undefined) {
             return {
                 build: request.givenChildrenResult.build,
