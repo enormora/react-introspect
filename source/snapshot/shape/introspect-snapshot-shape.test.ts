@@ -31,11 +31,13 @@ function createTextNode(textContent: string): SnapshotNode {
     };
 }
 
-function NamedComponent(): React.ReactNode {
-    return null;
+function createShownComponent(): () => React.ReactNode {
+    return Object.assign(function ComponentWithDisplayName(): React.ReactNode {
+        return null;
+    }, {
+        displayName: 'ShownComponent'
+    });
 }
-
-Reflect.set(NamedComponent, 'displayName', 'ShownComponent');
 
 export const testNode = suite('introspection snapshot shape', [
     test('derives text, public props, paths, and element kinds', function (scope) {
@@ -68,16 +70,25 @@ export const testNode = suite('introspection snapshot shape', [
         return scope.assert.collect();
     }),
     test('marks component children as not rendered at shallow depth', function (scope) {
+        const shownComponent = createShownComponent();
         const child = createTextNode('child');
         const hostState = getElementChildrenState('button', [ child ]);
-        const componentState = getElementChildrenState(NamedComponent, [ child ]);
+        const componentState = getElementChildrenState(shownComponent, [ child ]);
 
-        scope.assert.equal(hostState.renderedChildren.length, 1);
-        scope.assert.equal(hostState.renderedReason, undefined);
-        scope.assert.equal(componentState.renderedChildren.length, 0);
-        scope.assert.equal(componentState.renderedReason, 'depth');
-        scope.assert.equal(componentState.textContent, 'child');
-        scope.assert.equal(getTypeName(NamedComponent), 'ShownComponent');
+        scope.assert.deepEqual({
+            componentRenderedChildren: componentState.renderedChildren.length,
+            componentRenderedReason: componentState.renderedReason,
+            componentTextContent: componentState.textContent,
+            hostRenderedChildren: hostState.renderedChildren.length,
+            hostRenderedReason: hostState.renderedReason
+        }, {
+            componentRenderedChildren: 0,
+            componentRenderedReason: 'depth',
+            componentTextContent: 'child',
+            hostRenderedChildren: 1,
+            hostRenderedReason: undefined
+        });
+        scope.assert.equal(getTypeName(shownComponent), 'ShownComponent');
 
         return scope.assert.collect();
     })

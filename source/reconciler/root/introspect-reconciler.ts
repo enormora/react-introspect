@@ -1,6 +1,5 @@
-import * as timers from 'node:timers';
-import React from 'react';
-import createReconciler from 'react-reconciler';
+import type React from 'react';
+import createReconciler, { type ReconcilerRoot } from 'react-reconciler';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-frame-contract.ts';
 import {
@@ -29,6 +28,15 @@ import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.ts';
+import {
+    cancelIntrospectionTimeout,
+    enterIntrospectionRuntime,
+    readIntrospectionEventTimestamp,
+    runWithIntrospectionRuntime,
+    scheduleIntrospectionMicrotask,
+    scheduleIntrospectionTimeout
+} from './introspect-reconciler-runtime.ts';
 
 type Waiter = {
     readonly predicate: () => boolean;
@@ -42,6 +50,7 @@ type IntrospectionReconcilerRootOptions = {
     readonly idPrefix: string;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly refs: IntrospectionRefs | undefined;
+    readonly runtime: IntrospectionRuntimeDependencies;
     readonly strictMode: boolean;
     readonly waitTimeout: number;
 };
@@ -57,7 +66,6 @@ export type IntrospectionReconcilerRoot = {
 };
 
 const defaultEventPriority = 32;
-const reactActEnvironmentKey = 'IS_REACT_ACT_ENVIRONMENT';
 
 function noop(): void {
     return undefined;
@@ -83,96 +91,98 @@ function prepareForCommit(): null {
     return null;
 }
 
-const introspectionReconcilerHostConfig = {
-    NotPendingTransition: null,
-    HostTransitionContext: {
-        _currentValue: null,
-        _currentValue2: null
-    },
-    appendChild,
-    appendChildToContainer: appendChild,
-    appendInitialChild: appendChild,
-    applyViewTransitionName: noop,
-    beforeActiveInstanceBlur: noop,
-    cancelTimeout: timers.clearTimeout,
-    cancelRootViewTransitionName: noop,
-    cancelViewTransitionName: noop,
-    clearActivityBoundary: noop,
-    clearActivityBoundaryFromContainer: noop,
-    clearContainer,
-    clearSuspenseBoundary: noop,
-    commitMount: noop,
-    commitTextUpdate(instance: IntrospectionTextInstance, _oldText: string, newText: string) {
-        instance.writeText(newText);
-    },
-    commitUpdate(
-        instance: IntrospectionHostInstance,
-        _type: string,
-        _oldProps: IntrospectionHostProps,
-        newProps: IntrospectionHostProps
-    ) {
-        instance.writeProps(newProps);
-        instance.refreshPublicInstance(newProps);
-    },
-    createInstance: createHostInstance,
-    createTextInstance,
-    detachDeletedInstance: noop,
-    finalizeInitialChildren: alwaysFalse,
-    getChildHostContext,
-    getCurrentUpdatePriority: getDefaultEventPriority,
-    getPublicInstance(instance: IntrospectionHostInstance) {
-        return instance.readPublicInstance();
-    },
-    getRootHostContext,
-    hideInstance,
-    hideTextInstance,
-    insertBefore,
-    insertInContainerBefore: insertBefore,
-    isPrimaryRenderer: false,
-    isSuspenseInstanceFallback: alwaysFalse,
-    isSuspenseInstancePending: alwaysFalse,
-    maySuspendCommit: alwaysFalse,
-    maySuspendCommitInSyncRender: alwaysFalse,
-    maySuspendCommitOnUpdate: alwaysFalse,
-    noTimeout: -1,
-    prepareForCommit,
-    preparePortalMount: noop,
-    removeChild: removeHostChild.bind(undefined),
-    removeChildFromContainer: removeHostChild.bind(undefined),
-    resetAfterCommit: publishContainerSnapshot,
-    resetFormInstance: noop,
-    resolveEventTimeStamp: Date.now,
-    resolveEventType: returnNull,
-    resolveUpdatePriority: getDefaultEventPriority,
-    restoreRootViewTransitionName: noop,
-    restoreViewTransitionName: noop,
-    scheduleMicrotask: queueMicrotask,
-    scheduleTimeout: timers.setTimeout,
-    setCurrentUpdatePriority: noop,
-    shouldAttemptEagerTransition: alwaysFalse,
-    shouldSetTextContent: alwaysFalse,
-    startSuspendingCommit: noop,
-    stopViewTransition: noop,
-    supportsHydration: false,
-    supportsMicrotasks: true,
-    supportsMutation: true,
-    supportsPersistence: false,
-    supportsTestSelectors: false,
-    suspendInstance: noop,
-    suspendOnActiveViewTransition: alwaysFalse,
-    trackSchedulerEvent: noop,
-    unhideInstance,
-    unhideTextInstance,
-    waitForCommitToBeReady: returnNull
-};
+function createIntrospectionReconcilerHostConfig(): unknown {
+    return {
+        NotPendingTransition: null,
+        HostTransitionContext: {
+            _currentValue: null,
+            _currentValue2: null
+        },
+        appendChild,
+        appendChildToContainer: appendChild,
+        appendInitialChild: appendChild,
+        applyViewTransitionName: noop,
+        beforeActiveInstanceBlur: noop,
+        cancelTimeout: cancelIntrospectionTimeout,
+        cancelRootViewTransitionName: noop,
+        cancelViewTransitionName: noop,
+        clearActivityBoundary: noop,
+        clearActivityBoundaryFromContainer: noop,
+        clearContainer,
+        clearSuspenseBoundary: noop,
+        commitMount: noop,
+        commitTextUpdate(instance: IntrospectionTextInstance, _oldText: string, newText: string) {
+            instance.writeText(newText);
+        },
+        commitUpdate(
+            instance: IntrospectionHostInstance,
+            _type: string,
+            _oldProps: IntrospectionHostProps,
+            newProps: IntrospectionHostProps
+        ) {
+            instance.writeProps(newProps);
+            instance.refreshPublicInstance(newProps);
+        },
+        createInstance: createHostInstance,
+        createTextInstance,
+        detachDeletedInstance: noop,
+        finalizeInitialChildren: alwaysFalse,
+        getChildHostContext,
+        getCurrentUpdatePriority: getDefaultEventPriority,
+        getPublicInstance(instance: IntrospectionHostInstance) {
+            return instance.readPublicInstance();
+        },
+        getRootHostContext,
+        hideInstance,
+        hideTextInstance,
+        insertBefore,
+        insertInContainerBefore: insertBefore,
+        isPrimaryRenderer: false,
+        isSuspenseInstanceFallback: alwaysFalse,
+        isSuspenseInstancePending: alwaysFalse,
+        maySuspendCommit: alwaysFalse,
+        maySuspendCommitInSyncRender: alwaysFalse,
+        maySuspendCommitOnUpdate: alwaysFalse,
+        noTimeout: -1,
+        prepareForCommit,
+        preparePortalMount: noop,
+        removeChild: removeHostChild.bind(undefined),
+        removeChildFromContainer: removeHostChild.bind(undefined),
+        resetAfterCommit: publishContainerSnapshot,
+        resetFormInstance: noop,
+        resolveEventTimeStamp: readIntrospectionEventTimestamp,
+        resolveEventType: returnNull,
+        resolveUpdatePriority: getDefaultEventPriority,
+        restoreRootViewTransitionName: noop,
+        restoreViewTransitionName: noop,
+        scheduleMicrotask: scheduleIntrospectionMicrotask,
+        scheduleTimeout: scheduleIntrospectionTimeout,
+        setCurrentUpdatePriority: noop,
+        shouldAttemptEagerTransition: alwaysFalse,
+        shouldSetTextContent: alwaysFalse,
+        startSuspendingCommit: noop,
+        stopViewTransition: noop,
+        supportsHydration: false,
+        supportsMicrotasks: true,
+        supportsMutation: true,
+        supportsPersistence: false,
+        supportsTestSelectors: false,
+        suspendInstance: noop,
+        suspendOnActiveViewTransition: alwaysFalse,
+        trackSchedulerEvent: noop,
+        unhideInstance,
+        unhideTextInstance,
+        waitForCommitToBeReady: returnNull
+    };
+}
 
-const renderer = createReconciler(introspectionReconcilerHostConfig);
+const renderer = createReconciler(createIntrospectionReconcilerHostConfig());
 
 function createReconcilerContainer(
     container: IntrospectionHostContainer,
     diagnostics: IntrospectionDiagnostics,
     strictMode: boolean
-): Record<string, unknown> {
+): ReconcilerRoot {
     return renderer.createContainer(
         container,
         1,
@@ -185,28 +195,6 @@ function createReconcilerContainer(
         diagnostics.recordRecoverableError,
         null
     );
-}
-
-function actNow(action: () => unknown): unknown {
-    const results = new Set<unknown>();
-    const hadActEnvironment = Object.hasOwn(globalThis, reactActEnvironmentKey);
-    const previousActEnvironment: unknown = Reflect.get(globalThis, reactActEnvironmentKey);
-
-    Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-    try {
-        React.act(function runAction() {
-            results.add(action());
-        });
-    } finally {
-        if (hadActEnvironment) {
-            Reflect.set(globalThis, reactActEnvironmentKey, previousActEnvironment);
-        } else {
-            Reflect.deleteProperty(globalThis, reactActEnvironmentKey);
-        }
-    }
-
-    return results.values().next().value;
 }
 
 type IntrospectionReconcilerState = {
@@ -280,7 +268,10 @@ function createIntrospectionReconcilerSession(
         }
     });
     const container = createSessionContainer(options, state);
-    const root = createReconcilerContainer(container, options.diagnostics, options.strictMode);
+    enterIntrospectionRuntime(options.runtime);
+    const root = runWithIntrospectionRuntime(options.runtime, function createContainerWithRuntime() {
+        return createReconcilerContainer(container, options.diagnostics, options.strictMode);
+    });
 
     return Object.freeze({
         container,
@@ -292,22 +283,28 @@ function createIntrospectionReconcilerSession(
 
 function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
     return session.options.diagnostics.run(function actWithDiagnostics() {
-        return actNow(function runAction() {
-            const result = action();
+        return runWithIntrospectionRuntime(session.options.runtime, function actWithRuntime() {
+            return session.options.runtime.actEnvironment.act(function runAction() {
+                const result = action();
 
-            renderer.flushSyncWork();
-            renderer.flushPassiveEffects();
+                renderer.flushSyncWork();
+                renderer.flushPassiveEffects();
 
-            return result;
+                return result;
+            });
         });
     });
 }
 
 async function waitForIdleSession(session: IntrospectionReconcilerSession): Promise<void> {
     await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-        await Promise.resolve();
-        renderer.flushPassiveEffects();
-        settleWaiters(session.state);
+        await runWithIntrospectionRuntime(session.options.runtime, async function flushMicrotasksWithRuntime() {
+            await session.options.runtime.microtasks.flush();
+        });
+        runWithIntrospectionRuntime(session.options.runtime, function flushWithRuntime() {
+            renderer.flushPassiveEffects();
+            settleWaiters(session.state);
+        });
     });
 }
 
@@ -391,9 +388,12 @@ function renderRootElement(
     session: IntrospectionReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
-    actNow(function renderElement() {
-        updateRootElement(session, element);
-        renderer.flushPassiveEffects();
+    runWithIntrospectionRuntime(session.options.runtime, function renderWithRuntime() {
+        session.options.runtime.actEnvironment.act(function renderElement() {
+            updateRootElement(session, element);
+            renderer.flushSyncWork();
+            renderer.flushPassiveEffects();
+        });
     });
 }
 

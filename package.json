@@ -21,6 +21,7 @@
     "author": "Mathias Schreck <schreck.mathias@gmail.com>",
     "type": "module",
     "dependencies": {
+        "@enormora/clock": "0.0.2",
         "@types/react": "19.3.0",
         "react-reconciler": "0.34.0",
         "tslib": "2.8.1"

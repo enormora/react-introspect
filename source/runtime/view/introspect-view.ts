@@ -5,9 +5,16 @@ import {
     type IntrospectionDiagnosticsOptions
 } from '../../diagnostics/introspect-diagnostics.ts';
 import { createIntrospectionRenderElement } from '../../render/frame/introspect-frame.ts';
-import { createIntrospectionList } from '../query/introspect-list.ts';
-import { createIntrospectionListLocator, createIntrospectionLocator } from '../query/introspect-locator.ts';
-import { createIntrospectionNode, type SnapshotReader } from '../query/introspect-node.ts';
+import {
+    createIntrospectionListLocator,
+    createIntrospectionLocator
+} from '../query/introspect-locator.ts';
+import {
+    createIntrospectionNode,
+    createIntrospectionNodeList,
+    findIntrospectionNodes,
+    type SnapshotReader
+} from '../query/introspect-node.ts';
 import { createIntrospectionReconcilerRoot } from '../../reconciler/root/introspect-reconciler.ts';
 import type {
     RuntimeIntrospectionList,
@@ -15,12 +22,13 @@ import type {
     RuntimeIntrospectionOptions,
     RuntimeIntrospectionView
 } from '../types/introspect-runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from '../query/introspect-selector.ts';
 import {
-    createEmptyIntrospectionSnapshot,
-    type IntrospectionSnapshot,
-    type SnapshotNode
+    createEmptyIntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import {
+    createUnitRuntimeDependencies,
+    type IntrospectionRuntimeDependencies
+} from './introspect-runtime-dependencies.ts';
 
 const defaultWaitTimeout = 1000;
 const isolatedConsoleDiagnostics: IntrospectionConsoleDiagnostics = Object.freeze({
@@ -45,31 +53,11 @@ function diagnosticsOptions(options: RuntimeIntrospectionOptions): Introspection
     };
 }
 
-function nodeList(
-    reader: SnapshotReader,
-    snapshot: IntrospectionSnapshot,
-    nodes: readonly SnapshotNode[]
-): RuntimeIntrospectionList {
-    return createIntrospectionList(nodes.map(function createNode(node) {
-        return createIntrospectionNode(reader, snapshot, node);
-    }));
-}
-
-function snapshotTreeNodes(snapshot: IntrospectionSnapshot): readonly SnapshotNode[] {
-    function collect(node: SnapshotNode): readonly SnapshotNode[] {
-        return [
-            node,
-            ...node.renderedChildren.flatMap(collect)
-        ];
-    }
-
-    return snapshot.root === undefined ? Object.freeze([]) : collect(snapshot.root);
-}
-
 export function createIntrospectionView(
     element: React.ReactElement,
     options: RuntimeIntrospectionOptions = {},
-    consoleDiagnostics: IntrospectionConsoleDiagnostics = isolatedConsoleDiagnostics
+    consoleDiagnostics: IntrospectionConsoleDiagnostics = isolatedConsoleDiagnostics,
+    runtimeDependencies: IntrospectionRuntimeDependencies = createUnitRuntimeDependencies()
 ): RuntimeIntrospectionView {
     let currentSnapshot = createEmptyIntrospectionSnapshot(0);
     const depth = options.depth ?? 1;
@@ -85,6 +73,7 @@ export function createIntrospectionView(
                 currentSnapshot = snapshot;
             },
             refs: options.refs,
+            runtime: runtimeDependencies,
             strictMode: options.strictMode ?? true,
             waitTimeout: options.waitTimeout ?? defaultWaitTimeout
         });
@@ -105,16 +94,7 @@ export function createIntrospectionView(
     }
 
     function findAll(selector: unknown): RuntimeIntrospectionList {
-        const normalizedSelector = toSelector(selector);
-        const nodes = snapshotTreeNodes(currentSnapshot)
-            .map(function createNode(node) {
-                return createIntrospectionNode(state, currentSnapshot, node);
-            })
-            .filter(function isMatch(node) {
-                return nodeMatchesSelector(node, normalizedSelector);
-            });
-
-        return createIntrospectionList(nodes);
+        return findIntrospectionNodes(state, currentSnapshot, selector);
     }
 
     const view: RuntimeIntrospectionView = Object.freeze({
@@ -133,9 +113,7 @@ export function createIntrospectionView(
         get renderedChildren() {
             const { root } = currentSnapshot;
 
-            return root === undefined
-                ? createIntrospectionList([])
-                : nodeList(state, currentSnapshot, root.renderedChildren);
+            return createIntrospectionNodeList(state, currentSnapshot, root?.renderedChildren ?? []);
         },
         get root() {
             return rootNode();
