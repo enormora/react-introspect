@@ -31,6 +31,6 @@ expect(view.locate('button').pickProps([ 'title' ])).type.toBe<Pick<HostSchema['
 expect(view.locate('button').props).type.toBe<HostSchema['button'] | undefined>();
 expect(view.locate('button').type).type.toBe<'button' | undefined>();
 expect(view.locate('button').pickProps).type.not.toBeCallableWith([ 'missing' ]);
-expect({ depthFrom: MemoPage }).type.toBeAssignableTo<IntrospectionOptions>();
+expect({ depthFrom: Page, transparent: [ MemoPage ] }).type.toBeAssignableTo<IntrospectionOptions>();
 expect({ depthFrom: 'main' }).type.not.toBeAssignableTo<IntrospectionOptions>();
-expect({ depthFrom: Page }).type.toBeAssignableTo<IntrospectionOptions>();
+expect({ transparent: [ 'section' ] }).type.not.toBeAssignableTo<IntrospectionOptions>();

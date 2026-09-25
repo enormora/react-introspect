@@ -126,6 +126,7 @@ Options:
 | `refs`        | none        | Injects fake host ref nodes.                                             |
 | `waitTimeout` | `1000`      | Default timeout for wait APIs.                                           |
 | `strictMode`  | `true`      | Wraps the React Introspect root in `React.StrictMode`.                   |
+| `transparent` | `[]`        | Components that execute without consuming `depth`.                       |
 | `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.                 |
 
 View properties are lazy views of the latest committed snapshot.
@@ -903,7 +904,20 @@ assert.equal(card.props.theme, 'dark');
 
 Every executed component consumes one level of `depth`. Wrappers from the test harness would eat that budget.
 
-Use `depthFrom` to count `depth` from the component under test.
+Use `transparent` for wrappers you own.
+
+```tsx
+const view = introspect(
+    <ThemeProvider>
+        <SettingsPage />
+    </ThemeProvider>,
+    { transparent: [ ThemeProvider ] }
+);
+```
+
+`ThemeProvider` executes, `SettingsPage` executes, and its children stay leaves.
+
+Use `depthFrom` when the wrapper renders components you cannot name, such as router internals.
 
 ```tsx
 const view = introspect(<RouterProvider router={router} />, {

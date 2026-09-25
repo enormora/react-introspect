@@ -282,7 +282,7 @@ function transformComponentElement(
 ): React.ReactElement {
     const componentDepth = enterComponentDepth(depth, element.type);
 
-    if (canExecuteComponent(componentDepth) && isExecutableComponentType(element.type)) {
+    if (canExecuteComponent(componentDepth, element.type) && isExecutableComponentType(element.type)) {
         return frameFactory(element, componentDepth);
     }
 
@@ -412,7 +412,7 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
         createComponentMetadata(props.element, undefined),
         props.transformNode(
             executeIntrospectionFrameElement(props.element),
-            nextDepth(props.depth),
+            nextDepth(props.depth, props.element.type),
             props.createFrameElement
         )
     );

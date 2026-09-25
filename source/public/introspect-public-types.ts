@@ -27,6 +27,7 @@ export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = In
     readonly idPrefix?: string | undefined;
     readonly refs?: IntrospectionRefs<HostSchema> | undefined;
     readonly strictMode?: boolean;
+    readonly transparent?: readonly IntrospectionComponentType[];
     readonly waitTimeout?: number;
     readonly warningMode?: 'capture' | 'ignore' | 'throw';
 };

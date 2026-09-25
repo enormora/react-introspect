@@ -70,7 +70,7 @@ export const testNode = suite('introspection frame contract', [
     }),
     test('decrements numeric depth and preserves full depth', function (scope) {
         function readNextBudget(budget: number | 'full'): number | 'full' {
-            return nextDepth(createFrameDepth({ budget, depthFrom: undefined })).budget;
+            return nextDepth(createFrameDepth({ budget, depthFrom: undefined, transparent: [] }), 'span').budget;
         }
 
         scope.assert.equal(readNextBudget('full'), 'full');

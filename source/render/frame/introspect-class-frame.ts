@@ -423,7 +423,7 @@ const IntrospectionClassFrameBase = class
         if (shouldRender) {
             this.renderedNode = this.props.transformNode(
                 executeIntrospectionClassRender(instance),
-                nextDepth(this.props.depth),
+                nextDepth(this.props.depth, this.props.type),
                 this.props.createFrameElement
             );
         }

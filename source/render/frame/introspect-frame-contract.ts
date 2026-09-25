@@ -14,6 +14,7 @@ type IntrospectionDepthBudget = number | 'full';
 
 type IntrospectionDepthPolicy = {
     readonly depthFrom: unknown;
+    readonly transparent: ReadonlySet<unknown>;
 };
 
 export type IntrospectionFrameDepth = {
@@ -25,6 +26,7 @@ export type IntrospectionFrameDepth = {
 export type IntrospectionDepthOptions = {
     readonly budget: IntrospectionDepthBudget;
     readonly depthFrom: unknown;
+    readonly transparent: readonly unknown[];
 };
 
 export type IntrospectionElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
@@ -86,7 +88,8 @@ export function createFrameDepth(options: IntrospectionDepthOptions): Introspect
         budget: options.budget,
         counting: options.depthFrom === undefined,
         policy: Object.freeze({
-            depthFrom: options.depthFrom
+            depthFrom: options.depthFrom,
+            transparent: new Set(options.transparent)
         })
     });
 }
@@ -95,12 +98,16 @@ export function enterComponentDepth(depth: IntrospectionFrameDepth, type: unknow
     return !depth.counting && type === depth.policy.depthFrom ? Object.freeze({ ...depth, counting: true }) : depth;
 }
 
-export function canExecuteComponent(depth: IntrospectionFrameDepth): boolean {
-    return !depth.counting || depth.budget === 'full' || depth.budget > 0;
+function consumesDepth(depth: IntrospectionFrameDepth, type: unknown): boolean {
+    return depth.counting && !depth.policy.transparent.has(type);
 }
 
-export function nextDepth(depth: IntrospectionFrameDepth): IntrospectionFrameDepth {
-    if (!depth.counting || depth.budget === 'full') {
+export function canExecuteComponent(depth: IntrospectionFrameDepth, type: unknown): boolean {
+    return !consumesDepth(depth, type) || depth.budget === 'full' || depth.budget > 0;
+}
+
+export function nextDepth(depth: IntrospectionFrameDepth, type: unknown): IntrospectionFrameDepth {
+    if (!consumesDepth(depth, type) || depth.budget === 'full') {
         return depth;
     }
 

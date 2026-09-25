@@ -65,7 +65,8 @@ function createIntrospectionViewWithDependencies(
     let currentSnapshot = createEmptyIntrospectionSnapshot(0);
     const depth = createFrameDepth({
         budget: options.depth ?? 1,
-        depthFrom: options.depthFrom
+        depthFrom: options.depthFrom,
+        transparent: options.transparent ?? []
     });
     const idPrefix = options.idPrefix ?? createDefaultIdPrefix();
     const diagnostics = createIntrospectionDiagnostics(diagnosticsOptions(options), dependencies.consoleDiagnostics);

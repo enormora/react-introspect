@@ -420,6 +420,23 @@ export const testNode = suite('execution shallow function components', [
 
         return scope.assert.collect();
     }),
+    test('executes transparent components without consuming depth', function (scope) {
+        const { Button, log, Page, Theme } = createAnchoredComponents();
+        const view = introspect(React.createElement(Theme, null, React.createElement(Page)), {
+            strictMode: false,
+            transparent: [ Theme ]
+        });
+
+        scope.assert.deepEqual({
+            button: view.find(Button)?.state.reason,
+            rendered: log.rendered()
+        }, {
+            button: 'depth',
+            rendered: [ 'Theme', 'Page', 'Theme' ]
+        });
+
+        return scope.assert.collect();
+    }),
     test('executes all function boundaries at full depth', function (scope) {
         const { counts, Parent } = createDepthComponents();
         const view = introspect(React.createElement(Parent), {
@@ -509,7 +526,7 @@ export const testNode = suite('execution shallow function components', [
             function () {
                 createIntrospectionRenderElement(
                     invalidElement,
-                    createFrameDepth({ budget: 1, depthFrom: undefined })
+                    createFrameDepth({ budget: 1, depthFrom: undefined, transparent: [] })
                 );
             },
             { message: 'Introspection expected React element props to be an object.' }
@@ -552,7 +569,7 @@ export const testNode = suite('execution shallow function components', [
                 { fallback: React.createElement('em', null, 'loading') },
                 React.createElement('span', null, 'ready')
             ),
-            createFrameDepth({ budget: 'full', depthFrom: undefined })
+            createFrameDepth({ budget: 'full', depthFrom: undefined, transparent: [] })
         );
         const suspenseProps = suspense.props as Readonly<Record<PropertyKey, unknown>>;
         const lazyView = introspect(React.createElement(LazyLabel, { label: 'lazy' }), {
