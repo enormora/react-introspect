@@ -13,11 +13,19 @@ import {
     matchRefs as matchRefsImplementation
 } from './refs/introspect-ref.ts';
 import { createNodeConsoleDiagnostics } from './diagnostics/introspect-node-console-diagnostics.ts';
+import { createIntrospectionReconcilerModule } from './reconciler/root/introspect-reconciler.ts';
 import { createNodeRuntimeDependencies } from './runtime/view/introspect-node-runtime-dependencies.entry-point.ts';
-import { createIntrospectionView } from './runtime/view/introspect-view.ts';
+import { createIntrospectionViewModule } from './runtime/view/introspect-view.ts';
 
 const nodeConsoleDiagnostics = createNodeConsoleDiagnostics(diagnosticsChannel);
 const runtimeDependencies = createNodeRuntimeDependencies();
+const reconciler = createIntrospectionReconcilerModule({
+    runtime: runtimeDependencies
+});
+const introspectionView = createIntrospectionViewModule({
+    consoleDiagnostics: nodeConsoleDiagnostics,
+    reconciler
+});
 
 export type {
     GivenChildren,
@@ -46,7 +54,7 @@ export function introspect<HostSchema extends Record<string, unknown> = Record<s
     options?: IntrospectionOptions<HostSchema>
 ): IntrospectionView<HostSchema>;
 export function introspect(element: React.ReactElement, options: IntrospectionOptions = {}): unknown {
-    return createIntrospectionView(element, options, nodeConsoleDiagnostics, runtimeDependencies);
+    return introspectionView.createView(element, options);
 }
 
 export const createFakeRefNode: <Node>(node: Node) => IntrospectionFakeRefNode<Node> = createFakeRefNodeImplementation;

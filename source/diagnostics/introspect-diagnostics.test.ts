@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
-import { createIntrospectionView as introspect } from '../runtime/view/introspect-view.ts';
+import { createUnitIntrospectionView as introspect } from '../runtime/view/introspect-unit-view.test.ts';
 import {
     createIntrospectionDiagnostics,
     type IntrospectionConsoleDiagnostics,

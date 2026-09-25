@@ -2,7 +2,7 @@ import { suite, test } from '@overkill-dev/test';
 import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionOptions, IntrospectionView } from '../../public/introspect-public-types.ts';
-import { createIntrospectionView } from '../../runtime/view/introspect-view.ts';
+import { createUnitIntrospectionView } from '../../runtime/view/introspect-unit-view.test.ts';
 import type { IntrospectionSnapshot, SnapshotNode } from './introspect-snapshot-contract.ts';
 
 type WidgetProps = React.PropsWithChildren<{
@@ -19,7 +19,7 @@ function introspect(
     element: React.ReactElement,
     options: IntrospectionOptions
 ): IntrospectionView {
-    return createIntrospectionView(element, options) as IntrospectionView;
+    return createUnitIntrospectionView(element, options) as IntrospectionView;
 }
 
 function Widget(props: WidgetProps): React.ReactNode {

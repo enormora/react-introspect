@@ -6,7 +6,7 @@ import type {
     IntrospectionOptions,
     IntrospectionView
 } from '../../public/introspect-public-types.ts';
-import { createIntrospectionView } from '../../runtime/view/introspect-view.ts';
+import { createUnitIntrospectionView } from '../../runtime/view/introspect-unit-view.test.ts';
 import {
     createIdNormalizer,
     normalizeSnapshotValue
@@ -24,7 +24,7 @@ function introspect<HostSchema extends Record<string, unknown>>(
     element: React.ReactElement,
     options: IntrospectionOptions<HostSchema>
 ): IntrospectionView<HostSchema> {
-    return createIntrospectionView(element, options) as IntrospectionView<HostSchema>;
+    return createUnitIntrospectionView(element, options) as IntrospectionView<HostSchema>;
 }
 
 type IdLabelProps = {
