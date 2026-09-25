@@ -4,6 +4,7 @@ import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 import {
+    createFrameDepth,
     isIntrospectionRenderError,
     introspectionComponentHostType,
     throwIntrospectionRenderError
@@ -177,6 +178,77 @@ function Wrapper(): React.ReactNode {
     );
 }
 
+type RenderLog = {
+    readonly record: (name: string) => void;
+    readonly rendered: () => readonly string[];
+};
+
+type AnchoredComponents = {
+    readonly Button: React.FC<ButtonProps>;
+    readonly Harness: React.FC<React.PropsWithChildren>;
+    readonly log: RenderLog;
+    readonly Page: React.FC;
+    readonly Theme: React.FC<React.PropsWithChildren>;
+};
+
+type NestedPageProps = {
+    readonly level: number;
+};
+
+function createRenderLog(): RenderLog {
+    const names: string[] = [];
+
+    return {
+        record(name) {
+            names.push(name);
+        },
+        rendered() {
+            return Object.freeze(Array.from(names));
+        }
+    };
+}
+
+function createAnchoredComponents(): AnchoredComponents {
+    const log = createRenderLog();
+    const Button: React.FC<ButtonProps> = function Button(props) {
+        log.record('Button');
+
+        return React.createElement('button', null, props.label);
+    };
+    const Theme: React.FC<React.PropsWithChildren> = function Theme(props): React.ReactNode {
+        log.record('Theme');
+
+        return props.children;
+    };
+    const Page: React.FC = function Page() {
+        log.record('Page');
+
+        return React.createElement(Theme, null, React.createElement(Button, { label: 'Save' }));
+    };
+    const RouterInternals: React.FC<React.PropsWithChildren> = function RouterInternals(props): React.ReactNode {
+        log.record('RouterInternals');
+
+        return props.children;
+    };
+    const Harness: React.FC<React.PropsWithChildren> = function Harness(props) {
+        log.record('Harness');
+
+        return React.createElement(RouterInternals, null, props.children);
+    };
+
+    return { Button, Harness, log, Page, Theme };
+}
+
+function createNestedPage(log: RenderLog): React.FC<NestedPageProps> {
+    const NestedPage: React.FC<NestedPageProps> = function NestedPage(props): React.ReactNode {
+        log.record(`NestedPage${props.level}`);
+
+        return props.level < 2 ? React.createElement(NestedPage, { level: props.level + 1 }) : null;
+    };
+
+    return NestedPage;
+}
+
 function catchThrown(value: unknown): void {
     try {
         throwIntrospectionRenderError(value);
@@ -307,6 +379,47 @@ export const testNode = suite('execution shallow function components', [
 
         return scope.assert.collect();
     }),
+    test('counts depth from the first instance of the depthFrom component', function (scope) {
+        const { Harness, log, Page } = createAnchoredComponents();
+
+        introspect(React.createElement(Harness, null, React.createElement(Page)), {
+            depthFrom: Page,
+            strictMode: false
+        });
+
+        scope.assert.deepEqual(log.rendered(), [ 'Harness', 'RouterInternals', 'Page' ]);
+
+        return scope.assert.collect();
+    }),
+    test('does not restart depth counting at nested depthFrom instances', function (scope) {
+        const log = createRenderLog();
+        const NestedPage = createNestedPage(log);
+
+        introspect(React.createElement(NestedPage, { level: 0 }), {
+            depth: 2,
+            depthFrom: NestedPage,
+            strictMode: false
+        });
+
+        scope.assert.deepEqual(log.rendered(), [ 'NestedPage0', 'NestedPage1' ]);
+
+        return scope.assert.collect();
+    }),
+    test('executes the whole tree when the depthFrom component never renders', function (scope) {
+        const { Harness, log, Page } = createAnchoredComponents();
+        const Missing: React.FC = function Missing() {
+            return null;
+        };
+
+        introspect(React.createElement(Harness, null, React.createElement(Page)), {
+            depthFrom: Missing,
+            strictMode: false
+        });
+
+        scope.assert.deepEqual(log.rendered(), [ 'Harness', 'RouterInternals', 'Page', 'Theme', 'Button' ]);
+
+        return scope.assert.collect();
+    }),
     test('executes all function boundaries at full depth', function (scope) {
         const { counts, Parent } = createDepthComponents();
         const view = introspect(React.createElement(Parent), {
@@ -394,7 +507,10 @@ export const testNode = suite('execution shallow function components', [
 
         scope.assert.throws(
             function () {
-                createIntrospectionRenderElement(invalidElement, 1);
+                createIntrospectionRenderElement(
+                    invalidElement,
+                    createFrameDepth({ budget: 1, depthFrom: undefined })
+                );
             },
             { message: 'Introspection expected React element props to be an object.' }
         );
@@ -436,7 +552,7 @@ export const testNode = suite('execution shallow function components', [
                 { fallback: React.createElement('em', null, 'loading') },
                 React.createElement('span', null, 'ready')
             ),
-            'full'
+            createFrameDepth({ budget: 'full', depthFrom: undefined })
         );
         const suspenseProps = suspense.props as Readonly<Record<PropertyKey, unknown>>;
         const lazyView = introspect(React.createElement(LazyLabel, { label: 'lazy' }), {

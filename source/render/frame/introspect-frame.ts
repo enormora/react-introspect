@@ -3,7 +3,9 @@ import { isClassComponent, readClassFrameType } from './introspect-class-frame.t
 import {
     createComponentHost,
     createComponentMetadata,
+    canExecuteComponent,
     createEmptyHost,
+    enterComponentDepth,
     nextDepth,
     type IntrospectionElement,
     introspectionElementKeyMetadata,
@@ -144,10 +146,6 @@ function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
     return readElementProps(element).mode === 'hidden' ? 'hidden' : 'visible';
 }
 
-function canExecute(depth: IntrospectionFrameDepth): boolean {
-    return depth === 'full' || depth > 0;
-}
-
 function createOpaqueHost(value: unknown): React.ReactElement {
     return React.createElement(introspectionOpaqueHostType, {
         [introspectionValueMetadata]: value
@@ -282,8 +280,10 @@ function transformComponentElement(
     depth: IntrospectionFrameDepth,
     frameFactory: IntrospectionFrameElementFactory
 ): React.ReactElement {
-    if (canExecute(depth) && isExecutableComponentType(element.type)) {
-        return frameFactory(element, depth);
+    const componentDepth = enterComponentDepth(depth, element.type);
+
+    if (canExecuteComponent(componentDepth) && isExecutableComponentType(element.type)) {
+        return frameFactory(element, componentDepth);
     }
 
     return createComponentHost(createComponentMetadata(element, 'depth'), createEmptyHost(undefined));

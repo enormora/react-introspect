@@ -10,7 +10,22 @@ export const introspectionComponentMetadata = '__reactIntrospectionComponentMeta
 export const introspectionElementKeyMetadata = '__reactIntrospectionElementKeyMetadata';
 export const introspectionValueMetadata = '__reactIntrospectionValueMetadata';
 
-export type IntrospectionFrameDepth = number | 'full';
+type IntrospectionDepthBudget = number | 'full';
+
+type IntrospectionDepthPolicy = {
+    readonly depthFrom: unknown;
+};
+
+export type IntrospectionFrameDepth = {
+    readonly budget: IntrospectionDepthBudget;
+    readonly counting: boolean;
+    readonly policy: IntrospectionDepthPolicy;
+};
+
+export type IntrospectionDepthOptions = {
+    readonly budget: IntrospectionDepthBudget;
+    readonly depthFrom: unknown;
+};
 
 export type IntrospectionElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
 
@@ -66,8 +81,30 @@ export function readElementRef(element: IntrospectionElement): unknown {
     return readElementProps(element).ref;
 }
 
+export function createFrameDepth(options: IntrospectionDepthOptions): IntrospectionFrameDepth {
+    return Object.freeze({
+        budget: options.budget,
+        counting: options.depthFrom === undefined,
+        policy: Object.freeze({
+            depthFrom: options.depthFrom
+        })
+    });
+}
+
+export function enterComponentDepth(depth: IntrospectionFrameDepth, type: unknown): IntrospectionFrameDepth {
+    return !depth.counting && type === depth.policy.depthFrom ? Object.freeze({ ...depth, counting: true }) : depth;
+}
+
+export function canExecuteComponent(depth: IntrospectionFrameDepth): boolean {
+    return !depth.counting || depth.budget === 'full' || depth.budget > 0;
+}
+
 export function nextDepth(depth: IntrospectionFrameDepth): IntrospectionFrameDepth {
-    return depth === 'full' ? depth : Math.max(0, depth - 1);
+    if (!depth.counting || depth.budget === 'full') {
+        return depth;
+    }
+
+    return Object.freeze({ ...depth, budget: Math.max(0, depth.budget - 1) });
 }
 
 export function createComponentMetadata(

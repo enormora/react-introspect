@@ -119,6 +119,7 @@ Options:
 | Option        | Default     | What it does                                                             |
 | ------------- | ----------- | ------------------------------------------------------------------------ |
 | `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.                    |
+| `depthFrom`   | none        | Starts counting `depth` at the first instance of this component.         |
 | `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.              |
 | `idPrefix`    | generated   | Prefix passed to React for `useId`.                                      |
 | `idGenerator` | none        | Rewrites React-generated ids in React Introspect snapshots after commit. |
@@ -897,6 +898,22 @@ const card = view.find(Card);
 assert.ok(card);
 assert.equal(card.props.theme, 'dark');
 ```
+
+### Harness wrappers and routers
+
+Every executed component consumes one level of `depth`. Wrappers from the test harness would eat that budget.
+
+Use `depthFrom` to count `depth` from the component under test.
+
+```tsx
+const view = introspect(<RouterProvider router={router} />, {
+    depthFrom: SettingsPage
+});
+```
+
+Everything above `SettingsPage` executes. On each branch, `depth` counts from the first `SettingsPage`. Nested instances do not restart the count.
+
+Components beside the path to `depthFrom`, such as a layout's header, also execute. If `depthFrom` never renders, the whole tree executes.
 
 ### Render props
 

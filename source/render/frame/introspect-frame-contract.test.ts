@@ -4,6 +4,7 @@ import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
+    createFrameDepth,
     introspectionComponentMetadata,
     introspectionValueMetadata,
     isIntrospectionRenderError,
@@ -68,9 +69,13 @@ export const testNode = suite('introspection frame contract', [
         return scope.assert.collect();
     }),
     test('decrements numeric depth and preserves full depth', function (scope) {
-        scope.assert.equal(nextDepth('full'), 'full');
-        scope.assert.equal(nextDepth(2), 1);
-        scope.assert.equal(nextDepth(0), 0);
+        function readNextBudget(budget: number | 'full'): number | 'full' {
+            return nextDepth(createFrameDepth({ budget, depthFrom: undefined })).budget;
+        }
+
+        scope.assert.equal(readNextBudget('full'), 'full');
+        scope.assert.equal(readNextBudget(2), 1);
+        scope.assert.equal(readNextBudget(0), 0);
 
         return scope.assert.collect();
     })

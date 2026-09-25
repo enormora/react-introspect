@@ -20,6 +20,7 @@ export type IntrospectionNodeState = {
 
 export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema> = {
     readonly depth?: number | 'full';
+    readonly depthFrom?: IntrospectionComponentType;
     readonly errorMode?: 'capture' | 'throw';
     readonly hostSchema?: HostSchema;
     readonly idGenerator?: ((generatedId: string) => string) | undefined;
@@ -33,6 +34,8 @@ export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = In
 export type IntrospectionHostSchema = Readonly<Record<string, unknown>>;
 
 export type IntrospectionNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
+
+type IntrospectionComponentType = React.ExoticComponent<never> | React.JSXElementConstructor<never>;
 
 export type IntrospectionNotRenderedReason = 'depth' | 'errored' | 'suspended' | 'unsupported';
 

@@ -1,3 +1,4 @@
+import type React from 'react';
 import { expect } from 'tstyche';
 import type {
     IntrospectionList,
@@ -14,6 +15,8 @@ type HostSchema = {
     };
 };
 
+declare const Page: React.FC<{ readonly title: string; }>;
+declare const MemoPage: React.MemoExoticComponent<typeof Page>;
 declare const view: IntrospectionView<HostSchema>;
 declare const buttonNode: IntrospectionNode<HostSchema['button'], 'button', HostSchema>;
 declare const selector: IntrospectionSelector<HostSchema, HostSchema['button'], 'button'>;
@@ -28,3 +31,6 @@ expect(view.locate('button').pickProps([ 'title' ])).type.toBe<Pick<HostSchema['
 expect(view.locate('button').props).type.toBe<HostSchema['button'] | undefined>();
 expect(view.locate('button').type).type.toBe<'button' | undefined>();
 expect(view.locate('button').pickProps).type.not.toBeCallableWith([ 'missing' ]);
+expect({ depthFrom: MemoPage }).type.toBeAssignableTo<IntrospectionOptions>();
+expect({ depthFrom: 'main' }).type.not.toBeAssignableTo<IntrospectionOptions>();
+expect({ depthFrom: Page }).type.toBeAssignableTo<IntrospectionOptions>();
