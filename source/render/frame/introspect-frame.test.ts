@@ -195,18 +195,6 @@ const assertNotRendered = defineCompositeAssertion({
     name: 'assertNotRendered'
 });
 
-const assertInvalidRenderElementThrows = defineCompositeAssertion({
-    assert(check, invalidElement: React.ReactElement) {
-        return check.throws(
-            function () {
-                createIntrospectionRenderElement(invalidElement, 1);
-            },
-            { message: 'Introspection expected React element props to be an object.' }
-        );
-    },
-    name: 'assertInvalidRenderElementThrows'
-});
-
 export const testNode = suite('execution shallow function components', [
     test('keeps child components visible but unexecuted at depth 1', function (scope) {
         const { Button, counts, Parent, Shell } = createDepthComponents();
@@ -326,7 +314,12 @@ export const testNode = suite('execution shallow function components', [
             type: 'div'
         } as unknown as React.ReactElement;
 
-        scope.assert(assertInvalidRenderElementThrows, invalidElement);
+        scope.assert.throws(
+            function () {
+                createIntrospectionRenderElement(invalidElement, 1);
+            },
+            { message: 'Introspection expected React element props to be an object.' }
+        );
 
         return scope.assert.collect();
     }),

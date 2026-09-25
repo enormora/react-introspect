@@ -1,5 +1,4 @@
 import { suite, test } from '@overkill-dev/test';
-import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionOptions, IntrospectionView } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView } from '../../runtime/view/introspect-unit-view.test.ts';
@@ -111,167 +110,128 @@ function createMixedSnapshot(): IntrospectionSnapshot {
     return view.currentSnapshot;
 }
 
-const assertSnapshotShape = defineCompositeAssertion({
-    assert(check, nodes: readonly SnapshotNode[]) {
-        const root = findSnapshotNode(nodes, 'fragment', 'Fragment');
-        const section = findSnapshotNode(nodes, 'host', 'section');
-        const strong = findSnapshotNode(nodes, 'host', 'strong');
-        const widget = findSnapshotNode(nodes, 'component', 'Widget');
+export const testNode = suite('snapshot tree model', [
+    test('builds frozen committed snapshots with node ids and kinds', function (scope) {
+        const snapshot = createMixedSnapshot();
+        const root = findSnapshotNode(snapshot.nodes, 'fragment', 'Fragment');
+        const section = findSnapshotNode(snapshot.nodes, 'host', 'section');
+        const strong = findSnapshotNode(snapshot.nodes, 'host', 'strong');
+        const widget = findSnapshotNode(snapshot.nodes, 'component', 'Widget');
 
-        return check.group([
-            check.annotated('unique node ids').equal(uniqueNodeIds(nodes), nodes.length),
-            check.annotated('frozen root').true(Object.isFrozen(root)),
-            check.annotated('section parent').equal(section.parentId, root.id),
-            check.annotated('strong parent').equal(strong.parentId, section.id),
-            check.annotated('widget parent').equal(widget.parentId, root.id),
-            check.annotated('kind counts').deepEqual(kindCounts(nodes), {
+        scope.assert.deepEqual({
+            frozenRoot: Object.isFrozen(root),
+            kindCounts: kindCounts(snapshot.nodes),
+            renderCount: snapshot.renderCount,
+            sectionParentId: section.parentId,
+            strongParentId: strong.parentId,
+            uniqueNodeIds: uniqueNodeIds(snapshot.nodes),
+            widgetParentId: widget.parentId
+        }, {
+            frozenRoot: true,
+            kindCounts: {
                 component: 1,
                 empty: 3,
                 fragment: 1,
                 host: 3,
                 opaque: 1,
                 text: 3
-            })
-        ]);
-    },
-    name: 'assertSnapshotShape'
-});
-
-const assertGivenAndRenderedChildren = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(createMixedTree(), { depth: 0 });
-        const section = requireValue(view.find('section'));
-        const widget = requireValue(view.find(Widget));
-
-        return check.group([
-            check.annotated('section rendered children').equal(section.renderedChildren.status, 'rendered'),
-            check.annotated('section given children').equal(section.givenChildren.length, 2),
-            check.annotated('widget given child').equal(widget.givenChildren.first?.type, 'em'),
-            check.annotated('widget rendered children').deepEqual(widget.renderedChildren, {
-                reason: 'depth',
-                status: 'notRendered'
-            })
-        ]);
-    },
-    name: 'assertGivenAndRenderedChildren'
-});
-
-const assertSelectorSemantics = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(createMixedTree(), { depth: 0 });
-        const section = requireValue(view.find('section'));
-
-        return check.group([
-            check.annotated('key selector').equal(view.find({ key: 'host' })?.path, section.path),
-            check.annotated('text selector').equal(view.find({ textContent: 'Save now' })?.path, section.path),
-            check.annotated('pattern selector').equal(view.find({ textContent: /^Save\snow$/ })?.path, section.path),
-            check.annotated('props selector').equal(
-                view
-                    .find({
-                        props: {
-                            metadata: {
-                                actions: [
-                                    { id: 'archive' }
-                                ]
-                            }
-                        },
-                        type: Widget
-                    })
-                    ?.name,
-                'Widget'
-            ),
-            check.annotated('has selector').equal(
-                view
-                    .find({
-                        has: { type: 'strong' },
-                        where(node) {
-                            return node.textContent === 'Save now';
-                        }
-                    })
-                    ?.type,
-                'section'
-            ),
-            check.annotated('missing closest').undefined(requireValue(view.find('strong')).findClosest('main')),
-            check.annotated('missing props selector').undefined(
-                view.find({
-                    props: {
-                        metadata: {
-                            group: 'secondary'
-                        }
-                    },
-                    type: Widget
-                })
-            )
-        ]);
-    },
-    name: 'assertSelectorSemantics'
-});
-
-const assertIntrospectionList = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(createMixedTree(), { depth: 0 });
-        const renderedText = view.findAll('#text');
-
-        return check.group([
-            check.annotated('rendered text count').equal(renderedText.length, 2),
-            check.annotated('first rendered text').equal(renderedText.first?.textContent, 'Save '),
-            check.annotated('last rendered text').equal(renderedText.last?.textContent, 'now'),
-            check.annotated('indexed rendered text').equal(renderedText.at(1)?.textContent, 'now'),
-            check.annotated('rendered text').deepEqual(
-                Array.from(renderedText, function readText(node) {
-                    return node.textContent;
-                }),
-                [ 'Save ', 'now' ]
-            ),
-            check.annotated('empty nodes').equal(view.findAll('#empty').length, 3),
-            check.annotated('filtered sections').equal(
-                view.findAll('section').filterBy({ has: { type: 'strong' } }).length,
-                1
-            )
-        ]);
-    },
-    name: 'assertIntrospectionList'
-});
-
-const assertAcyclicPublicOutput = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(createMixedTree(), { depth: 0 });
-        const serializedRoot = JSON.stringify(view.root);
-
-        return check.group([
-            check.annotated('serialized type').string(serializedRoot),
-            check.annotated('fragment name').match(requireValue(serializedRoot), /"name":"Fragment"/)
-        ]);
-    },
-    name: 'assertAcyclicPublicOutput'
-});
-
-export const testNode = suite('snapshot tree model', [
-    test('builds frozen committed snapshots with node ids and kinds', function (scope) {
-        const snapshot = createMixedSnapshot();
-
-        scope.assert.equal(snapshot.renderCount, 1);
-        scope.assert(assertSnapshotShape, snapshot.nodes);
+            },
+            renderCount: 1,
+            sectionParentId: root.id,
+            strongParentId: section.id,
+            uniqueNodeIds: snapshot.nodes.length,
+            widgetParentId: root.id
+        });
 
         return scope.assert.collect();
     }),
     test('normalizes given children and rendered children', function (scope) {
-        scope.assert(assertGivenAndRenderedChildren);
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const section = requireValue(view.find('section'));
+        const widget = requireValue(view.find(Widget));
+
+        scope.assert.equal(section.renderedChildren.status, 'rendered');
+        scope.assert.equal(section.givenChildren.length, 2);
+        scope.assert.equal(widget.givenChildren.first?.type, 'em');
+        scope.assert.deepEqual(widget.renderedChildren, {
+            reason: 'depth',
+            status: 'notRendered'
+        });
 
         return scope.assert.collect();
     }),
     test('matches selectors against tree nodes', function (scope) {
-        scope.assert(assertSelectorSemantics);
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const section = requireValue(view.find('section'));
+
+        scope.assert.equal(view.find({ key: 'host' })?.path, section.path);
+        scope.assert.equal(view.find({ textContent: 'Save now' })?.path, section.path);
+        scope.assert.equal(view.find({ textContent: /^Save\snow$/ })?.path, section.path);
+        scope.assert.equal(
+            view
+                .find({
+                    props: {
+                        metadata: {
+                            actions: [
+                                { id: 'archive' }
+                            ]
+                        }
+                    },
+                    type: Widget
+                })
+                ?.name,
+            'Widget'
+        );
+        scope.assert.equal(
+            view
+                .find({
+                    has: { type: 'strong' },
+                    where(node) {
+                        return node.textContent === 'Save now';
+                    }
+                })
+                ?.type,
+            'section'
+        );
+        scope.assert.undefined(requireValue(view.find('strong')).findClosest('main'));
+        scope.assert.undefined(
+            view.find({
+                props: {
+                    metadata: {
+                        group: 'secondary'
+                    }
+                },
+                type: Widget
+            })
+        );
 
         return scope.assert.collect();
     }),
     test('provides stable list behavior over matching nodes', function (scope) {
-        scope.assert(assertIntrospectionList);
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const renderedText = view.findAll('#text');
+
+        scope.assert.equal(renderedText.length, 2);
+        scope.assert.equal(renderedText.first?.textContent, 'Save ');
+        scope.assert.equal(renderedText.last?.textContent, 'now');
+        scope.assert.equal(renderedText.at(1)?.textContent, 'now');
+        scope.assert.deepEqual(
+            Array.from(renderedText, function readText(node) {
+                return node.textContent;
+            }),
+            [ 'Save ', 'now' ]
+        );
+        scope.assert.equal(view.findAll('#empty').length, 3);
+        scope.assert.equal(view.findAll('section').filterBy({ has: { type: 'strong' } }).length, 1);
 
         return scope.assert.collect();
     }),
     test('keeps public node output acyclic', function (scope) {
-        scope.assert(assertAcyclicPublicOutput);
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const serializedRoot = JSON.stringify(view.root);
+
+        scope.assert.string(serializedRoot);
+        scope.assert.match(requireValue(serializedRoot), /"name":"Fragment"/);
 
         return scope.assert.collect();
     })

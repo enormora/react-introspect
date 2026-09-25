@@ -1,8 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
-import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type {
-    IntrospectionNode,
     IntrospectionOptions,
     IntrospectionView
 } from '../../public/introspect-public-types.ts';
@@ -116,48 +114,6 @@ function createRejectedReactPromise(reason: Error): React.RejectedReactPromise<s
     });
 }
 
-const assertFullRender = defineCompositeAssertion({
-    assert(check, view: IntrospectionView<HostSchema>) {
-        const main = requireValue(view.find('main'));
-        const strong = requireValue(view.find('strong'));
-
-        return check.group([
-            check.annotated('render count').equal(view.renderCount, 1),
-            check.annotated('root type').equal(view.root?.type, Page),
-            check.annotated('text content').equal(view.textContent, 'Hello world'),
-            check.annotated('main title').equal(main.props.title, 'world'),
-            check.annotated('strong text').equal(strong.textContent, 'world'),
-            check.annotated('tree').equal(view.formatTree(), 'Page\n  main\n    #text\n    strong\n      #text')
-        ]);
-    },
-    name: 'assertFullRender'
-});
-
-const assertUpdatedView = defineCompositeAssertion({
-    assert(check, view: IntrospectionView<HostSchema>, staleRoot: IntrospectionNode) {
-        return check.group([
-            check.annotated('stale root').equal(staleRoot.isStale, true),
-            check.annotated('render count').equal(view.renderCount, 2),
-            check.annotated('text content').equal(view.textContent, 'Hello updated'),
-            check.annotated('main title').equal(view.find('main')?.props.title, 'updated')
-        ]);
-    },
-    name: 'assertUpdatedView'
-});
-
-const assertUnmountedView = defineCompositeAssertion({
-    assert(check, view: IntrospectionView<HostSchema>, staleRoot: IntrospectionNode) {
-        return check.group([
-            check.annotated('stale root').equal(staleRoot.isStale, true),
-            check.annotated('render count').equal(view.renderCount, 2),
-            check.annotated('root').undefined(view.root),
-            check.annotated('text content').equal(view.textContent, ''),
-            check.annotated('main').undefined(view.find('main'))
-        ]);
-    },
-    name: 'assertUnmountedView'
-});
-
 async function waitForDelayedRender(view: IntrospectionView<HostSchema>): Promise<void> {
     const delayedRender = view.waitForRenderCount(3);
 
@@ -166,8 +122,60 @@ async function waitForDelayedRender(view: IntrospectionView<HostSchema>): Promis
     await delayedRender;
 }
 
-const assertWaits = defineCompositeAssertion({
-    async assert(check, view: IntrospectionView<HostSchema>) {
+export const testNode = suite('custom reconciler host layer', [
+    test('publishes host and text output after a synchronous commit', function (scope) {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'world' }), {
+            depth: 'full'
+        });
+        const main = requireValue(view.find('main'));
+        const strong = requireValue(view.find('strong'));
+
+        scope.assert.equal(view.renderCount, 1);
+        scope.assert.equal(view.root?.type, Page);
+        scope.assert.equal(view.textContent, 'Hello world');
+        scope.assert.equal(main.props.title, 'world');
+        scope.assert.equal(strong.textContent, 'world');
+        scope.assert.equal(view.formatTree(), 'Page\n  main\n    #text\n    strong\n      #text');
+
+        return scope.assert.collect();
+    }),
+    test('updates committed host snapshots', function (scope) {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'initial' }), {
+            depth: 'full',
+            strictMode: false
+        });
+        const root = requireValue(view.root);
+
+        view.update(React.createElement(Page, { title: 'updated' }));
+        scope.assert.equal(root.isStale, true);
+        scope.assert.equal(view.renderCount, 2);
+        scope.assert.equal(view.textContent, 'Hello updated');
+        scope.assert.equal(view.find('main')?.props.title, 'updated');
+
+        return scope.assert.collect();
+    }),
+    test('unmounts the committed root', function (scope) {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'mounted' }), {
+            depth: 'full',
+            strictMode: false
+        });
+        const root = requireValue(view.root);
+
+        view.unmount();
+        scope.assert.equal(root.isStale, true);
+        scope.assert.equal(view.renderCount, 2);
+        scope.assert.undefined(view.root);
+        scope.assert.equal(view.textContent, '');
+        scope.assert.undefined(view.find('main'));
+
+        return scope.assert.collect();
+    }),
+    test('waits for committed renders and idle work', async function (scope) {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'first' }), {
+            depth: 'full',
+            strictMode: false
+        });
+
         const nextRender = view.waitForNextRender();
 
         view.update(React.createElement(Page, { title: 'next' }));
@@ -180,13 +188,11 @@ const assertWaits = defineCompositeAssertion({
         await view.waitForIdle();
         await waitForDelayedRender(view);
 
-        return check.equal(view.textContent, 'Hello delayed');
-    },
-    name: 'assertWaits'
-});
+        scope.assert.equal(view.textContent, 'Hello delayed');
 
-const assertEventUpdate = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('wraps event props in React act', function (scope) {
         const view = introspect(React.createElement(Clicker), {
             depth: 'full',
             strictMode: false
@@ -195,17 +201,13 @@ const assertEventUpdate = defineCompositeAssertion({
 
         button.sendEvent('click');
 
-        return check.group([
-            check.annotated('stale button').equal(button.isStale, true),
-            check.annotated('text content').equal(view.textContent, 'on'),
-            check.annotated('render count').equal(view.renderCount, 2)
-        ]);
-    },
-    name: 'assertEventUpdate'
-});
+        scope.assert.equal(button.isStale, true);
+        scope.assert.equal(view.textContent, 'on');
+        scope.assert.equal(view.renderCount, 2);
 
-const assertKeyedInsertion = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('preserves committed keyed host order after movement', function (scope) {
         const view = introspect(
             React.createElement(
                 'main',
@@ -234,18 +236,16 @@ const assertKeyedInsertion = defineCompositeAssertion({
             React.createElement('span', { key: 'second' }, 'second')
         ));
 
-        return check.deepEqual(
+        scope.assert.deepEqual(
             Array.from(view.findAll('span'), function readText(node) {
                 return node.textContent;
             }),
             [ 'third', 'first', 'second' ]
         );
-    },
-    name: 'assertKeyedInsertion'
-});
 
-const assertHostChildRemoval = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('removes committed host children', function (scope) {
         const view = introspect(
             React.createElement(
                 'div',
@@ -265,16 +265,12 @@ const assertHostChildRemoval = defineCompositeAssertion({
             React.createElement('span', { key: 'first' }, 'first')
         ));
 
-        return check.group([
-            check.annotated('removed child').undefined(view.find('em')),
-            check.annotated('text content').equal(view.textContent, 'first')
-        ]);
-    },
-    name: 'assertHostChildRemoval'
-});
+        scope.assert.undefined(view.find('em'));
+        scope.assert.equal(view.textContent, 'first');
 
-const assertRootChildCounts = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('publishes empty and multi-child root snapshots', function (scope) {
         const emptyView = introspect(React.createElement(RendersNull), {
             depth: 'full',
             strictMode: false
@@ -292,20 +288,16 @@ const assertRootChildCounts = defineCompositeAssertion({
             }
         );
 
-        return check.group([
-            check.annotated('empty root type').equal(emptyView.root?.type, RendersNull),
-            check.annotated('empty children').equal(emptyView.renderedChildren.length, 1),
-            check.annotated('empty text').equal(emptyView.find('#empty')?.textContent, ''),
-            check.annotated('fragment root type').equal(fragmentView.root?.type, React.Fragment),
-            check.annotated('fragment children').equal(fragmentView.renderedChildren.length, 2),
-            check.annotated('fragment text').equal(fragmentView.textContent, 'firstsecond')
-        ]);
-    },
-    name: 'assertRootChildCounts'
-});
+        scope.assert.equal(emptyView.root?.type, RendersNull);
+        scope.assert.equal(emptyView.renderedChildren.length, 1);
+        scope.assert.equal(emptyView.find('#empty')?.textContent, '');
+        scope.assert.equal(fragmentView.root?.type, React.Fragment);
+        scope.assert.equal(fragmentView.renderedChildren.length, 2);
+        scope.assert.equal(fragmentView.textContent, 'firstsecond');
 
-const assertRootChildRemoval = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('removes committed root children', function (scope) {
         const view = introspect(
             React.createElement(
                 React.Fragment,
@@ -325,16 +317,12 @@ const assertRootChildRemoval = defineCompositeAssertion({
             React.createElement('span', { key: 'first' }, 'first')
         ));
 
-        return check.group([
-            check.annotated('remaining spans').equal(view.findAll('span').length, 1),
-            check.annotated('text content').equal(view.textContent, 'first')
-        ]);
-    },
-    name: 'assertRootChildRemoval'
-});
+        scope.assert.equal(view.findAll('span').length, 1);
+        scope.assert.equal(view.textContent, 'first');
 
-const assertRootHostReplacement = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('replaces the committed root host child', function (scope) {
         const view = introspect(React.createElement('span', null, 'first'), {
             depth: 'full',
             strictMode: false
@@ -342,210 +330,27 @@ const assertRootHostReplacement = defineCompositeAssertion({
 
         view.update(React.createElement('em', null, 'second'));
 
-        return check.group([
-            check.annotated('old host').undefined(view.find('span')),
-            check.annotated('new host text').equal(view.find('em')?.textContent, 'second')
-        ]);
-    },
-    name: 'assertRootHostReplacement'
-});
-
-const assertSuspendedUpdateRollback = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(React.createElement(Page, { title: 'stable' }), {
-            depth: 'full',
-            strictMode: false
-        });
-
-        try {
-            view.update(React.createElement(Suspends));
-        } catch {
-            return check.group([
-                check.annotated('render count').equal(view.renderCount, 1),
-                check.annotated('text content').equal(view.textContent, 'Hello stable')
-            ]);
-        }
-
-        return check.group([
-            check.annotated('render count').equal(view.renderCount, 1),
-            check.annotated('text content').equal(view.textContent, 'Hello stable')
-        ]);
-    },
-    name: 'assertSuspendedUpdateRollback'
-});
-
-const assertSuspendedInitialRoot = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(React.createElement(Suspends), {
-            depth: 'full',
-            errorMode: 'capture',
-            strictMode: false
-        });
-
-        return check.group([
-            check.annotated('render count').equal(view.renderCount, 1),
-            check.annotated('root').undefined(view.root),
-            check.annotated('error message').equal(
-                view.errors.at(-1)?.message,
-                'React Introspect cannot commit a suspended root. Wrap lazy, async, or promise-using roots in React.Suspense.'
-            )
-        ]);
-    },
-    name: 'assertSuspendedInitialRoot'
-});
-
-const assertSuspenseReadyChildren = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(
-            React.createElement(
-                React.Suspense,
-                { fallback: React.createElement(Loading) },
-                React.createElement(ReadyPanel)
-            ),
-            {
-                depth: 'full',
-                strictMode: false
-            }
-        );
-
-        return check.group([
-            check.annotated('render count').equal(view.renderCount, 1),
-            check.annotated('root type').equal(view.root?.type, ReadyPanel),
-            check.annotated('fallback host').undefined(view.find('em')),
-            check.annotated('fallback component').undefined(view.find(Loading)),
-            check.annotated('ready children').equal(view.find(ReadyPanel)?.renderedChildren.status, 'rendered'),
-            check.annotated('ready text').equal(view.find('span')?.textContent, 'ready')
-        ]);
-    },
-    name: 'assertSuspenseReadyChildren'
-});
-
-const assertUseFulfilledPromise = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(
-            React.createElement(
-                React.Suspense,
-                { fallback: React.createElement(Loading) },
-                React.createElement(PromiseReader, { textPromise: createFulfilledReactPromise('resolved') })
-            ),
-            {
-                depth: 'full',
-                strictMode: false
-            }
-        );
-
-        return check.group([
-            check.annotated('render count').equal(view.renderCount, 1),
-            check.annotated('fallback host').undefined(view.find('em')),
-            check.annotated('promise children').equal(view.find(PromiseReader)?.renderedChildren.status, 'rendered'),
-            check.annotated('resolved text').equal(view.find('span')?.textContent, 'resolved')
-        ]);
-    },
-    name: 'assertUseFulfilledPromise'
-});
-
-const assertUseRejectedPromise = defineCompositeAssertion({
-    assert(check) {
-        const error = new Error('load failed');
-        const view = introspect(
-            React.createElement(
-                React.Suspense,
-                { fallback: React.createElement(Loading) },
-                React.createElement(PromiseReader, { textPromise: createRejectedReactPromise(error) })
-            ),
-            {
-                depth: 'full',
-                errorMode: 'capture',
-                strictMode: false
-            }
-        );
-
-        return check.group([
-            check.annotated('root').undefined(view.root),
-            check.annotated('error cause').equal(view.errors.at(-1)?.cause, error)
-        ]);
-    },
-    name: 'assertUseRejectedPromise'
-});
-
-export const testNode = suite('custom reconciler host layer', [
-    test('publishes host and text output after a synchronous commit', function (scope) {
-        const view = introspect<HostSchema>(React.createElement(Page, { title: 'world' }), {
-            depth: 'full'
-        });
-
-        scope.assert(assertFullRender, view);
-
-        return scope.assert.collect();
-    }),
-    test('updates committed host snapshots', function (scope) {
-        const view = introspect<HostSchema>(React.createElement(Page, { title: 'initial' }), {
-            depth: 'full',
-            strictMode: false
-        });
-        const root = requireValue(view.root);
-
-        view.update(React.createElement(Page, { title: 'updated' }));
-        scope.assert(assertUpdatedView, view, root);
-
-        return scope.assert.collect();
-    }),
-    test('unmounts the committed root', function (scope) {
-        const view = introspect<HostSchema>(React.createElement(Page, { title: 'mounted' }), {
-            depth: 'full',
-            strictMode: false
-        });
-        const root = requireValue(view.root);
-
-        view.unmount();
-        scope.assert(assertUnmountedView, view, root);
-
-        return scope.assert.collect();
-    }),
-    test('waits for committed renders and idle work', async function (scope) {
-        const view = introspect<HostSchema>(React.createElement(Page, { title: 'first' }), {
-            depth: 'full',
-            strictMode: false
-        });
-
-        await scope.assert(assertWaits, view);
-
-        return scope.assert.collect();
-    }),
-    test('wraps event props in React act', function (scope) {
-        scope.assert(assertEventUpdate);
-
-        return scope.assert.collect();
-    }),
-    test('preserves committed keyed host order after movement', function (scope) {
-        scope.assert(assertKeyedInsertion);
-
-        return scope.assert.collect();
-    }),
-    test('removes committed host children', function (scope) {
-        scope.assert(assertHostChildRemoval);
-
-        return scope.assert.collect();
-    }),
-    test('publishes empty and multi-child root snapshots', function (scope) {
-        scope.assert(assertRootChildCounts);
-
-        return scope.assert.collect();
-    }),
-    test('removes committed root children', function (scope) {
-        scope.assert(assertRootChildRemoval);
-
-        return scope.assert.collect();
-    }),
-    test('replaces the committed root host child', function (scope) {
-        scope.assert(assertRootHostReplacement);
+        scope.assert.undefined(view.find('span'));
+        scope.assert.equal(view.find('em')?.textContent, 'second');
 
         return scope.assert.collect();
     }),
     test(
         'keeps the previous snapshot when a sync update suspends before commit',
         function (scope) {
-            scope.assert(assertSuspendedUpdateRollback);
+            const view = introspect(React.createElement(Page, { title: 'stable' }), {
+                depth: 'full',
+                strictMode: false
+            });
+
+            try {
+                view.update(React.createElement(Suspends));
+            } catch {
+                Object.freeze({});
+            }
+
+            scope.assert.equal(view.renderCount, 1);
+            scope.assert.equal(view.textContent, 'Hello stable');
 
             return scope.assert.collect();
         }
@@ -553,7 +358,18 @@ export const testNode = suite('custom reconciler host layer', [
     test(
         'reports a suspended initial root clearly',
         function (scope) {
-            scope.assert(assertSuspendedInitialRoot);
+            const view = introspect(React.createElement(Suspends), {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false
+            });
+
+            scope.assert.equal(view.renderCount, 1);
+            scope.assert.undefined(view.root);
+            scope.assert.equal(
+                view.errors.at(-1)?.message,
+                'React Introspect cannot commit a suspended root. Wrap lazy, async, or promise-using roots in React.Suspense.'
+            );
 
             return scope.assert.collect();
         }
@@ -561,7 +377,24 @@ export const testNode = suite('custom reconciler host layer', [
     test(
         'commits ready Suspense children without rendering fallback',
         function (scope) {
-            scope.assert(assertSuspenseReadyChildren);
+            const view = introspect(
+                React.createElement(
+                    React.Suspense,
+                    { fallback: React.createElement(Loading) },
+                    React.createElement(ReadyPanel)
+                ),
+                {
+                    depth: 'full',
+                    strictMode: false
+                }
+            );
+
+            scope.assert.equal(view.renderCount, 1);
+            scope.assert.equal(view.root?.type, ReadyPanel);
+            scope.assert.undefined(view.find('em'));
+            scope.assert.undefined(view.find(Loading));
+            scope.assert.equal(view.find(ReadyPanel)?.renderedChildren.status, 'rendered');
+            scope.assert.equal(view.find('span')?.textContent, 'ready');
 
             return scope.assert.collect();
         }
@@ -569,7 +402,22 @@ export const testNode = suite('custom reconciler host layer', [
     test(
         'renders React.use fulfilled promise values',
         function (scope) {
-            scope.assert(assertUseFulfilledPromise);
+            const view = introspect(
+                React.createElement(
+                    React.Suspense,
+                    { fallback: React.createElement(Loading) },
+                    React.createElement(PromiseReader, { textPromise: createFulfilledReactPromise('resolved') })
+                ),
+                {
+                    depth: 'full',
+                    strictMode: false
+                }
+            );
+
+            scope.assert.equal(view.renderCount, 1);
+            scope.assert.undefined(view.find('em'));
+            scope.assert.equal(view.find(PromiseReader)?.renderedChildren.status, 'rendered');
+            scope.assert.equal(view.find('span')?.textContent, 'resolved');
 
             return scope.assert.collect();
         }
@@ -577,7 +425,22 @@ export const testNode = suite('custom reconciler host layer', [
     test(
         'records React.use rejected promise errors',
         function (scope) {
-            scope.assert(assertUseRejectedPromise);
+            const error = new Error('load failed');
+            const view = introspect(
+                React.createElement(
+                    React.Suspense,
+                    { fallback: React.createElement(Loading) },
+                    React.createElement(PromiseReader, { textPromise: createRejectedReactPromise(error) })
+                ),
+                {
+                    depth: 'full',
+                    errorMode: 'capture',
+                    strictMode: false
+                }
+            );
+
+            scope.assert.undefined(view.root);
+            scope.assert.equal(view.errors.at(-1)?.cause, error);
 
             return scope.assert.collect();
         }
