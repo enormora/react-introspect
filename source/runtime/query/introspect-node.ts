@@ -147,6 +147,9 @@ export function createIntrospectionNode(
         get key() {
             return node.key;
         },
+        get kind() {
+            return node.kind;
+        },
         get name() {
             return node.name;
         },

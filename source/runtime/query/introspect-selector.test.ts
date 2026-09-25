@@ -31,6 +31,7 @@ function createNode(): RuntimeIntrospectionNode {
         givenChildren: createIntrospectionList([]),
         isStale: false,
         key: 'save',
+        kind: 'host',
         name: 'button',
         omitProps() {
             return {};

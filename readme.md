@@ -277,6 +277,16 @@ await view.waitForNextRender();
 assert.equal(save.node?.props.disabled, true);
 ```
 
+Locators project node data the same way. Each projection returns `undefined` when nothing matches, so one assertion covers both cases.
+
+```tsx
+assert.deepEqual(view.locate('button').pickProps([ 'type' ]), { type: 'submit' });
+assert.equal(view.locate(Status).textContent, 'Saved');
+assert.equal(view.locate(ErrorBanner).props, undefined);
+```
+
+Projections: `props`, `pickProps()`, `omitProps()`, `textContent`, `type`, `name`, `key`, and `kind`.
+
 List locators stay live too.
 
 ```tsx
@@ -312,6 +322,40 @@ assert.equal(button.type, Button);
 assert.equal(button.name, 'Button');
 assert.equal(button.key, 'primary');
 ```
+
+### `node.kind`
+
+Tells you what a node models, without matching on `'#empty'` or `'#text'`.
+
+Values:
+
+- `'component'`
+- `'host'`
+- `'fragment'`
+- `'text'`
+- `'empty'` for `null`, `undefined`, and booleans
+- `'opaque'` for values React Introspect does not model
+
+Empty children keep their position.
+
+```tsx
+const Toolbar = (props: { canSave: boolean; }) => (
+    <Shell>
+        {props.canSave && <SaveButton />}
+        <CancelButton />
+    </Shell>
+);
+
+const view = introspect(<Toolbar canSave={false} />);
+
+const shell = view.find(Shell);
+
+assert.ok(shell);
+assert.equal(shell.givenChildren.at(0)?.kind, 'empty');
+assert.equal(shell.givenChildren.at(1)?.type, CancelButton);
+```
+
+### `node.isStale`
 
 `isStale` tells you whether a newer committed snapshot exists.
 

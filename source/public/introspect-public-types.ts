@@ -32,6 +32,8 @@ export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = In
 
 export type IntrospectionHostSchema = Readonly<Record<string, unknown>>;
 
+export type IntrospectionNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
+
 export type IntrospectionNotRenderedReason = 'depth' | 'errored' | 'suspended' | 'unsupported';
 
 export type IntrospectionFakeRefNode<Node = Record<PropertyKey, unknown>> = Node;
@@ -234,6 +236,7 @@ export type IntrospectionNode<
     readonly givenChildren: GivenChildren<HostSchema>;
     readonly isStale: boolean;
     readonly key: string | null;
+    readonly kind: IntrospectionNodeKind;
     readonly name: string;
     readonly path: string;
     readonly props: Props;
@@ -274,12 +277,22 @@ export type IntrospectionLocator<
     HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
 > = {
     readonly exists: boolean;
+    readonly key: string | null | undefined;
+    readonly kind: IntrospectionNodeKind | undefined;
+    readonly name: string | undefined;
     readonly node: IntrospectionNode<Props, Type, HostSchema> | undefined;
+    readonly props: Props | undefined;
+    readonly textContent: string | undefined;
+    readonly type: Type | undefined;
     readonly callProp: <Property extends keyof Props>(
         property: Property,
         ...parameters: Props[Property] extends (...callParameters: infer Parameters) => unknown ? Parameters
             : readonly never[]
     ) => Props[Property] extends (...callParameters: readonly never[]) => infer Result ? Result : unknown;
+    readonly omitProps: <Key extends keyof Props>(
+        keys: readonly Key[]
+    ) => IntrospectionWithoutKeys<Props, Key> | undefined;
+    readonly pickProps: <Key extends keyof Props>(keys: readonly Key[]) => Pick<Props, Key> | undefined;
     readonly sendEvent: (name: string, ...parameters: readonly unknown[]) => unknown;
 };
 

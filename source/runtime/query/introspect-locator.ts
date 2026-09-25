@@ -28,8 +28,26 @@ export function createIntrospectionLocator(
         get exists() {
             return readLocatedNode(target) !== undefined;
         },
+        get key() {
+            return readLocatedNode(target)?.key;
+        },
+        get kind() {
+            return readLocatedNode(target)?.kind;
+        },
+        get name() {
+            return readLocatedNode(target)?.name;
+        },
         get node() {
             return readLocatedNode(target);
+        },
+        get props() {
+            return readLocatedNode(target)?.props;
+        },
+        get textContent() {
+            return readLocatedNode(target)?.textContent;
+        },
+        get type() {
+            return readLocatedNode(target)?.type;
         },
         callProp(property: PropertyKey, ...parameters: readonly unknown[]) {
             const node = readLocatedNode(target);
@@ -39,6 +57,12 @@ export function createIntrospectionLocator(
             }
 
             return node.callProp(property, ...parameters);
+        },
+        omitProps(keys: readonly PropertyKey[]) {
+            return readLocatedNode(target)?.omitProps(keys);
+        },
+        pickProps(keys: readonly PropertyKey[]) {
+            return readLocatedNode(target)?.pickProps(keys);
         },
         sendEvent(name: string, ...parameters: readonly unknown[]) {
             const node = readLocatedNode(target);

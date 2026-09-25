@@ -24,3 +24,7 @@ expect(buttonNode.props.disabled).type.toBe<boolean>();
 expect(buttonNode.pickProps([ 'title' ])).type.toBe<Pick<HostSchema['button'], 'title'>>();
 expect(selector).type.toBeAssignableTo<IntrospectionSelector<HostSchema, HostSchema['button'], 'button'>>();
 expect({ depth: 'full', strictMode: false } as const).type.toBeAssignableTo<IntrospectionOptions<HostSchema>>();
+expect(view.locate('button').pickProps([ 'title' ])).type.toBe<Pick<HostSchema['button'], 'title'> | undefined>();
+expect(view.locate('button').props).type.toBe<HostSchema['button'] | undefined>();
+expect(view.locate('button').type).type.toBe<'button' | undefined>();
+expect(view.locate('button').pickProps).type.not.toBeCallableWith([ 'missing' ]);
