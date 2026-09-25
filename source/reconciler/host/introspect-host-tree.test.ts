@@ -1,5 +1,4 @@
 import { suite, test } from '@overkill-dev/test';
-import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import {
     appendChild,
@@ -35,45 +34,6 @@ function requireValue<Value>(value: Value | undefined): Value {
     return value;
 }
 
-const assertTreeOrder = defineCompositeAssertion({
-    assert(check) {
-        const container = createContainer();
-        const first = createHostInstance('span', { title: 'first' }, undefined, { refs: undefined });
-        const second = createHostInstance('strong', { title: 'second' }, undefined, { refs: undefined });
-
-        appendChild(container, second);
-        insertBefore(container, first, second);
-
-        const snapshot = toSnapshot(container);
-        const root = requireValue(snapshot.root);
-
-        return check.deepEqual(
-            root.renderedChildren.map(function readName(node) {
-                return node.name;
-            }),
-            [ 'span', 'strong' ]
-        );
-    },
-    name: 'assertTreeOrder'
-});
-
-const assertDetachedChildMoves = defineCompositeAssertion({
-    assert(check) {
-        const firstParent = createHostInstance('section', {}, undefined, { refs: undefined });
-        const secondParent = createHostInstance('article', {}, undefined, { refs: undefined });
-        const child = createTextInstance('moved');
-
-        appendChild(firstParent, child);
-        appendChild(secondParent, child);
-
-        return check.group([
-            check.annotated('first parent children').equal(firstParent.readChildren().length, 0),
-            check.annotated('second parent child').equal(secondParent.readChildren()[0], child)
-        ]);
-    },
-    name: 'assertDetachedChildMoves'
-});
-
 function createButtonSnapshot(): IntrospectionSnapshot {
     const container = createContainer();
     const button = createHostInstance('button', { children: 'ignored', title: 'Save' }, undefined, {
@@ -99,9 +59,36 @@ export const testNode = suite('introspection host tree', [
 
         return scope.assert.collect();
     }),
-    test('maintains parent child order and detach state', function (scope) {
-        scope.assert(assertTreeOrder);
-        scope.assert(assertDetachedChildMoves);
+    test('maintains parent child order', function (scope) {
+        const container = createContainer();
+        const first = createHostInstance('span', { title: 'first' }, undefined, { refs: undefined });
+        const second = createHostInstance('strong', { title: 'second' }, undefined, { refs: undefined });
+
+        appendChild(container, second);
+        insertBefore(container, first, second);
+
+        const snapshot = toSnapshot(container);
+        const root = requireValue(snapshot.root);
+
+        scope.assert.deepEqual(
+            root.renderedChildren.map(function readName(node) {
+                return node.name;
+            }),
+            [ 'span', 'strong' ]
+        );
+
+        return scope.assert.collect();
+    }),
+    test('detaches moved children from their previous parent', function (scope) {
+        const firstParent = createHostInstance('section', {}, undefined, { refs: undefined });
+        const secondParent = createHostInstance('article', {}, undefined, { refs: undefined });
+        const child = createTextInstance('moved');
+
+        appendChild(firstParent, child);
+        appendChild(secondParent, child);
+
+        scope.assert.equal(firstParent.readChildren().length, 0);
+        scope.assert.equal(secondParent.readChildren()[0], child);
 
         return scope.assert.collect();
     }),

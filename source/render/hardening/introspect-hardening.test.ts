@@ -1,5 +1,4 @@
 import { suite, test } from '@overkill-dev/test';
-import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
@@ -199,77 +198,15 @@ function createFailingActRuntime(): FailingActRuntime {
     });
 }
 
-const assertPublicOutputIsIntrospectionOwned = defineCompositeAssertion({
-    assert(check) {
-        const leaf = requireValue(introspect(React.createElement(ElementPropRoot)).find(Leaf));
-        const icon = readElementProp(leaf);
-        const serialized = requireValue(JSON.stringify(leaf));
-
-        return check.group([
-            check.annotated('icon type').equal(icon.type, Icon),
-            check.annotated('icon props').deepEqual(icon.props, {
-                title: 'info'
-            }),
-            check.annotated('metadata').deepEqual(leaf.props.metadata, {
-                label: 'details',
-                self: '[Circular]'
-            }),
-            check.annotated('serialized type').string(serialized),
-            check.annotated('component name').match(serialized, /"name":"Leaf"/u),
-            check.annotated('reflect marker').false(serialized.includes('__reactReflect')),
-            check.annotated('internal marker').false(serialized.includes('react-introspect-internal')),
-            check.annotated('react type marker').false(serialized.includes('$$typeof')),
-            check.annotated('react owner').false(serialized.includes('_owner')),
-            check.annotated('react store').false(serialized.includes('_store'))
-        ]);
-    },
-    name: 'assertPublicOutputIsIntrospectionOwned'
-});
-
-const assertPortalRootFails = defineCompositeAssertion({
-    assert(check) {
-        return check.throws(
+export const testNode = suite('unsupported React concepts and hardening', [
+    test('fails clearly for portal roots', function (scope) {
+        scope.assert.throws(
             function () {
                 introspect(createPortalValue(React.createElement('span', null, 'root')));
             },
             { message: 'React Introspect cannot represent portal output yet.' }
         );
-    },
-    name: 'assertPortalRootFails'
-});
-
-const assertPortalOutputFails = defineCompositeAssertion({
-    assert(check) {
-        return check.throws(
-            function () {
-                introspect(React.createElement(PortalOutput), {
-                    depth: 'full',
-                    strictMode: false
-                });
-            },
-            { message: 'React Introspect cannot represent portal output yet.' }
-        );
-    },
-    name: 'assertPortalOutputFails'
-});
-
-const assertPortalChildFails = defineCompositeAssertion({
-    assert(check) {
-        return check.throws(
-            function () {
-                introspect(React.createElement(PortalArrayChildRoot), {
-                    strictMode: false
-                });
-            },
-            { message: 'React Introspect cannot represent portal output yet.' }
-        );
-    },
-    name: 'assertPortalChildFails'
-});
-
-const assertPortalNormalizationFails = defineCompositeAssertion({
-    assert(check) {
-        return check.throws(
+        scope.assert.throws(
             function () {
                 normalizeSnapshotValue(
                     createPortalValue(React.createElement('span', null, 'portal')),
@@ -278,43 +215,71 @@ const assertPortalNormalizationFails = defineCompositeAssertion({
             },
             { message: 'React Introspect cannot represent portal output yet.' }
         );
-    },
-    name: 'assertPortalNormalizationFails'
-});
-
-const assertCircularArrayNormalization = defineCompositeAssertion({
-    assert(check) {
-        const value: unknown[] = [];
-
-        value.push(value);
-
-        return check.deepEqual(normalizeSnapshotValue(value, String), [
-            '[Circular]'
-        ]);
-    },
-    name: 'assertCircularArrayNormalization'
-});
-
-export const testNode = suite('unsupported React concepts and hardening', [
-    test('fails clearly for portal roots', function (scope) {
-        scope.assert(assertPortalRootFails);
-        scope.assert(assertPortalNormalizationFails);
 
         return scope.assert.collect();
     }),
     test('fails clearly for portal render output', function (scope) {
-        scope.assert(assertPortalOutputFails);
+        scope.assert.throws(
+            function () {
+                introspect(React.createElement(PortalOutput), {
+                    depth: 'full',
+                    strictMode: false
+                });
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
 
         return scope.assert.collect();
     }),
     test('fails clearly for portal children captured in snapshots', function (scope) {
-        scope.assert(assertPortalChildFails);
+        scope.assert.throws(
+            function () {
+                introspect(React.createElement(PortalArrayChildRoot), {
+                    strictMode: false
+                });
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
 
         return scope.assert.collect();
     }),
     test('keeps public output acyclic and free of raw React internals', function (scope) {
-        scope.assert(assertPublicOutputIsIntrospectionOwned);
-        scope.assert(assertCircularArrayNormalization);
+        const leaf = requireValue(introspect(React.createElement(ElementPropRoot)).find(Leaf));
+        const icon = readElementProp(leaf);
+        const serialized = requireValue(JSON.stringify(leaf));
+        const circularArray: unknown[] = [];
+
+        circularArray.push(circularArray);
+
+        scope.assert.string(serialized);
+        scope.assert.deepEqual({
+            circularArray: normalizeSnapshotValue(circularArray, String),
+            componentName: serialized.includes('"name":"Leaf"'),
+            iconProps: icon.props,
+            iconType: icon.type,
+            internalMarker: serialized.includes('react-introspect-internal'),
+            metadata: leaf.props.metadata,
+            reactOwner: serialized.includes('_owner'),
+            reactStore: serialized.includes('_store'),
+            reactTypeMarker: serialized.includes('$$typeof'),
+            reflectMarker: serialized.includes('__reactReflect')
+        }, {
+            circularArray: [ '[Circular]' ],
+            componentName: true,
+            iconProps: {
+                title: 'info'
+            },
+            iconType: Icon,
+            internalMarker: false,
+            metadata: {
+                label: 'details',
+                self: '[Circular]'
+            },
+            reactOwner: false,
+            reactStore: false,
+            reactTypeMarker: false,
+            reflectMarker: false
+        });
 
         return scope.assert.collect();
     }),

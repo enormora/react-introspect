@@ -1,5 +1,4 @@
 import { suite, test } from '@overkill-dev/test';
-import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionView } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
@@ -349,68 +348,6 @@ const CatchOnlyBoundary = class extends React.Component<BoundaryProps, BoundaryS
     }
 };
 
-const assertLifecycle = defineCompositeAssertion({
-    assert(check) {
-        const recorder = createRecorder();
-        const view = introspect(React.createElement(LifecyclePanel, { label: 'initial', recorder }), {
-            depth: 'full',
-            strictMode: false
-        });
-
-        const initialRootType = view.root?.type;
-        const initialText = view.textContent;
-
-        view.update(React.createElement(LifecyclePanel, { label: 'derived', recorder }));
-        view.unmount();
-
-        return check.group([
-            check.annotated('initial root type').equal(initialRootType, LifecyclePanel),
-            check.annotated('initial text').equal(initialText, 'initial:created'),
-            check.annotated('unmounted text').equal(view.textContent, ''),
-            check.annotated('lifecycle entries').deepEqual(recorder.entries, [
-                'render:initial:created',
-                'mount:initial:created',
-                'render:derived:derived',
-                'update:initial:created:snapshot:initial',
-                'unmount:derived:derived'
-            ])
-        ]);
-    },
-    name: 'assertLifecycle'
-});
-
-const assertStateUpdates = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(React.createElement(Counter), {
-            depth: 'full',
-            strictMode: false
-        });
-
-        requireValue(view.find('button')).sendEvent('click');
-
-        return check.equal(view.textContent, '2');
-    },
-    name: 'assertStateUpdates'
-});
-
-const assertForceUpdate = defineCompositeAssertion({
-    assert(check) {
-        const { Panel, readRenders } = createForcedPanel();
-        const view = introspect(React.createElement(Panel), {
-            depth: 'full',
-            strictMode: false
-        });
-
-        requireValue(view.find('button')).sendEvent('click');
-
-        return check.group([
-            check.annotated('render count').equal(readRenders(), 2),
-            check.annotated('text content').equal(view.textContent, '2')
-        ]);
-    },
-    name: 'assertForceUpdate'
-});
-
 function createRenderGateViews(): RenderGateViews {
     const gated = createGatedPanel();
     const pure = createPurePanel();
@@ -428,123 +365,6 @@ function createRenderGateViews(): RenderGateViews {
         })
     });
 }
-
-const assertRenderGates = defineCompositeAssertion({
-    assert(check) {
-        const { gated, gatedView, pure, pureView } = createRenderGateViews();
-
-        gatedView.update(React.createElement(gated.Panel, { value: 'skip' }));
-        pureView.update(React.createElement(pure.Panel, { label: 'one' }));
-        pureView.update(React.createElement(pure.Panel, { label: 'two' }));
-
-        return check.group([
-            check.annotated('gated renders').equal(gated.readRenders(), 1),
-            check.annotated('gated props').equal(requireValue(gatedView.find(gated.Panel)).props.value, 'skip'),
-            check.annotated('gated text').equal(gatedView.textContent, 'one'),
-            check.annotated('pure renders').equal(pure.readRenders(), 2),
-            check.annotated('pure text').equal(pureView.textContent, 'two')
-        ]);
-    },
-    name: 'assertRenderGates'
-});
-
-const assertErrorBoundary = defineCompositeAssertion({
-    assert(check) {
-        const recorder = createRecorder();
-        const view = introspect(
-            React.createElement(
-                Boundary,
-                { recorder },
-                React.createElement(Bomb)
-            ),
-            {
-                depth: 'full',
-                errorMode: 'capture',
-                strictMode: false,
-                warningMode: 'capture'
-            }
-        );
-
-        return check.group([
-            check.annotated('recorder entries').deepEqual(recorder.entries, [ 'boom' ]),
-            check.annotated('view errors').equal(view.errors.length, 0),
-            check.annotated('root error message').equal(view.root?.error?.message, 'boom'),
-            check.annotated('root error handled').true(view.root?.error?.handled),
-            check.annotated('fallback text').equal(view.find('span')?.textContent, 'fallback')
-        ]);
-    },
-    name: 'assertErrorBoundary'
-});
-
-const assertPrimitiveBoundaryState = defineCompositeAssertion({
-    assert(check) {
-        const recorder = createRecorder();
-        const view = introspect(
-            React.createElement(
-                PrimitiveBoundary as never,
-                { recorder },
-                React.createElement(StringBomb)
-            ),
-            {
-                depth: 'full',
-                errorMode: 'capture',
-                strictMode: false,
-                warningMode: 'capture'
-            }
-        );
-
-        return check.group([
-            check.annotated('root error message').equal(view.root?.error?.message, 'string boom'),
-            check.annotated('fallback text').equal(view.find('span')?.textContent, 'primitive fallback')
-        ]);
-    },
-    name: 'assertPrimitiveBoundaryState'
-});
-
-const assertCatchOnlyBoundary = defineCompositeAssertion({
-    assert(check) {
-        const recorder = createRecorder();
-        const view = introspect(
-            React.createElement(
-                CatchOnlyBoundary,
-                { recorder },
-                React.createElement(Bomb)
-            ),
-            {
-                depth: 'full',
-                errorMode: 'capture',
-                strictMode: false,
-                warningMode: 'capture'
-            }
-        );
-
-        return check.group([
-            check.annotated('recorder entries').deepEqual(recorder.entries, [ 'boom', 'recovered' ]),
-            check.annotated('root error message').equal(view.root?.error?.message, 'boom'),
-            check.annotated('root error handled').true(view.root?.error?.handled),
-            check.annotated('fallback text').equal(view.find('span')?.textContent, 'catch fallback')
-        ]);
-    },
-    name: 'assertCatchOnlyBoundary'
-});
-
-const assertClassRenderError = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(React.createElement(BrokenClass, { label: 'broken' }), {
-            depth: 'full',
-            errorMode: 'capture',
-            strictMode: false,
-            warningMode: 'capture'
-        });
-
-        return check.group([
-            check.annotated('error count').equal(view.errors.length, 1),
-            check.annotated('error message').equal(view.errors[0]?.message, 'class render failed'),
-            check.annotated('root').undefined(view.root)
-        ]);
-    },
-    name: 'assertClassRenderError'
-});
 
 function createClassRefState(): ClassRefState {
     let callbackValue: unknown = null;
@@ -582,8 +402,120 @@ function createClassRefState(): ClassRefState {
     });
 }
 
-const assertClassRefs = defineCompositeAssertion({
-    assert(check) {
+export const testNode = suite('class components and error boundaries', [
+    test('runs class lifecycles around committed renders', function (scope) {
+        const recorder = createRecorder();
+        const view = introspect(React.createElement(LifecyclePanel, { label: 'initial', recorder }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        const initialRootType = view.root?.type;
+        const initialText = view.textContent;
+
+        view.update(React.createElement(LifecyclePanel, { label: 'derived', recorder }));
+        view.unmount();
+
+        scope.assert.deepEqual({
+            entries: recorder.entries,
+            initialRootType,
+            initialText,
+            unmountedText: view.textContent
+        }, {
+            entries: [
+                'render:initial:created',
+                'mount:initial:created',
+                'render:derived:derived',
+                'update:initial:created:snapshot:initial',
+                'unmount:derived:derived'
+            ],
+            initialRootType: LifecyclePanel,
+            initialText: 'initial:created',
+            unmountedText: ''
+        });
+
+        return scope.assert.collect();
+    }),
+    test('updates class state from event handlers', function (scope) {
+        const view = introspect(React.createElement(Counter), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        requireValue(view.find('button')).sendEvent('click');
+
+        scope.assert.equal(view.textContent, '2');
+
+        return scope.assert.collect();
+    }),
+    test('forces class renders through forceUpdate', function (scope) {
+        const { Panel, readRenders } = createForcedPanel();
+        const view = introspect(React.createElement(Panel), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        requireValue(view.find('button')).sendEvent('click');
+
+        scope.assert.equal(readRenders(), 2);
+        scope.assert.equal(view.textContent, '2');
+
+        return scope.assert.collect();
+    }),
+    test('honors class render gates', function (scope) {
+        const { gated, gatedView, pure, pureView } = createRenderGateViews();
+
+        gatedView.update(React.createElement(gated.Panel, { value: 'skip' }));
+        pureView.update(React.createElement(pure.Panel, { label: 'one' }));
+        pureView.update(React.createElement(pure.Panel, { label: 'two' }));
+
+        scope.assert.equal(gated.readRenders(), 1);
+        scope.assert.equal(requireValue(gatedView.find(gated.Panel)).props.value, 'skip');
+        scope.assert.equal(gatedView.textContent, 'one');
+        scope.assert.equal(pure.readRenders(), 2);
+        scope.assert.equal(pureView.textContent, 'two');
+
+        return scope.assert.collect();
+    }),
+    test('keeps handled boundary errors on the boundary node', function (scope) {
+        const recorder = createRecorder();
+        const view = introspect(
+            React.createElement(
+                Boundary,
+                { recorder },
+                React.createElement(Bomb)
+            ),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false,
+                warningMode: 'capture'
+            }
+        );
+
+        scope.assert.deepEqual(recorder.entries, [ 'boom' ]);
+        scope.assert.equal(view.errors.length, 0);
+        scope.assert.equal(view.root?.error?.message, 'boom');
+        scope.assert.true(view.root?.error?.handled);
+        scope.assert.equal(view.find('span')?.textContent, 'fallback');
+
+        return scope.assert.collect();
+    }),
+    test('captures uncaught class render errors', function (scope) {
+        const view = introspect(React.createElement(BrokenClass, { label: 'broken' }), {
+            depth: 'full',
+            errorMode: 'capture',
+            strictMode: false,
+            warningMode: 'capture'
+        });
+
+        scope.assert.equal(view.errors.length, 1);
+        scope.assert.equal(view.errors[0]?.message, 'class render failed');
+        scope.assert.undefined(view.root);
+
+        return scope.assert.collect();
+    }),
+    test('attaches refs to executed class instances', function (scope) {
         const state = createClassRefState();
         const objectRefIsComponent = state.objectRef.current instanceof React.Component;
         const callbackRefIsComponent = state.callback.read() instanceof React.Component;
@@ -591,18 +523,14 @@ const assertClassRefs = defineCompositeAssertion({
         state.objectView.unmount();
         state.callbackView.unmount();
 
-        return check.group([
-            check.annotated('object ref instance').true(objectRefIsComponent),
-            check.annotated('callback ref instance').true(callbackRefIsComponent),
-            check.annotated('object ref cleared').null(state.objectRef.current),
-            check.annotated('callback ref cleared').null(state.callback.read())
-        ]);
-    },
-    name: 'assertClassRefs'
-});
+        scope.assert.true(objectRefIsComponent);
+        scope.assert.true(callbackRefIsComponent);
+        scope.assert.null(state.objectRef.current);
+        scope.assert.null(state.callback.read());
 
-const assertPrimitivePureState = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('updates primitive PureComponent state', function (scope) {
         const view = introspect(React.createElement(PrimitivePureCounter), {
             depth: 'full',
             strictMode: false
@@ -611,13 +539,11 @@ const assertPrimitivePureState = defineCompositeAssertion({
 
         button.sendEvent('click');
 
-        return check.equal(view.textContent, '1');
-    },
-    name: 'assertPrimitivePureState'
-});
+        scope.assert.equal(view.textContent, '1');
 
-const assertObjectPureState = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('updates object PureComponent state', function (scope) {
         const view = introspect(React.createElement(ObjectPureCounter), {
             depth: 'full',
             strictMode: false
@@ -626,64 +552,51 @@ const assertObjectPureState = defineCompositeAssertion({
 
         button.sendEvent('click');
 
-        return check.equal(view.textContent, '1');
-    },
-    name: 'assertObjectPureState'
-});
-
-export const testNode = suite('class components and error boundaries', [
-    test('runs class lifecycles around committed renders', function (scope) {
-        scope.assert(assertLifecycle);
-
-        return scope.assert.collect();
-    }),
-    test('updates class state from event handlers', function (scope) {
-        scope.assert(assertStateUpdates);
-
-        return scope.assert.collect();
-    }),
-    test('forces class renders through forceUpdate', function (scope) {
-        scope.assert(assertForceUpdate);
-
-        return scope.assert.collect();
-    }),
-    test('honors class render gates', function (scope) {
-        scope.assert(assertRenderGates);
-
-        return scope.assert.collect();
-    }),
-    test('keeps handled boundary errors on the boundary node', function (scope) {
-        scope.assert(assertErrorBoundary);
-
-        return scope.assert.collect();
-    }),
-    test('captures uncaught class render errors', function (scope) {
-        scope.assert(assertClassRenderError);
-
-        return scope.assert.collect();
-    }),
-    test('attaches refs to executed class instances', function (scope) {
-        scope.assert(assertClassRefs);
-
-        return scope.assert.collect();
-    }),
-    test('updates primitive PureComponent state', function (scope) {
-        scope.assert(assertPrimitivePureState);
-
-        return scope.assert.collect();
-    }),
-    test('updates object PureComponent state', function (scope) {
-        scope.assert(assertObjectPureState);
+        scope.assert.equal(view.textContent, '1');
 
         return scope.assert.collect();
     }),
     test('handles primitive boundary state', function (scope) {
-        scope.assert(assertPrimitiveBoundaryState);
+        const recorder = createRecorder();
+        const view = introspect(
+            React.createElement(
+                PrimitiveBoundary as never,
+                { recorder },
+                React.createElement(StringBomb)
+            ),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false,
+                warningMode: 'capture'
+            }
+        );
+
+        scope.assert.equal(view.root?.error?.message, 'string boom');
+        scope.assert.equal(view.find('span')?.textContent, 'primitive fallback');
 
         return scope.assert.collect();
     }),
     test('handles componentDidCatch recovery', function (scope) {
-        scope.assert(assertCatchOnlyBoundary);
+        const recorder = createRecorder();
+        const view = introspect(
+            React.createElement(
+                CatchOnlyBoundary,
+                { recorder },
+                React.createElement(Bomb)
+            ),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false,
+                warningMode: 'capture'
+            }
+        );
+
+        scope.assert.deepEqual(recorder.entries, [ 'boom', 'recovered' ]);
+        scope.assert.equal(view.root?.error?.message, 'boom');
+        scope.assert.true(view.root?.error?.handled);
+        scope.assert.equal(view.find('span')?.textContent, 'catch fallback');
 
         return scope.assert.collect();
     })

@@ -59,22 +59,6 @@ function IdLabel(props: IdLabelProps): React.ReactNode {
     );
 }
 
-const assertHiddenActivityNode = defineCompositeAssertion({
-    assert(check, activity: IntrospectionNode) {
-        return check.group([
-            check.annotated('activity name').equal(activity.name, 'Activity'),
-            check.annotated('activity visibility').equal(activity.visibility, 'hidden'),
-            check.annotated('activity state').deepEqual(activity.state, {
-                activityMode: 'hidden',
-                reason: 'activity',
-                rendered: true,
-                visible: false
-            })
-        ]);
-    },
-    name: 'assertHiddenActivityNode'
-});
-
 const assertHiddenDescendant = defineCompositeAssertion({
     assert(check, node: IntrospectionNode) {
         return check.group([
@@ -84,22 +68,6 @@ const assertHiddenDescendant = defineCompositeAssertion({
         ]);
     },
     name: 'assertHiddenDescendant'
-});
-
-const assertVisibleActivity = defineCompositeAssertion({
-    assert(check, view: IntrospectionView) {
-        const activity = requireValue(view.find(React.Activity));
-        const panel = requireValue(view.find(Panel));
-        const section = requireValue(view.find('section'));
-
-        return check.group([
-            check.annotated('activity visibility').equal(activity.visibility, 'visible'),
-            check.annotated('activity mode').equal(activity.state.activityMode, 'visible'),
-            check.annotated('panel visibility').equal(panel.visibility, 'visible'),
-            check.annotated('section visibility').equal(section.visibility, 'visible')
-        ]);
-    },
-    name: 'assertVisibleActivity'
 });
 
 function createCyclicIdObject(id: string): Record<PropertyKey, unknown> {
@@ -202,7 +170,20 @@ export const testNode = suite('React 19 special surfaces', [
         const panel = requireValue(view.find(Panel));
         const section = requireValue(view.find('section'));
 
-        scope.assert(assertHiddenActivityNode, activity);
+        scope.assert.deepEqual({
+            name: activity.name,
+            state: activity.state,
+            visibility: activity.visibility
+        }, {
+            name: 'Activity',
+            state: {
+                activityMode: 'hidden',
+                reason: 'activity',
+                rendered: true,
+                visible: false
+            },
+            visibility: 'hidden'
+        });
         scope.assert(assertHiddenDescendant, panel);
         scope.assert(assertHiddenDescendant, section);
         scope.assert.equal(view.formatTree(), 'Activity\n  Panel\n    section\n      #text');
@@ -227,8 +208,23 @@ export const testNode = suite('React 19 special surfaces', [
             mode: 'visible'
         }));
 
-        scope.assert.equal(hiddenActivity.isStale, true);
-        scope.assert(assertVisibleActivity, view);
+        const activity = requireValue(view.find(React.Activity));
+        const panel = requireValue(view.find(Panel));
+        const section = requireValue(view.find('section'));
+
+        scope.assert.deepEqual({
+            activityMode: activity.state.activityMode,
+            activityVisibility: activity.visibility,
+            hiddenActivityStale: hiddenActivity.isStale,
+            panelVisibility: panel.visibility,
+            sectionVisibility: section.visibility
+        }, {
+            activityMode: 'visible',
+            activityVisibility: 'visible',
+            hiddenActivityStale: true,
+            panelVisibility: 'visible',
+            sectionVisibility: 'visible'
+        });
 
         return scope.assert.collect();
     }),

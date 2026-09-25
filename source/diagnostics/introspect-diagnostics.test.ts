@@ -1,5 +1,4 @@
-import { suite, test } from '@overkill-dev/test';
-import { defineCompositeAssertion } from '@overkill-dev/test/assert';
+import { recordSink, suite, test, transcriptUsage } from '@overkill-dev/test';
 import React from 'react';
 import { createUnitIntrospectionView as introspect } from '../runtime/view/introspect-unit-view.test.ts';
 import {
@@ -32,41 +31,6 @@ function requireError(action: () => unknown): Error {
 function ThrowingComponent(): React.ReactNode {
     throw new Error('render failed');
 }
-
-const assertCapturedRootError = defineCompositeAssertion({
-    assert(check) {
-        const view = introspect(React.createElement(ThrowingComponent), {
-            errorMode: 'capture',
-            strictMode: false,
-            warningMode: 'capture'
-        });
-
-        return check.group([
-            check.annotated('error count').equal(view.errors.length, 1),
-            check.annotated('error message').equal(view.errors[0]?.message, 'render failed'),
-            check.annotated('handled').false(view.errors[0]?.handled),
-            check.annotated('warning count').equal(view.warnings.length, 0),
-            check.annotated('root').undefined(view.root),
-            check.annotated('render count').equal(view.renderCount, 1)
-        ]);
-    },
-    name: 'assertCapturedRootError'
-});
-
-const assertThrownRootError = defineCompositeAssertion({
-    assert(check) {
-        const error = requireError(function renderThrowingComponent() {
-            introspect(React.createElement(ThrowingComponent), {
-                errorMode: 'throw',
-                strictMode: false,
-                warningMode: 'capture'
-            });
-        });
-
-        return check.equal(error.message, 'render failed');
-    },
-    name: 'assertThrownRootError'
-});
 
 function createConsoleDiagnosticPublisher(): ConsoleDiagnosticPublisher {
     let records: readonly ((message: unknown) => void)[] = Object.freeze([]);
@@ -108,52 +72,69 @@ function recordRecoverableWarning(diagnostics: IntrospectionDiagnostics, message
     });
 }
 
-const assertCapturedRecoverableWarning = defineCompositeAssertion({
-    assert(check) {
+export const testNode = suite('diagnostics', [
+    test('captures uncaught root errors on the view', function (scope) {
+        const view = introspect(React.createElement(ThrowingComponent), {
+            errorMode: 'capture',
+            strictMode: false,
+            warningMode: 'capture'
+        });
+
+        scope.assert.equal(view.errors.length, 1);
+        scope.assert.equal(view.errors[0]?.message, 'render failed');
+        scope.assert.false(view.errors[0]?.handled);
+        scope.assert.equal(view.warnings.length, 0);
+        scope.assert.undefined(view.root);
+        scope.assert.equal(view.renderCount, 1);
+
+        return scope.assert.collect();
+    }),
+    test('throws uncaught root errors when error mode is throw', function (scope) {
+        const error = requireError(function renderThrowingComponent() {
+            introspect(React.createElement(ThrowingComponent), {
+                errorMode: 'throw',
+                strictMode: false,
+                warningMode: 'capture'
+            });
+        });
+
+        scope.assert.equal(error.message, 'render failed');
+
+        return scope.assert.collect();
+    }),
+    test('captures recoverable warnings', function (scope) {
         const diagnostics = createIsolatedDiagnostics('capture');
 
         recordRecoverableWarning(diagnostics, 'recoverable warning');
 
-        return check.group([
-            check.annotated('has warnings').true(diagnostics.hasWarnings),
-            check.annotated('warning count').equal(diagnostics.warnings.length, 1),
-            check.annotated('warning message').equal(diagnostics.warnings[0]?.message, 'recoverable warning')
-        ]);
-    },
-    name: 'assertCapturedRecoverableWarning'
-});
+        scope.assert.true(diagnostics.hasWarnings);
+        scope.assert.equal(diagnostics.warnings.length, 1);
+        scope.assert.equal(diagnostics.warnings[0]?.message, 'recoverable warning');
 
-const assertDefaultRecoverableWarningThrow = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('throws recoverable warnings in throw mode', function (scope) {
         const diagnostics = createIsolatedDiagnostics('throw');
         const error = requireError(function renderWarningComponent() {
             recordRecoverableWarning(diagnostics, 'recoverable warning');
         });
 
-        return check.group([
-            check.annotated('error message').equal(error.message, 'recoverable warning'),
-            check.annotated('warning count').equal(diagnostics.warnings.length, 1)
-        ]);
-    },
-    name: 'assertDefaultRecoverableWarningThrow'
-});
+        scope.assert.equal(error.message, 'recoverable warning');
+        scope.assert.equal(diagnostics.warnings.length, 1);
 
-const assertIgnoredRecoverableWarning = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('ignores recoverable warnings when requested', function (scope) {
         const diagnostics = createIsolatedDiagnostics('ignore');
 
         recordRecoverableWarning(diagnostics, 'recoverable warning');
 
-        return check.group([
-            check.annotated('has warnings').false(diagnostics.hasWarnings),
-            check.annotated('warning count').equal(diagnostics.warnings.length, 0)
-        ]);
-    },
-    name: 'assertIgnoredRecoverableWarning'
-});
+        scope.assert.false(diagnostics.hasWarnings);
+        scope.assert.equal(diagnostics.warnings.length, 0);
 
-const assertConsoleDiagnostics = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('captures React console diagnostics inside Introspection context', function (scope) {
         const consoleDiagnostics = createConsoleDiagnosticPublisher();
         const diagnostics = createDiagnostics('capture', consoleDiagnostics.source);
 
@@ -163,17 +144,13 @@ const assertConsoleDiagnostics = defineCompositeAssertion({
             consoleDiagnostics.publish('ordinary application output');
         });
 
-        return check.group([
-            check.annotated('has warnings').true(diagnostics.hasWarnings),
-            check.annotated('warning count').equal(diagnostics.warnings.length, 1),
-            check.annotated('warning message').equal(diagnostics.warnings[0]?.message, 'Warning: console warning')
-        ]);
-    },
-    name: 'assertConsoleDiagnostics'
-});
+        scope.assert.true(diagnostics.hasWarnings);
+        scope.assert.equal(diagnostics.warnings.length, 1);
+        scope.assert.equal(diagnostics.warnings[0]?.message, 'Warning: console warning');
 
-const assertStringWarningThrow = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('throws string console warnings in throw mode', function (scope) {
         const consoleDiagnostics = createConsoleDiagnosticPublisher();
         const diagnostics = createDiagnostics('throw', consoleDiagnostics.source);
         const error = requireError(function recordStringWarning() {
@@ -182,15 +159,12 @@ const assertStringWarningThrow = defineCompositeAssertion({
             });
         });
 
-        return check.equal(error.message, 'Warning: string warning');
-    },
-    name: 'assertStringWarningThrow'
-});
+        scope.assert.equal(error.message, 'Warning: string warning');
 
-const assertNodeConsoleDiagnosticsSubscription = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('subscribes the Node console diagnostic channels', function (scope) {
         let subscriptions: readonly NodeConsoleSubscription[] = Object.freeze([]);
-        let messages: readonly unknown[] = Object.freeze([]);
         const consoleDiagnostics = createNodeConsoleDiagnostics(Object.freeze({
             subscribe(name: string, record: (message: unknown) => void) {
                 subscriptions = Object.freeze([
@@ -199,50 +173,48 @@ const assertNodeConsoleDiagnosticsSubscription = defineCompositeAssertion({
                 ]);
             }
         }));
+        const messages = recordSink<readonly [kind: 'message', message: unknown]>(function subscribe(record) {
+            consoleDiagnostics.subscribe(function recordMessage(message) {
+                record('message', message);
+            });
 
-        consoleDiagnostics.subscribe(function recordMessage(message) {
-            messages = Object.freeze([
-                ...messages,
-                message
-            ]);
+            return function disposeMessages() {
+                return undefined;
+            };
+        });
+
+        scope.cleanup(function disposeMessages() {
+            messages.dispose();
         });
         subscriptions[0]?.[1]('error message');
         subscriptions[1]?.[1]([ 'warn', 'message' ]);
 
-        return check.group([
-            check.annotated('channel names').deepEqual(
-                subscriptions.map(function readName(subscription) {
-                    return subscription[0];
-                }),
-                [ 'console.error', 'console.warn' ]
-            ),
-            check.annotated('messages').deepEqual(messages, [
-                'error message',
-                [ 'warn', 'message' ]
-            ])
+        scope.assert.deepEqual(
+            subscriptions.map(function readName(subscription) {
+                return subscription[0];
+            }),
+            [ 'console.error', 'console.warn' ]
+        );
+        scope.assert(transcriptUsage.exactly, messages, [
+            [ 'message', 'error message' ],
+            [ 'message', [ 'warn', 'message' ] ]
         ]);
-    },
-    name: 'assertNodeConsoleDiagnosticsSubscription'
-});
 
-const assertCaughtErrorsAreNotDoubleReported = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('does not double-report caught errors', function (scope) {
         const diagnostics = createIsolatedDiagnostics('capture');
 
         diagnostics.run(function recordCaughtError() {
             diagnostics.recordCaughtError(new Error('handled'));
         });
 
-        return check.group([
-            check.annotated('error count').equal(diagnostics.errors.length, 0),
-            check.annotated('warning count').equal(diagnostics.warnings.length, 0)
-        ]);
-    },
-    name: 'assertCaughtErrorsAreNotDoubleReported'
-});
+        scope.assert.equal(diagnostics.errors.length, 0);
+        scope.assert.equal(diagnostics.warnings.length, 0);
 
-const assertDuplicateErrorsAreDeduped = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('dedupes repeated uncaught errors', function (scope) {
         const diagnostics = createIsolatedDiagnostics('capture');
         const error = new Error('same failure');
 
@@ -251,116 +223,44 @@ const assertDuplicateErrorsAreDeduped = defineCompositeAssertion({
             diagnostics.recordUncaughtError(error);
         });
 
-        return check.group([
-            check.annotated('error count').equal(diagnostics.errors.length, 1),
-            check.annotated('error message').equal(diagnostics.errors[0]?.message, 'same failure')
-        ]);
-    },
-    name: 'assertDuplicateErrorsAreDeduped'
-});
+        scope.assert.equal(diagnostics.errors.length, 1);
+        scope.assert.equal(diagnostics.errors[0]?.message, 'same failure');
 
-const assertRootCallbackMapping = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('maps React root error callbacks', function (scope) {
         const diagnostics = createIsolatedDiagnostics('capture');
 
         diagnostics.recordCaughtError(new Error('handled failure'));
         diagnostics.recordRecoverableError(new Error('recoverable failure'));
         diagnostics.recordUncaughtError(new Error('uncaught failure'));
 
-        return check.group([
-            check.annotated('error count').equal(diagnostics.errors.length, 1),
-            check.annotated('error message').equal(diagnostics.errors[0]?.message, 'uncaught failure'),
-            check.annotated('warning count').equal(diagnostics.warnings.length, 1),
-            check.annotated('warning message').equal(diagnostics.warnings[0]?.message, 'recoverable failure')
-        ]);
-    },
-    name: 'assertRootCallbackMapping'
-});
+        scope.assert.equal(diagnostics.errors.length, 1);
+        scope.assert.equal(diagnostics.errors[0]?.message, 'uncaught failure');
+        scope.assert.equal(diagnostics.warnings.length, 1);
+        scope.assert.equal(diagnostics.warnings[0]?.message, 'recoverable failure');
 
-const assertDiagnosticsIsolation = defineCompositeAssertion({
-    assert(check) {
+        return scope.assert.collect();
+    }),
+    test('keeps Introspection diagnostics isolated', function (scope) {
         const first = createIsolatedDiagnostics('capture');
         const second = createIsolatedDiagnostics('capture');
 
         recordRecoverableWarning(first, 'first warning');
         recordRecoverableWarning(second, 'second warning');
 
-        return check.group([
-            check.annotated('first diagnostics').deepEqual(
-                first.warnings.map(function readMessage(warning) {
-                    return warning.message;
-                }),
-                [ 'first warning' ]
-            ),
-            check.annotated('second diagnostics').deepEqual(
-                second.warnings.map(function readMessage(warning) {
-                    return warning.message;
-                }),
-                [ 'second warning' ]
-            )
-        ]);
-    },
-    name: 'assertDiagnosticsIsolation'
-});
-
-export const testNode = suite('diagnostics', [
-    test('captures uncaught root errors on the view', function (scope) {
-        scope.assert(assertCapturedRootError);
-
-        return scope.assert.collect();
-    }),
-    test('throws uncaught root errors when error mode is throw', function (scope) {
-        scope.assert(assertThrownRootError);
-
-        return scope.assert.collect();
-    }),
-    test('captures recoverable warnings', function (scope) {
-        scope.assert(assertCapturedRecoverableWarning);
-
-        return scope.assert.collect();
-    }),
-    test('throws recoverable warnings in throw mode', function (scope) {
-        scope.assert(assertDefaultRecoverableWarningThrow);
-
-        return scope.assert.collect();
-    }),
-    test('ignores recoverable warnings when requested', function (scope) {
-        scope.assert(assertIgnoredRecoverableWarning);
-
-        return scope.assert.collect();
-    }),
-    test('captures React console diagnostics inside Introspection context', function (scope) {
-        scope.assert(assertConsoleDiagnostics);
-
-        return scope.assert.collect();
-    }),
-    test('throws string console warnings in throw mode', function (scope) {
-        scope.assert(assertStringWarningThrow);
-
-        return scope.assert.collect();
-    }),
-    test('subscribes the Node console diagnostic channels', function (scope) {
-        scope.assert(assertNodeConsoleDiagnosticsSubscription);
-
-        return scope.assert.collect();
-    }),
-    test('does not double-report caught errors', function (scope) {
-        scope.assert(assertCaughtErrorsAreNotDoubleReported);
-
-        return scope.assert.collect();
-    }),
-    test('dedupes repeated uncaught errors', function (scope) {
-        scope.assert(assertDuplicateErrorsAreDeduped);
-
-        return scope.assert.collect();
-    }),
-    test('maps React root error callbacks', function (scope) {
-        scope.assert(assertRootCallbackMapping);
-
-        return scope.assert.collect();
-    }),
-    test('keeps Introspection diagnostics isolated', function (scope) {
-        scope.assert(assertDiagnosticsIsolation);
+        scope.assert.deepEqual(
+            first.warnings.map(function readMessage(warning) {
+                return warning.message;
+            }),
+            [ 'first warning' ]
+        );
+        scope.assert.deepEqual(
+            second.warnings.map(function readMessage(warning) {
+                return warning.message;
+            }),
+            [ 'second warning' ]
+        );
 
         return scope.assert.collect();
     })
