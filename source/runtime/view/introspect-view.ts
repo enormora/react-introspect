@@ -4,6 +4,7 @@ import {
     type IntrospectionConsoleDiagnostics,
     type IntrospectionDiagnosticsOptions
 } from '../../diagnostics/introspect-diagnostics.ts';
+import { createFrameDepth } from '../../render/frame/introspect-frame-contract.ts';
 import { createIntrospectionRenderElement } from '../../render/frame/introspect-frame.ts';
 import {
     createIntrospectionListLocator,
@@ -62,7 +63,11 @@ function createIntrospectionViewWithDependencies(
     dependencies: IntrospectionViewModuleDependencies
 ): RuntimeIntrospectionView {
     let currentSnapshot = createEmptyIntrospectionSnapshot(0);
-    const depth = options.depth ?? 1;
+    const depth = createFrameDepth({
+        budget: options.depth ?? 1,
+        depthFrom: options.depthFrom,
+        transparent: options.transparent ?? []
+    });
     const idPrefix = options.idPrefix ?? createDefaultIdPrefix();
     const diagnostics = createIntrospectionDiagnostics(diagnosticsOptions(options), dependencies.consoleDiagnostics);
     const reconcilerRoot = diagnostics.run(function createRootWithDiagnostics() {

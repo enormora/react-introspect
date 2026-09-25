@@ -119,12 +119,14 @@ Options:
 | Option        | Default     | What it does                                                             |
 | ------------- | ----------- | ------------------------------------------------------------------------ |
 | `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.                    |
+| `depthFrom`   | none        | Starts counting `depth` at the first instance of this component.         |
 | `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.              |
 | `idPrefix`    | generated   | Prefix passed to React for `useId`.                                      |
 | `idGenerator` | none        | Rewrites React-generated ids in React Introspect snapshots after commit. |
 | `refs`        | none        | Injects fake host ref nodes.                                             |
 | `waitTimeout` | `1000`      | Default timeout for wait APIs.                                           |
 | `strictMode`  | `true`      | Wraps the React Introspect root in `React.StrictMode`.                   |
+| `transparent` | `[]`        | Components that execute without consuming `depth`.                       |
 | `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.                 |
 
 View properties are lazy views of the latest committed snapshot.
@@ -897,6 +899,35 @@ const card = view.find(Card);
 assert.ok(card);
 assert.equal(card.props.theme, 'dark');
 ```
+
+### Harness wrappers and routers
+
+Every executed component consumes one level of `depth`. Wrappers from the test harness would eat that budget.
+
+Use `transparent` for wrappers you own.
+
+```tsx
+const view = introspect(
+    <ThemeProvider>
+        <SettingsPage />
+    </ThemeProvider>,
+    { transparent: [ ThemeProvider ] }
+);
+```
+
+`ThemeProvider` executes, `SettingsPage` executes, and its children stay leaves.
+
+Use `depthFrom` when the wrapper renders components you cannot name, such as router internals.
+
+```tsx
+const view = introspect(<RouterProvider router={router} />, {
+    depthFrom: SettingsPage
+});
+```
+
+Everything above `SettingsPage` executes. On each branch, `depth` counts from the first `SettingsPage`. Nested instances do not restart the count.
+
+Components beside the path to `depthFrom`, such as a layout's header, also execute. If `depthFrom` never renders, the whole tree executes.
 
 ### Render props
 
