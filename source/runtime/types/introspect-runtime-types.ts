@@ -1,6 +1,7 @@
 import type React from 'react';
 import type {
     IntrospectionError,
+    IntrospectionNodeKind,
     IntrospectionNodeState,
     IntrospectionNotRenderedReason,
     IntrospectionOptions,
@@ -24,6 +25,7 @@ export type RuntimeIntrospectionNode = {
     readonly givenChildren: RuntimeIntrospectionList;
     readonly isStale: boolean;
     readonly key: string | null;
+    readonly kind: IntrospectionNodeKind;
     readonly name: string;
     readonly path: string;
     readonly props: Readonly<Record<PropertyKey, unknown>>;

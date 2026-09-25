@@ -35,6 +35,7 @@ export type {
     IntrospectionListLocator,
     IntrospectionLocator,
     IntrospectionNode,
+    IntrospectionNodeKind,
     IntrospectionNodeState,
     IntrospectionOptions,
     IntrospectionRefMatcher,

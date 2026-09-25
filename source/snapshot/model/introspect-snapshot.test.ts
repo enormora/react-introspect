@@ -160,6 +160,24 @@ export const testNode = suite('snapshot tree model', [
 
         return scope.assert.collect();
     }),
+    test('exposes node kinds without magic type names', function (scope) {
+        const view = introspect(createMixedTree(), { depth: 0 });
+        const root = requireValue(view.root);
+
+        scope.assert.deepEqual({
+            childKinds: Array.from(view.renderedChildren, function readKind(node) {
+                return node.kind;
+            }),
+            rootKind: root.kind,
+            textKind: view.find({ textContent: 'now', type: '#text' })?.kind
+        }, {
+            childKinds: [ 'host', 'component', 'empty', 'empty', 'empty', 'opaque' ],
+            rootKind: 'fragment',
+            textKind: 'text'
+        });
+
+        return scope.assert.collect();
+    }),
     test('matches selectors against tree nodes', function (scope) {
         const view = introspect(createMixedTree(), { depth: 0 });
         const section = requireValue(view.find('section'));

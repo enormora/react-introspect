@@ -1,6 +1,10 @@
 import type React from 'react';
 import type { IntrospectionIdNormalization } from '../normalization/introspect-id-normalization.ts';
-import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
+import type {
+    IntrospectionError,
+    IntrospectionNodeKind,
+    IntrospectionNotRenderedReason
+} from '../../public/introspect-public-types.ts';
 
 export type IntrospectionSnapshot = {
     readonly nodes: readonly SnapshotNode[];
@@ -10,7 +14,7 @@ export type IntrospectionSnapshot = {
 
 export type SnapshotProps = Readonly<Record<PropertyKey, unknown>>;
 
-export type SnapshotNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
+export type SnapshotNodeKind = IntrospectionNodeKind;
 
 export type SnapshotVisibility = 'hidden' | 'visible';
 

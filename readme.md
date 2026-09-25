@@ -313,6 +313,40 @@ assert.equal(button.name, 'Button');
 assert.equal(button.key, 'primary');
 ```
 
+### `node.kind`
+
+Tells you what a node models, without matching on `'#empty'` or `'#text'`.
+
+Values:
+
+- `'component'`
+- `'host'`
+- `'fragment'`
+- `'text'`
+- `'empty'` for `null`, `undefined`, and booleans
+- `'opaque'` for values React Introspect does not model
+
+Empty children keep their position.
+
+```tsx
+const Toolbar = (props: { canSave: boolean; }) => (
+    <Shell>
+        {props.canSave && <SaveButton />}
+        <CancelButton />
+    </Shell>
+);
+
+const view = introspect(<Toolbar canSave={false} />);
+
+const shell = view.find(Shell);
+
+assert.ok(shell);
+assert.equal(shell.givenChildren.at(0)?.kind, 'empty');
+assert.equal(shell.givenChildren.at(1)?.type, CancelButton);
+```
+
+### `node.isStale`
+
 `isStale` tells you whether a newer committed snapshot exists.
 
 ```tsx

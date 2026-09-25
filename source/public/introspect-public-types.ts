@@ -32,6 +32,8 @@ export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = In
 
 export type IntrospectionHostSchema = Readonly<Record<string, unknown>>;
 
+export type IntrospectionNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
+
 export type IntrospectionNotRenderedReason = 'depth' | 'errored' | 'suspended' | 'unsupported';
 
 export type IntrospectionFakeRefNode<Node = Record<PropertyKey, unknown>> = Node;
@@ -234,6 +236,7 @@ export type IntrospectionNode<
     readonly givenChildren: GivenChildren<HostSchema>;
     readonly isStale: boolean;
     readonly key: string | null;
+    readonly kind: IntrospectionNodeKind;
     readonly name: string;
     readonly path: string;
     readonly props: Props;
