@@ -214,3 +214,41 @@ export function createIntrospectionNode(
         }
     });
 }
+
+function snapshotTreeNodes(snapshot: IntrospectionSnapshot): readonly SnapshotNode[] {
+    function collect(node: SnapshotNode): readonly SnapshotNode[] {
+        return [
+            node,
+            ...node.renderedChildren.flatMap(collect)
+        ];
+    }
+
+    return snapshot.root === undefined ? Object.freeze([]) : collect(snapshot.root);
+}
+
+export function createIntrospectionNodeList(
+    reader: SnapshotReader,
+    snapshot: IntrospectionSnapshot,
+    nodes: readonly SnapshotNode[]
+): RuntimeIntrospectionList {
+    return createIntrospectionList(nodes.map(function createNode(node) {
+        return createIntrospectionNode(reader, snapshot, node);
+    }));
+}
+
+export function findIntrospectionNodes(
+    reader: SnapshotReader,
+    snapshot: IntrospectionSnapshot,
+    selector: unknown
+): RuntimeIntrospectionList {
+    const normalizedSelector = toSelector(selector);
+    const nodes = snapshotTreeNodes(snapshot)
+        .map(function createNode(node) {
+            return createIntrospectionNode(reader, snapshot, node);
+        })
+        .filter(function isMatch(node) {
+            return nodeMatchesSelector(node, normalizedSelector);
+        });
+
+    return createIntrospectionList(nodes);
+}

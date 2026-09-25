@@ -1,3 +1,4 @@
+import { AsyncResource } from 'node:async_hooks';
 import { suite, test } from '@overkill-dev/test';
 import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
@@ -6,7 +7,16 @@ import type {
     IntrospectionOptions,
     IntrospectionView
 } from '../../public/introspect-public-types.ts';
+import {
+    createUnitRuntimeDependencies,
+    type IntrospectionRuntimeDependencies
+} from '../../runtime/view/introspect-runtime-dependencies.ts';
 import { createIntrospectionView } from '../../runtime/view/introspect-view.ts';
+import {
+    cancelIntrospectionTimeout,
+    runWithIntrospectionRuntime,
+    scheduleIntrospectionTimeout
+} from './introspect-reconciler-runtime.ts';
 
 type HostSchema = {
     readonly main: {
@@ -349,8 +359,7 @@ const assertSuspendedUpdateRollback = defineCompositeAssertion({
     assert(check) {
         const view = introspect(React.createElement(Page, { title: 'stable' }), {
             depth: 'full',
-            strictMode: false,
-            waitTimeout: 10
+            strictMode: false
         });
 
         try {
@@ -501,8 +510,7 @@ export const testNode = suite('custom reconciler host layer', [
     test('waits for committed renders and idle work', async function (scope) {
         const view = introspect<HostSchema>(React.createElement(Page, { title: 'first' }), {
             depth: 'full',
-            strictMode: false,
-            waitTimeout: 50
+            strictMode: false
         });
 
         await scope.assert(assertWaits, view);
@@ -578,5 +586,53 @@ export const testNode = suite('custom reconciler host layer', [
 
             return scope.assert.collect();
         }
-    )
+    ),
+    test('routes timeout hooks through injected runtime', function (scope) {
+        const unitRuntime = createUnitRuntimeDependencies();
+        const timeoutEvents: string[] = [];
+        const runtime: IntrospectionRuntimeDependencies = {
+            ...unitRuntime,
+            clock: {
+                ...unitRuntime.clock,
+                clearTimeout(timeoutIdentifier) {
+                    timeoutEvents.push('clear');
+                    unitRuntime.clock.clearTimeout(timeoutIdentifier);
+                },
+                setTimeout(handler, delayInMilliseconds, ...handlerArguments) {
+                    timeoutEvents.push(`schedule:${delayInMilliseconds}:${String(handlerArguments[0])}`);
+
+                    return unitRuntime.clock.setTimeout(handler, delayInMilliseconds, ...handlerArguments);
+                }
+            }
+        };
+        const timeoutIdentifier = runWithIntrospectionRuntime(runtime, function scheduleTimeout() {
+            return scheduleIntrospectionTimeout(
+                function recordTimeout(value: string) {
+                    timeoutEvents.push(value);
+                },
+                5,
+                'value'
+            );
+        });
+
+        runWithIntrospectionRuntime(runtime, function cancelTimeout() {
+            cancelIntrospectionTimeout(timeoutIdentifier);
+        });
+
+        scope.assert.deepEqual(timeoutEvents, [ 'schedule:5:value', 'clear' ]);
+        scope.assert.throws(
+            function scheduleWithoutRuntime() {
+                const asyncResource = new AsyncResource('missing-introspection-runtime');
+
+                asyncResource.runInAsyncScope(function runWithoutRuntime() {
+                    scheduleIntrospectionTimeout(function noopTimeout() {
+                        return undefined;
+                    }, 0);
+                });
+            },
+            { message: 'Expected Introspection runtime dependencies.' }
+        );
+
+        return scope.assert.collect();
+    })
 ]);

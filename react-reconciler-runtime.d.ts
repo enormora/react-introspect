@@ -1,7 +1,7 @@
 declare module 'react-reconciler' {
-    type ReconcilerRoot = Record<string, unknown>;
+    export type ReconcilerRoot = Record<string, unknown>;
 
-    type ReconcilerInstance = {
+    export type ReconcilerInstance = {
         readonly createContainer: (
             containerInfo: unknown,
             tag: number,

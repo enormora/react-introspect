@@ -2,6 +2,11 @@ import { suite, test } from '@overkill-dev/test';
 import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
+import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
+import {
+    createUnitRuntimeDependencies,
+    type IntrospectionRuntimeDependencies
+} from '../../runtime/view/introspect-runtime-dependencies.ts';
 import { createIntrospectionView as introspect } from '../../runtime/view/introspect-view.ts';
 import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
 
@@ -19,12 +24,30 @@ type LeafProps = {
     };
 };
 
-const actEnvironmentKey = 'IS_REACT_ACT_ENVIRONMENT';
+type ActObservation = {
+    readonly actCalls: number;
+    readonly active: boolean;
+    readonly componentObservedAct: boolean;
+    readonly restored: boolean;
+};
+
+type ObservedActRuntime = {
+    readonly component: () => React.ReactNode;
+    readonly readObservation: () => ActObservation;
+    readonly runtime: IntrospectionRuntimeDependencies;
+};
+
+type FailingActRuntime = {
+    readonly readObservation: () => Pick<ActObservation, 'active' | 'restored'>;
+    readonly runtime: IntrospectionRuntimeDependencies;
+};
+
 const reactPortalType = Symbol.for('react.portal');
-const browserGlobalKeys = Object.freeze([
-    'document',
-    'window'
-]);
+const noConsoleDiagnostics: IntrospectionConsoleDiagnostics = Object.freeze({
+    subscribe() {
+        return undefined;
+    }
+});
 
 function requireValue<Value>(value: Value | undefined): Value {
     if (value === undefined) {
@@ -99,6 +122,83 @@ function readElementProp(node: IntrospectionNode): ElementProp {
     }
 
     return icon as ElementProp;
+}
+
+function createObservedActRuntime(): ObservedActRuntime {
+    const unitRuntime = createUnitRuntimeDependencies();
+    let actCalls = 0;
+    let active = false;
+    let componentObservedAct = false;
+    let restored = false;
+
+    function ActProbe(): React.ReactNode {
+        componentObservedAct = active;
+
+        return React.createElement('main', null, 'clean');
+    }
+
+    const runtime: IntrospectionRuntimeDependencies = {
+        ...unitRuntime,
+        actEnvironment: Object.freeze({
+            act(action: () => unknown) {
+                actCalls += 1;
+                active = true;
+
+                try {
+                    return unitRuntime.actEnvironment.act(action);
+                } finally {
+                    active = false;
+                    restored = true;
+                }
+            }
+        })
+    };
+
+    return Object.freeze({
+        component: ActProbe,
+        readObservation() {
+            return {
+                actCalls,
+                active,
+                componentObservedAct,
+                restored
+            };
+        },
+        runtime
+    });
+}
+
+function createFailingActRuntime(): FailingActRuntime {
+    const unitRuntime = createUnitRuntimeDependencies();
+    let active = false;
+    let restored = false;
+    const runtime: IntrospectionRuntimeDependencies = {
+        ...unitRuntime,
+        actEnvironment: Object.freeze({
+            act(action: () => unknown) {
+                active = true;
+
+                try {
+                    unitRuntime.actEnvironment.act(action);
+
+                    throw new Error('Injected act failed.');
+                } finally {
+                    active = false;
+                    restored = true;
+                }
+            }
+        })
+    };
+
+    return Object.freeze({
+        readObservation() {
+            return {
+                active,
+                restored
+            };
+        },
+        runtime
+    });
 }
 
 const assertPublicOutputIsIntrospectionOwned = defineCompositeAssertion({
@@ -197,99 +297,6 @@ const assertCircularArrayNormalization = defineCompositeAssertion({
     name: 'assertCircularArrayNormalization'
 });
 
-function installThrowingBrowserGlobals(): () => void {
-    const originals = browserGlobalKeys.map(function readOriginal(key) {
-        return Object.freeze({
-            descriptor: Object.getOwnPropertyDescriptor(globalThis, key),
-            key
-        });
-    });
-
-    for (const key of browserGlobalKeys) {
-        Object.defineProperty(globalThis, key, {
-            configurable: true,
-            get() {
-                throw new Error(`Unexpected browser global read: ${key}`);
-            }
-        });
-    }
-
-    return function restoreBrowserGlobals() {
-        for (const original of originals) {
-            if (original.descriptor === undefined) {
-                Reflect.deleteProperty(globalThis, original.key);
-            } else {
-                Object.defineProperty(globalThis, original.key, original.descriptor);
-            }
-        }
-    };
-}
-
-const assertBrowserGlobalsAreNotRequired = defineCompositeAssertion({
-    assert(check) {
-        const restoreBrowserGlobals = installThrowingBrowserGlobals();
-
-        try {
-            const view = introspect(React.createElement('main', null, 'server-safe'));
-
-            return check.equal(view.textContent, 'server-safe');
-        } finally {
-            restoreBrowserGlobals();
-        }
-    },
-    name: 'assertBrowserGlobalsAreNotRequired'
-});
-
-const assertActEnvironmentRestored = defineCompositeAssertion({
-    assert(check) {
-        const hadActEnvironment = Object.hasOwn(globalThis, actEnvironmentKey);
-        const previousActEnvironment: unknown = Reflect.get(globalThis, actEnvironmentKey);
-
-        try {
-            introspect(React.createElement('main', null, 'clean'));
-
-            return check.group([
-                check.annotated('own act environment').equal(
-                    Object.hasOwn(globalThis, actEnvironmentKey),
-                    hadActEnvironment
-                ),
-                check.annotated('act environment value').equal(
-                    Reflect.get(globalThis, actEnvironmentKey),
-                    previousActEnvironment
-                )
-            ]);
-        } finally {
-            if (hadActEnvironment) {
-                Reflect.set(globalThis, actEnvironmentKey, previousActEnvironment);
-            } else {
-                Reflect.deleteProperty(globalThis, actEnvironmentKey);
-            }
-        }
-    },
-    name: 'assertActEnvironmentRestored'
-});
-
-const assertExistingActEnvironmentRestored = defineCompositeAssertion({
-    assert(check) {
-        const hadActEnvironment = Object.hasOwn(globalThis, actEnvironmentKey);
-        const previousActEnvironment: unknown = Reflect.get(globalThis, actEnvironmentKey);
-
-        try {
-            Reflect.set(globalThis, actEnvironmentKey, 'existing');
-            introspect(React.createElement('main', null, 'clean'));
-
-            return check.equal(Reflect.get(globalThis, actEnvironmentKey), 'existing');
-        } finally {
-            if (hadActEnvironment) {
-                Reflect.set(globalThis, actEnvironmentKey, previousActEnvironment);
-            } else {
-                Reflect.deleteProperty(globalThis, actEnvironmentKey);
-            }
-        }
-    },
-    name: 'assertExistingActEnvironmentRestored'
-});
-
 export const testNode = suite('unsupported React concepts and hardening', [
     test('fails clearly for portal roots', function (scope) {
         scope.assert(assertPortalRootFails);
@@ -313,16 +320,58 @@ export const testNode = suite('unsupported React concepts and hardening', [
 
         return scope.assert.collect();
     }),
-    test('restores React act global state after operations', function (scope) {
-        scope.assert(assertActEnvironmentRestored);
-        scope.assert(assertExistingActEnvironmentRestored);
+    test('uses injected React act environment', function (scope) {
+        const observed = createObservedActRuntime();
+        const view = introspect(React.createElement(observed.component), {}, noConsoleDiagnostics, observed.runtime);
+
+        scope.assert.deepEqual(observed.readObservation(), {
+            actCalls: 1,
+            active: false,
+            componentObservedAct: true,
+            restored: true
+        });
+        scope.assert.equal(view.textContent, 'clean');
+
+        return scope.assert.collect();
+    }),
+    test('restores injected React act environment after failure', function (scope) {
+        const failingAct = createFailingActRuntime();
+
+        scope.assert.throws(
+            function () {
+                introspect(React.createElement('main'), {}, noConsoleDiagnostics, failingAct.runtime);
+            },
+            { message: 'Injected act failed.' }
+        );
+        scope.assert.deepEqual(failingAct.readObservation(), {
+            active: false,
+            restored: true
+        });
 
         return scope.assert.collect();
     }),
     test(
         'renders without DOM or browser globals',
         function (scope) {
-            scope.assert(assertBrowserGlobalsAreNotRequired);
+            const runtime: IntrospectionRuntimeDependencies = {
+                ...createUnitRuntimeDependencies(),
+                browserEnvironment: Object.freeze({
+                    readDocument() {
+                        throw new Error('Unexpected document dependency.');
+                    },
+                    readWindow() {
+                        throw new Error('Unexpected window dependency.');
+                    }
+                })
+            };
+            const view = introspect(
+                React.createElement('main', null, 'server-safe'),
+                {},
+                noConsoleDiagnostics,
+                runtime
+            );
+
+            scope.assert.equal(view.textContent, 'server-safe');
 
             return scope.assert.collect();
         }
