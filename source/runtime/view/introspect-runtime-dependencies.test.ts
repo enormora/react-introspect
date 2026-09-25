@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import * as timersPromises from 'node:timers/promises';
 import { createDeterministicClock } from '@enormora/clock/deterministic-clock';
 import { suite, test } from '@overkill-dev/test';
 import type { Clock } from '@enormora/clock';
@@ -6,6 +7,7 @@ import React from 'react';
 import type {
     IntrospectionActEnvironment,
     IntrospectionBrowserEnvironment,
+    IntrospectionMacrotasks,
     IntrospectionMicrotasks,
     IntrospectionRuntimeDependencies
 } from './introspect-runtime-dependencies-types.ts';
@@ -57,6 +59,12 @@ function createQueuedMicrotasks(): IntrospectionMicrotasks {
     });
 }
 
+const schedulerMacrotasks: IntrospectionMacrotasks = Object.freeze({
+    async waitForNext() {
+        await timersPromises.setImmediate();
+    }
+});
+
 function createUnitClock(): Clock {
     return createDeterministicClock({
         initialUnixEpochMicroseconds: unitClockStart
@@ -93,6 +101,7 @@ export function createUnitRuntimeDependencies(): IntrospectionRuntimeDependencie
         actEnvironment: unitActEnvironment,
         browserEnvironment: emptyBrowserEnvironment,
         clock: createUnitClock(),
+        macrotasks: schedulerMacrotasks,
         microtasks: createQueuedMicrotasks()
     });
 }

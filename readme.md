@@ -716,6 +716,19 @@ button.sendEvent('save');
 await view.waitForIdle();
 ```
 
+Render work that is already scheduled when you call it is committed first, including transitions scheduled outside React, for example by a store or router subscription.
+
+```tsx
+cartStore.add(item);
+
+await view.waitForIdle();
+
+const badge = view.find(CartBadge);
+
+assert.ok(badge);
+assert.equal(badge.props.count, 1);
+```
+
 ### `view.waitUntil(predicate)`
 
 Waits for a predicate.
