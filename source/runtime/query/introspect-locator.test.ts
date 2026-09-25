@@ -1,6 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import type {
     RuntimeIntrospectionList,
+    RuntimeIntrospectionLocator,
     RuntimeIntrospectionNode,
     RuntimeIntrospectionView
 } from '../types/introspect-runtime-types.ts';
@@ -100,6 +101,34 @@ function createView(nodes: readonly RuntimeIntrospectionNode[]): RuntimeIntrospe
     return view;
 }
 
+function createSaveButton(title: string): RuntimeIntrospectionNode {
+    return {
+        ...createNode('button'),
+        key: 'save',
+        omitProps(keys) {
+            return { omitted: keys };
+        },
+        pickProps(keys) {
+            return { picked: keys };
+        },
+        props: { title },
+        textContent: title
+    };
+}
+
+function readProjections(locator: RuntimeIntrospectionLocator): Readonly<Record<string, unknown>> {
+    return {
+        key: locator.key,
+        kind: locator.kind,
+        name: locator.name,
+        omitted: locator.omitProps([ 'title' ]),
+        picked: locator.pickProps([ 'title' ]),
+        props: locator.props,
+        textContent: locator.textContent,
+        type: locator.type
+    };
+}
+
 function requireError(action: () => void): Error {
     try {
         action();
@@ -119,6 +148,45 @@ export const testNode = suite('introspection locators', [
         scope.assert.equal(locator.node?.name, 'button');
         scope.assert.equal(locator.callProp('title', 'Save'), 'title:Save');
         scope.assert.equal(locator.sendEvent('click', 1), 'click:1');
+
+        return scope.assert.collect();
+    }),
+    test('projects node data from the latest match', function (scope) {
+        const nodes = [ createSaveButton('Save') ];
+        const locator = createIntrospectionLocator(createView(nodes), 'button');
+        const initial = readProjections(locator);
+
+        nodes[0] = createSaveButton('Saving');
+
+        scope.assert.deepEqual({ initial, updated: locator.textContent }, {
+            initial: {
+                key: 'save',
+                kind: 'host',
+                name: 'button',
+                omitted: { omitted: [ 'title' ] },
+                picked: { picked: [ 'title' ] },
+                props: { title: 'Save' },
+                textContent: 'Save',
+                type: 'button'
+            },
+            updated: 'Saving'
+        });
+
+        return scope.assert.collect();
+    }),
+    test('projects undefined for a missing node', function (scope) {
+        const locator = createIntrospectionLocator(createView([]), 'button');
+
+        scope.assert.deepEqual(readProjections(locator), {
+            key: undefined,
+            kind: undefined,
+            name: undefined,
+            omitted: undefined,
+            picked: undefined,
+            props: undefined,
+            textContent: undefined,
+            type: undefined
+        });
 
         return scope.assert.collect();
     }),

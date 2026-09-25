@@ -54,8 +54,16 @@ export type RuntimeIntrospectionList = Iterable<RuntimeIntrospectionNode> & {
 
 export type RuntimeIntrospectionLocator = {
     readonly exists: boolean;
+    readonly key: string | null | undefined;
+    readonly kind: IntrospectionNodeKind | undefined;
+    readonly name: string | undefined;
     readonly node: RuntimeIntrospectionNode | undefined;
+    readonly props: Readonly<Record<PropertyKey, unknown>> | undefined;
+    readonly textContent: string | undefined;
+    readonly type: unknown;
     readonly callProp: (property: PropertyKey, ...parameters: readonly unknown[]) => unknown;
+    readonly omitProps: (keys: readonly PropertyKey[]) => Readonly<Record<PropertyKey, unknown>> | undefined;
+    readonly pickProps: (keys: readonly PropertyKey[]) => Readonly<Record<PropertyKey, unknown>> | undefined;
     readonly sendEvent: (name: string, ...parameters: readonly unknown[]) => unknown;
 };
 

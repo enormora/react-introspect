@@ -277,6 +277,16 @@ await view.waitForNextRender();
 assert.equal(save.node?.props.disabled, true);
 ```
 
+Locators project node data the same way. Each projection returns `undefined` when nothing matches, so one assertion covers both cases.
+
+```tsx
+assert.deepEqual(view.locate('button').pickProps([ 'type' ]), { type: 'submit' });
+assert.equal(view.locate(Status).textContent, 'Saved');
+assert.equal(view.locate(ErrorBanner).props, undefined);
+```
+
+Projections: `props`, `pickProps()`, `omitProps()`, `textContent`, `type`, `name`, `key`, and `kind`.
+
 List locators stay live too.
 
 ```tsx
