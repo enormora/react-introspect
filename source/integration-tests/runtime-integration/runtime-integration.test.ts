@@ -13,6 +13,10 @@ type SuspendsUntilReadyProps = {
     readonly resource: SuspenseResource;
 };
 
+type TransitionValueReaderProps = {
+    readonly subscribe: (listener: (value: string) => void) => void;
+};
+
 type PendingRetry = {
     readonly renderCount: number;
     readonly wait: Promise<void>;
@@ -71,6 +75,20 @@ function SuspendsUntilReady(props: SuspendsUntilReadyProps): React.ReactNode {
     }
 
     return React.createElement('span', null, 'ready');
+}
+
+function TransitionValueReader(props: TransitionValueReaderProps): React.ReactNode {
+    const [ value, setValue ] = React.useState('before');
+
+    React.useLayoutEffect(function subscribeToValue() {
+        props.subscribe(function applyValueInTransition(nextValue) {
+            React.startTransition(function applyValue() {
+                setValue(nextValue);
+            });
+        });
+    }, [ props ]);
+
+    return React.createElement('span', null, value);
 }
 
 function createSuspenseResource(): SuspenseResource {
@@ -144,6 +162,34 @@ export const testNode = suite('runtime integration', [
                 }
             ]);
             scope.assert.equal(view.textContent, 'undefined');
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'waits for transition work scheduled outside React on the real scheduler',
+        async function (scope) {
+            const listeners = new Set<(value: string) => void>();
+            const view = introspect(
+                React.createElement(TransitionValueReader, {
+                    subscribe(listener) {
+                        listeners.add(listener);
+                    }
+                }),
+                { depth: 'full', strictMode: false }
+            );
+
+            queueMicrotask(function publishValue() {
+                for (const listener of listeners) {
+                    listener('after');
+                }
+            });
+            await view.waitForIdle();
+
+            scope.assert.deepEqual(
+                { renderCount: view.renderCount, textContent: view.textContent },
+                { renderCount: 2, textContent: 'after' }
+            );
 
             return scope.assert.collect();
         }

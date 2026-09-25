@@ -1,8 +1,10 @@
+import * as timersPromises from 'node:timers/promises';
 import { createClock } from '@enormora/clock';
 import React from 'react';
 import type {
     IntrospectionActEnvironment,
     IntrospectionBrowserEnvironment,
+    IntrospectionMacrotasks,
     IntrospectionMicrotasks,
     IntrospectionRuntimeDependencies
 } from './introspect-runtime-dependencies-types.ts';
@@ -42,6 +44,12 @@ const realActEnvironment: IntrospectionActEnvironment = Object.freeze({
     }
 });
 
+const realMacrotasks: IntrospectionMacrotasks = Object.freeze({
+    async waitForNext() {
+        await timersPromises.setImmediate();
+    }
+});
+
 const realMicrotasks: IntrospectionMicrotasks = Object.freeze({
     async flush() {
         await Promise.resolve();
@@ -58,6 +66,7 @@ export function createNodeRuntimeDependencies(): IntrospectionRuntimeDependencie
         actEnvironment: realActEnvironment,
         browserEnvironment: realBrowserEnvironment,
         clock: createNodeClock(),
+        macrotasks: realMacrotasks,
         microtasks: realMicrotasks
     });
 }

@@ -32,6 +32,16 @@ type PromiseReaderProps = {
     readonly textPromise: React.Usable<string>;
 };
 
+type ExternalStore = {
+    readonly read: () => string;
+    readonly subscribe: (listener: () => void) => () => void;
+    readonly write: (value: string) => void;
+};
+
+type StoreReaderProps = {
+    readonly store: ExternalStore;
+};
+
 class SuspenseThenableError extends Error {
     public constructor() {
         super('suspended');
@@ -98,6 +108,45 @@ function RendersNull(): React.ReactNode {
 
 function Suspends(): React.ReactNode {
     throw new SuspenseThenableError();
+}
+
+function createExternalStore(initialValue: string): ExternalStore {
+    let value = initialValue;
+    const listeners = new Set<() => void>();
+
+    return Object.freeze({
+        read() {
+            return value;
+        },
+        subscribe(listener: () => void) {
+            listeners.add(listener);
+
+            return function unsubscribe() {
+                listeners.delete(listener);
+            };
+        },
+        write(nextValue: string) {
+            value = nextValue;
+
+            for (const listener of listeners) {
+                listener();
+            }
+        }
+    });
+}
+
+function TransitionStoreReader(props: StoreReaderProps): React.ReactNode {
+    const [ value, setValue ] = React.useState(props.store.read());
+
+    React.useLayoutEffect(function subscribeToStore() {
+        return props.store.subscribe(function applyStoreValueInTransition() {
+            React.startTransition(function applyStoreValue() {
+                setValue(props.store.read());
+            });
+        });
+    }, [ props.store ]);
+
+    return React.createElement('span', null, value);
 }
 
 function createFulfilledReactPromise(value: string): React.FulfilledReactPromise<string> {
@@ -189,6 +238,42 @@ export const testNode = suite('custom reconciler host layer', [
         await waitForDelayedRender(view);
 
         scope.assert.equal(view.textContent, 'Hello delayed');
+
+        return scope.assert.collect();
+    }),
+    test('waits for transition work scheduled by a store update outside React', async function (scope) {
+        const store = createExternalStore('before');
+        const view = introspect(React.createElement(TransitionStoreReader, { store }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        store.write('after');
+        await view.waitForIdle();
+
+        scope.assert.deepEqual(
+            { renderCount: view.renderCount, textContent: view.textContent },
+            { renderCount: 2, textContent: 'after' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('waits for transition work scheduled by a store update in a microtask', async function (scope) {
+        const store = createExternalStore('before');
+        const view = introspect(React.createElement(TransitionStoreReader, { store }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        queueMicrotask(function writeStoreLater() {
+            store.write('after');
+        });
+        await view.waitForIdle();
+
+        scope.assert.deepEqual(
+            { renderCount: view.renderCount, textContent: view.textContent },
+            { renderCount: 2, textContent: 'after' }
+        );
 
         return scope.assert.collect();
     }),

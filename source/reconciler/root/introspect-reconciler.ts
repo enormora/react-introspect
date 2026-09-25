@@ -309,14 +309,31 @@ function actSession(session: IntrospectionReconcilerSession, action: () => unkno
     });
 }
 
+function hasScheduledRootTask(session: IntrospectionReconcilerSession): boolean {
+    return session.root.callbackNode !== null;
+}
+
+async function flushMicrotasks(session: IntrospectionReconcilerSession): Promise<void> {
+    await session.moduleState.reconcilerRuntime.run(
+        session.moduleState.runtime,
+        async function flushMicrotasksWithRuntime() {
+            await session.moduleState.runtime.microtasks.flush();
+        }
+    );
+}
+
+async function flushScheduledWork(session: IntrospectionReconcilerSession): Promise<void> {
+    await flushMicrotasks(session);
+
+    do {
+        await session.moduleState.runtime.macrotasks.waitForNext();
+        await flushMicrotasks(session);
+    } while (hasScheduledRootTask(session));
+}
+
 async function waitForIdleSession(session: IntrospectionReconcilerSession): Promise<void> {
     await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-        await session.moduleState.reconcilerRuntime.run(
-            session.moduleState.runtime,
-            async function flushMicrotasksWithRuntime() {
-                await session.moduleState.runtime.microtasks.flush();
-            }
-        );
+        await flushScheduledWork(session);
         session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function flushWithRuntime() {
             renderer.flushPassiveEffects();
             settleWaiters(session.state);
