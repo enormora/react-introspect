@@ -17,7 +17,7 @@ jobs:
         runs-on: ubuntu-latest
         name: Dispatch publish workflow
         permissions:
-            actions: write
+            actions: write # required to dispatch the publish workflow
             contents: read
         steps:
             - name: Dispatch publish workflow

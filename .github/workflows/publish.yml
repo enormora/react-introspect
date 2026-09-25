@@ -25,8 +25,8 @@ jobs:
         name: Evaluate GitHub release gate
         permissions:
             contents: read
-            issues: read
-            pull-requests: read
+            issues: read # required by the release gate to inspect open issues for activity
+            pull-requests: read # required by the release gate to inspect open pull requests for activity
         outputs:
             should_publish: ${{ steps.force-publish.outputs.should_publish || steps.release-gate.outputs.should_publish }}
             reason: ${{ steps.force-publish.outputs.reason || steps.release-gate.outputs.reason }}
@@ -94,7 +94,7 @@ jobs:
         name: Publish package
         permissions:
             contents: read
-            id-token: write
+            id-token: write # required by npm trusted publishing to mint the OIDC token
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
