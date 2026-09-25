@@ -1,5 +1,9 @@
 import type React from 'react';
-import { createIntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
+import {
+    createIntrospectionDiagnostics,
+    type IntrospectionConsoleDiagnostics,
+    type IntrospectionDiagnosticsOptions
+} from '../../diagnostics/introspect-diagnostics.ts';
 import { createIntrospectionRenderElement } from '../../render/frame/introspect-frame.ts';
 import { createIntrospectionList } from '../query/introspect-list.ts';
 import { createIntrospectionListLocator, createIntrospectionLocator } from '../query/introspect-locator.ts';
@@ -19,6 +23,11 @@ import {
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 
 const defaultWaitTimeout = 1000;
+const isolatedConsoleDiagnostics: IntrospectionConsoleDiagnostics = Object.freeze({
+    subscribe() {
+        return undefined;
+    }
+});
 const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
     let nextIdPrefixIndex = 0;
 
@@ -28,6 +37,13 @@ const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
         return `react-introspect-${nextIdPrefixIndex}-`;
     };
 })();
+
+function diagnosticsOptions(options: RuntimeIntrospectionOptions): IntrospectionDiagnosticsOptions {
+    return {
+        errorMode: options.errorMode ?? 'capture',
+        warningMode: options.warningMode ?? 'throw'
+    };
+}
 
 function nodeList(
     reader: SnapshotReader,
@@ -52,15 +68,13 @@ function snapshotTreeNodes(snapshot: IntrospectionSnapshot): readonly SnapshotNo
 
 export function createIntrospectionView(
     element: React.ReactElement,
-    options: RuntimeIntrospectionOptions = {}
+    options: RuntimeIntrospectionOptions = {},
+    consoleDiagnostics: IntrospectionConsoleDiagnostics = isolatedConsoleDiagnostics
 ): RuntimeIntrospectionView {
     let currentSnapshot = createEmptyIntrospectionSnapshot(0);
     const depth = options.depth ?? 1;
     const idPrefix = options.idPrefix ?? createDefaultIdPrefix();
-    const diagnostics = createIntrospectionDiagnostics({
-        errorMode: options.errorMode ?? 'capture',
-        warningMode: options.warningMode ?? 'throw'
-    });
+    const diagnostics = createIntrospectionDiagnostics(diagnosticsOptions(options), consoleDiagnostics);
     const reconcilerRoot = diagnostics.run(function createRootWithDiagnostics() {
         return createIntrospectionReconcilerRoot({
             diagnostics,

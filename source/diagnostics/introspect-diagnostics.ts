@@ -1,10 +1,14 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import diagnosticsChannel from 'node:diagnostics_channel';
 import type { IntrospectionError, IntrospectionWarning } from '../public/introspect-public-types.ts';
 
 type IntrospectionDiagnosticMode = 'capture' | 'ignore' | 'throw';
+type ConsoleDiagnosticRecorder = (message: unknown) => void;
 
-type IntrospectionDiagnosticsOptions = {
+export type IntrospectionConsoleDiagnostics = {
+    readonly subscribe: (record: ConsoleDiagnosticRecorder) => void;
+};
+
+export type IntrospectionDiagnosticsOptions = {
     readonly errorMode: 'capture' | 'throw';
     readonly warningMode: IntrospectionDiagnosticMode;
 };
@@ -18,7 +22,6 @@ export type IntrospectionDiagnostics = {
     readonly hasWarnings: boolean;
     readonly warnings: readonly IntrospectionWarning[];
     readonly recordCaughtError: (cause: unknown) => void;
-    readonly recordConsoleDiagnostic: (message: unknown) => void;
     readonly recordRecoverableError: (cause: unknown) => void;
     readonly recordUncaughtError: (cause: unknown) => void;
     readonly run: <Result>(action: () => Result) => Result;
@@ -26,10 +29,7 @@ export type IntrospectionDiagnostics = {
 };
 
 const storage = new AsyncLocalStorage<IntrospectionDiagnosticsContext>();
-const consoleDiagnosticChannels = Object.freeze([
-    'console.error',
-    'console.warn'
-]);
+const subscribedConsoleDiagnostics = new WeakSet<IntrospectionConsoleDiagnostics>();
 
 function messageFromCause(cause: unknown): string {
     return cause instanceof Error ? cause.message : String(cause);
@@ -69,7 +69,8 @@ function isReactDiagnosticMessage(message: readonly unknown[]): boolean {
         text.includes('React') ||
         text.includes('Each child in a list should have a unique') ||
         text.includes('Encountered two children with the same key') ||
-        text.includes('Invalid hook call');
+        text.includes('Invalid hook call') ||
+        text.includes('Calling useContext(Context.Consumer)');
 }
 
 function toConsoleMessage(value: unknown): readonly unknown[] {
@@ -87,23 +88,21 @@ function recordIntrospectionConsoleDiagnostic(message: unknown): void {
 }
 
 const subscribeConsoleDiagnostics = (function createConsoleDiagnosticsSubscription() {
-    let ready = false;
-
-    return function subscribe(): void {
-        if (ready) {
+    return function subscribe(consoleDiagnostics: IntrospectionConsoleDiagnostics): void {
+        if (subscribedConsoleDiagnostics.has(consoleDiagnostics)) {
             return;
         }
 
-        for (const channelName of consoleDiagnosticChannels) {
-            diagnosticsChannel.subscribe(channelName, recordIntrospectionConsoleDiagnostic);
-        }
-
-        ready = true;
+        consoleDiagnostics.subscribe(recordIntrospectionConsoleDiagnostic);
+        subscribedConsoleDiagnostics.add(consoleDiagnostics);
     };
 })();
 
-export function createIntrospectionDiagnostics(options: IntrospectionDiagnosticsOptions): IntrospectionDiagnostics {
-    subscribeConsoleDiagnostics();
+export function createIntrospectionDiagnostics(
+    options: IntrospectionDiagnosticsOptions,
+    consoleDiagnostics: IntrospectionConsoleDiagnostics
+): IntrospectionDiagnostics {
+    subscribeConsoleDiagnostics(consoleDiagnostics);
 
     let errors: readonly IntrospectionError[] = Object.freeze([]);
     let warnings: readonly IntrospectionWarning[] = Object.freeze([]);
@@ -152,11 +151,11 @@ export function createIntrospectionDiagnostics(options: IntrospectionDiagnostics
         }
     }
 
-    const context: IntrospectionDiagnosticsContext = Object.freeze({
+    const context: IntrospectionDiagnosticsContext = {
         recordConsoleWarning(message) {
             appendWarning(createIntrospectionWarning(consoleMessageText(message)));
         }
-    });
+    };
 
     return Object.freeze({
         get errors() {
@@ -170,9 +169,6 @@ export function createIntrospectionDiagnostics(options: IntrospectionDiagnostics
         },
         recordCaughtError() {
             return undefined;
-        },
-        recordConsoleDiagnostic(message) {
-            recordIntrospectionConsoleDiagnostic(message);
         },
         recordRecoverableError(cause) {
             appendWarning(createIntrospectionWarning(cause));
