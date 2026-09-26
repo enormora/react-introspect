@@ -85,6 +85,7 @@ export type SnapshotBuild = {
     readonly nextId: number;
     readonly nodes: readonly SnapshotNode[];
     readonly normalizeIdString: (value: string) => string;
+    readonly valueAncestors: WeakSet<WeakKey>;
 };
 
 export type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: number; };
@@ -110,7 +111,7 @@ export type SnapshotNodeInput = {
 export type SnapshotNodeRequest = {
     readonly build: SnapshotBuild;
     readonly idNormalization: IntrospectionIdNormalization;
-    readonly index: number;
+    readonly index: number | string;
     readonly inheritedVisibility: SnapshotVisibility;
     readonly node: unknown;
     readonly parentId: number | undefined;
@@ -160,6 +161,20 @@ export type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest 
     readonly givenChildrenResult: ChildSnapshotsResult;
 };
 
+export type PropsSnapshotRequest = {
+    readonly build: SnapshotBuild;
+    readonly idNormalization: IntrospectionIdNormalization;
+    readonly inheritedVisibility: SnapshotVisibility;
+    readonly ownerId: number;
+    readonly ownerPath: string;
+    readonly props: SnapshotProps;
+};
+
+export type PropsSnapshotResult = {
+    readonly build: SnapshotBuild;
+    readonly props: SnapshotProps;
+};
+
 export type SnapshotNodeResult = {
     readonly build: SnapshotBuild;
     readonly node: SnapshotNode;
@@ -182,4 +197,16 @@ export function createEmptyIntrospectionSnapshot(renderCount: number): Introspec
         renderCount,
         root: undefined
     });
+}
+
+const snapshotNodes = new WeakSet();
+
+export function registerSnapshotNode(node: SnapshotNode): SnapshotNode {
+    snapshotNodes.add(node);
+
+    return node;
+}
+
+export function isSnapshotNode(value: unknown): value is SnapshotNode {
+    return typeof value === 'object' && value !== null && snapshotNodes.has(value);
 }

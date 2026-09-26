@@ -1,6 +1,10 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { IntrospectionOptions, IntrospectionView } from '../../public/introspect-public-types.ts';
+import type {
+    IntrospectionNode,
+    IntrospectionOptions,
+    IntrospectionView
+} from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView } from '../../runtime/view/introspect-unit-view.test.ts';
 import type { IntrospectionSnapshot, SnapshotNode } from './introspect-snapshot-contract.ts';
 
@@ -25,6 +29,50 @@ function Widget(props: WidgetProps): React.ReactNode {
     Reflect.ownKeys(props);
 
     return React.createElement('output');
+}
+
+type IconProps = {
+    readonly name: string;
+};
+
+type TabProps = {
+    readonly actions: readonly React.ReactNode[];
+    readonly badge: React.ReactElement;
+    readonly config: {
+        readonly icon: React.ReactElement<IconProps>;
+    };
+    readonly label: string;
+};
+
+function Badge(props: React.PropsWithChildren): React.ReactNode {
+    return props.children;
+}
+
+function Icon(props: IconProps): React.ReactNode {
+    return props.name;
+}
+
+function Tab(props: TabProps): React.ReactNode {
+    Reflect.ownKeys(props);
+
+    return null;
+}
+
+function TabPage(): React.ReactNode {
+    return React.createElement(Tab, {
+        actions: [ React.createElement(Icon, { key: 'archive', name: 'archive' }), 'more', null ],
+        badge: React.createElement(Badge, null, React.createElement('strong', null, '3')),
+        config: { icon: React.createElement(Icon, { name: 'gear' }) },
+        label: 'Inbox'
+    });
+}
+
+function isIntrospectionNode(value: unknown): value is IntrospectionNode {
+    return typeof value === 'object' && value !== null && Object.hasOwn(value, 'kind');
+}
+
+function readPropEntry(value: unknown): unknown {
+    return isIntrospectionNode(value) ? value.type : value;
 }
 
 function requireValue<Value>(value: Value | undefined): Value {
@@ -158,6 +206,64 @@ export const testNode = suite('snapshot tree model', [
         scope.assert.equal(
             widget.renderedChildren.status === 'rendered' ? widget.renderedChildren.nodes.first?.type : undefined,
             'em'
+        );
+
+        return scope.assert.collect();
+    }),
+    test('exposes elements in props as introspection nodes', function (scope) {
+        const view = introspect(React.createElement(TabPage), { strictMode: false });
+        const tab = requireValue(view.find(Tab));
+        const { badge } = tab.props;
+
+        scope.assert.deepEqual({
+            actions: Array.from(tab.props.actions, readPropEntry),
+            actionPath: tab.props.actions.map(function readPath(action) {
+                return isIntrospectionNode(action) ? action.path : undefined;
+            }),
+            badgeClosest: badge.findClosest(Tab)?.path,
+            badgeKind: badge.kind,
+            badgePath: badge.path,
+            badgeStrong: badge.find('strong')?.textContent,
+            badgeText: badge.textContent,
+            badgeType: badge.type,
+            configIconName: tab.props.config.icon.props.name,
+            label: tab.props.label,
+            matchedBySelector: view.find({ props: { badge: { type: Badge } }, type: Tab })?.path,
+            searchedFromView: view.find(Badge)
+        }, {
+            actions: [ Icon, 'more', null ],
+            actionPath: [ 'TabPage > Tab[0] > Icon[actions.0]', undefined, undefined ],
+            badgeClosest: 'TabPage > Tab[0]',
+            badgeKind: 'component',
+            badgePath: 'TabPage > Tab[0] > Badge[badge]',
+            badgeStrong: '3',
+            badgeText: '3',
+            badgeType: Badge,
+            configIconName: 'gear',
+            label: 'Inbox',
+            matchedBySelector: 'TabPage > Tab[0]',
+            searchedFromView: undefined
+        });
+
+        return scope.assert.collect();
+    }),
+    test('cuts circular values that pass through elements in props', function (scope) {
+        const settings: Record<string, unknown> = {};
+
+        settings.icon = React.createElement(Icon, { name: 'loop', settings } as IconProps);
+
+        const view = introspect(React.createElement(Widget, { label: 'Loop', metadata: settings } as never), {
+            depth: 0,
+            strictMode: false
+        });
+        const { metadata } = requireValue(view.root).props as Readonly<
+            Record<string, Readonly<Record<string, unknown>>>
+        >;
+        const icon = metadata?.icon;
+
+        scope.assert.deepEqual(
+            { iconProps: isIntrospectionNode(icon) ? icon.props : undefined },
+            { iconProps: { name: 'loop', settings: '[Circular]' } }
         );
 
         return scope.assert.collect();

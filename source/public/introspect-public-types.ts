@@ -148,7 +148,7 @@ type IntrospectionNodeProps<
     Type,
     HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
 > = Type extends string ? IntrospectionHostProps<HostSchema, Type>
-    : IntrospectionPublicProps<IntrospectionElementProps<Type>>;
+    : IntrospectionPublicProps<IntrospectionElementProps<Type>, HostSchema>;
 
 type IntrospectionHostProps<
     HostSchema extends IntrospectionHostSchema,
@@ -162,7 +162,36 @@ type IntrospectionWithoutKeys<Value, Keys extends PropertyKey> = {
     readonly [Key in keyof Value as Key extends Keys ? never : Key]: Value[Key];
 };
 
-type IntrospectionPublicProps<Props> = unknown extends Props ? unknown : IntrospectionWithoutKeys<Props, 'children'>;
+type IntrospectionPropValue<Value, HostSchema extends IntrospectionHostSchema> = Value extends React.ReactElement<
+    infer ElementProps,
+    infer ElementType
+> ? IntrospectionNode<IntrospectionPublicProps<ElementProps, HostSchema>, ElementType, HostSchema>
+    : IntrospectionNestedPropValue<Value, HostSchema>;
+
+type IntrospectionNestedPropValue<
+    Value,
+    HostSchema extends IntrospectionHostSchema
+> = Value extends IntrospectionCallable ? Value
+    : IntrospectionCollectionPropValue<Value, HostSchema>;
+
+type IntrospectionCollectionPropValue<
+    Value,
+    HostSchema extends IntrospectionHostSchema
+> = Value extends readonly (infer Item)[] ? readonly IntrospectionPropValue<Item, HostSchema>[]
+    : IntrospectionObjectPropValue<Value, HostSchema>;
+
+type IntrospectionObjectPropValue<
+    Value,
+    HostSchema extends IntrospectionHostSchema
+> = Value extends Readonly<Record<PropertyKey, unknown>> ? IntrospectionPropValues<Value, HostSchema>
+    : Value;
+
+type IntrospectionPropValues<Props, HostSchema extends IntrospectionHostSchema> = {
+    readonly [Key in keyof Props]: IntrospectionPropValue<Props[Key], HostSchema>;
+};
+
+type IntrospectionPublicProps<Props, HostSchema extends IntrospectionHostSchema> = unknown extends Props ? unknown
+    : IntrospectionPropValues<IntrospectionWithoutKeys<Props, 'children'>, HostSchema>;
 
 type IntrospectionTypedSelector<
     HostSchema extends IntrospectionHostSchema,

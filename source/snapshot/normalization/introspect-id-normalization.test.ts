@@ -28,27 +28,39 @@ export const testNode = suite('introspection id normalization', [
         const normalized = normalizeSnapshotProps(
             {
                 element: React.createElement('label', { htmlFor: '_test-r_a_' }),
+                nested: [ { icon: React.createElement('svg', { id: '_test-r_a_' }) } ],
                 value
             },
-            createIdNormalizer({
-                generator() {
-                    return 'stable-id';
+            {
+                ancestors: new WeakSet(),
+                describeElement(element, location, normalizeElementProps) {
+                    return { location, props: normalizeElementProps(), type: element.type };
                 },
-                prefix: 'test-'
-            })
+                normalizeIdString: createIdNormalizer({
+                    generator() {
+                        return 'stable-id';
+                    },
+                    prefix: 'test-'
+                })
+            }
         );
 
         scope.assert.deepEqual(normalized, {
             element: {
-                key: null,
+                location: 'element',
                 props: { htmlFor: 'stable-id' },
                 type: 'label'
             },
+            nested: [ { icon: { location: 'nested.0.icon', props: { id: 'stable-id' }, type: 'svg' } } ],
             value: {
                 id: 'stable-id',
                 self: '[Circular]'
             }
         });
+        scope.assert.deepEqual(
+            normalizeSnapshotValue(React.createElement('b', { title: 'plain' }), String),
+            { key: null, props: { title: 'plain' }, type: 'b' }
+        );
         scope.assert.equal(
             normalizeSnapshotValue('unchanged', function (valueToNormalize) {
                 return valueToNormalize;

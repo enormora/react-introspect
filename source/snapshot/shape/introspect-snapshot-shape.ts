@@ -56,7 +56,7 @@ export function getElementKind(type: unknown): SnapshotNodeKind {
     return type === React.Fragment ? 'fragment' : 'component';
 }
 
-export function getIndexedPath(parentPath: string, index: number, name: string): string {
+export function getIndexedPath(parentPath: string, index: number | string, name: string): string {
     return parentPath === 'root' ? name : `${parentPath} > ${name}[${index}]`;
 }
 
