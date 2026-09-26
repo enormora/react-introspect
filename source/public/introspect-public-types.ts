@@ -22,6 +22,7 @@ export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = In
     readonly depth?: number | 'full';
     readonly depthFrom?: IntrospectionComponentType;
     readonly errorMode?: 'capture' | 'throw';
+    readonly hostEvent?: Readonly<Record<string, unknown>>;
     readonly hostSchema?: HostSchema;
     readonly idGenerator?: ((generatedId: string) => string) | undefined;
     readonly idPrefix?: string | undefined;

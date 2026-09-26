@@ -15,6 +15,7 @@ import { createIntrospectionList } from './introspect-list.ts';
 
 export type SnapshotReader = {
     readonly currentSnapshot: IntrospectionSnapshot;
+    readonly hostEvent: Readonly<Record<PropertyKey, unknown>>;
     readonly act: (action: () => unknown) => unknown;
 };
 
@@ -30,6 +31,55 @@ function callProp(props: SnapshotProps, property: string, parameters: readonly u
     }
 
     return Reflect.apply(value, undefined, parameters);
+}
+
+function isEventOverride(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function createHostEvent(
+    type: string,
+    defaults: Readonly<Record<PropertyKey, unknown>>,
+    override: Readonly<Record<PropertyKey, unknown>>
+): Readonly<Record<PropertyKey, unknown>> {
+    let propagationStopped = false;
+    const event: Record<PropertyKey, unknown> = {
+        defaultPrevented: false,
+        isDefaultPrevented() {
+            return event.defaultPrevented === true;
+        },
+        isPropagationStopped() {
+            return propagationStopped;
+        },
+        preventDefault() {
+            event.defaultPrevented = true;
+        },
+        stopPropagation() {
+            propagationStopped = true;
+        },
+        type,
+        ...defaults,
+        ...override
+    };
+
+    return event;
+}
+
+function createHostEventParameters(
+    name: string,
+    defaults: Readonly<Record<PropertyKey, unknown>>,
+    parameters: readonly unknown[]
+): readonly unknown[] {
+    const [ firstParameter, ...remainingParameters ] = parameters;
+    const type = name.toLowerCase();
+
+    if (parameters.length === 0) {
+        return [ createHostEvent(type, defaults, {}) ];
+    }
+
+    return isEventOverride(firstParameter)
+        ? [ createHostEvent(type, defaults, firstParameter), ...remainingParameters ]
+        : parameters;
 }
 
 function omitProperties(props: SnapshotProps, keys: readonly PropertyKey[]): SnapshotProps {
@@ -261,9 +311,12 @@ export function createIntrospectionNode(
         },
         sendEvent(name: string, ...parameters: readonly unknown[]) {
             const eventName = `on${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
+            const eventParameters = node.kind === 'host'
+                ? createHostEventParameters(name, reader.hostEvent, parameters)
+                : parameters;
 
             return reader.act(function sendSnapshotEvent() {
-                return callProp(node.props, eventName, parameters);
+                return callProp(node.props, eventName, eventParameters);
             });
         }
     });
