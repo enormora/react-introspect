@@ -12,7 +12,7 @@ const selectorFields = Object.freeze([
 ]);
 
 function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Reflect.has(value, property);
+    return Object.hasOwn(value, property);
 }
 
 function isSelectorObject(value: unknown): value is IntrospectionSelector {

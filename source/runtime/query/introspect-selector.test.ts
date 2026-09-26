@@ -86,5 +86,15 @@ export const testNode = suite('introspection selector', [
         scope.assert.equal(nodeMatchesSelector(node, selectorWithUndefinedTextContent), true);
 
         return scope.assert.collect();
+    }),
+    test('ignores inherited selector fields like ref rules do', function (scope) {
+        const inheritedTypeSelector: unknown = Object.create({ type: 'button' });
+
+        scope.assert.deepEqual(toSelector(inheritedTypeSelector), { type: inheritedTypeSelector });
+        const inheritedKeySelector = Object.create({ key: 'delete' }) as IntrospectionSelector;
+
+        scope.assert.equal(nodeMatchesSelector(createNode(), inheritedKeySelector), true);
+
+        return scope.assert.collect();
     })
 ]);
