@@ -205,13 +205,7 @@ function collectRefTargets(child: IntrospectionHostChild): readonly Introspectio
     ]);
 }
 
-function detachChild(child: IntrospectionHostChild): void {
-    const parent = parentByChild.get(child);
-
-    if (parent === undefined) {
-        return;
-    }
-
+export function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
     const children = parent.readChildren();
     const index = children.indexOf(child);
 
@@ -220,6 +214,14 @@ function detachChild(child: IntrospectionHostChild): void {
     }
 
     parentByChild.delete(child);
+}
+
+function detachChild(child: IntrospectionHostChild): void {
+    const parent = parentByChild.get(child);
+
+    if (parent !== undefined) {
+        removeChild(parent, child);
+    }
 }
 
 function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
@@ -384,17 +386,6 @@ export function insertBefore(
 
     parent.writeChildren(children.toSpliced(children.indexOf(beforeChild), 0, child));
     parentByChild.set(child, parent);
-}
-
-export function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
-    const children = parent.readChildren();
-    const index = children.indexOf(child);
-
-    if (index !== -1) {
-        parent.writeChildren(children.toSpliced(index, 1));
-    }
-
-    parentByChild.delete(child);
 }
 
 export function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot {
