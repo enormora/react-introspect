@@ -34,3 +34,37 @@ expect(view.locate('button').pickProps).type.not.toBeCallableWith([ 'missing' ])
 expect({ depthFrom: Page, transparent: [ MemoPage ] }).type.toBeAssignableTo<IntrospectionOptions>();
 expect({ depthFrom: 'main' }).type.not.toBeAssignableTo<IntrospectionOptions>();
 expect({ transparent: [ 'section' ] }).type.not.toBeAssignableTo<IntrospectionOptions>();
+
+type IconProps = { readonly name: string; };
+type TabProps = {
+    readonly actions: readonly React.ReactNode[];
+    readonly badge: React.ReactNode;
+    readonly config: { readonly icon: React.ReactElement<IconProps>; };
+    readonly icon: React.ReactElement<IconProps>;
+    readonly label: string;
+    readonly onSelect: (id: string) => void;
+};
+
+declare const Tab: React.FC<TabProps>;
+declare function isIntrospectionNode(value: unknown): value is IntrospectionNode;
+declare const tabView: IntrospectionView;
+
+const tab = tabView.find(Tab);
+
+if (tab !== undefined) {
+    expect(tab.props.icon.props.name).type.toBe<string>();
+    expect(tab.props.config.icon.textContent).type.toBe<string>();
+    expect(tab.props.label).type.toBe<string>();
+    expect(tab.props.onSelect).type.toBe<(id: string) => void>();
+    expect<'Inbox'>().type.toBeAssignableTo<typeof tab.props.badge>();
+    expect<null>().type.toBeAssignableTo<typeof tab.props.badge>();
+
+    const { badge } = tab.props;
+
+    if (isIntrospectionNode(badge)) {
+        expect(badge).type.toBeAssignableTo<typeof tab.props.badge>();
+        expect(badge.textContent).type.toBe<string>();
+    }
+
+    expect(tab.props.actions).type.toBeAssignableTo<readonly (typeof tab.props.badge)[]>();
+}

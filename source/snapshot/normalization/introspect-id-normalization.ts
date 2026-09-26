@@ -9,8 +9,16 @@ export type IntrospectionIdNormalization = {
     readonly prefix: string;
 };
 
-type SnapshotValueNormalizationState = {
+type SnapshotElementDescriber = (
+    element: React.ReactElement<Readonly<Record<PropertyKey, unknown>>>,
+    location: string,
+    normalizeElementProps: () => Readonly<Record<PropertyKey, unknown>>
+) => unknown;
+
+export type SnapshotPropsNormalization = {
     readonly ancestors: WeakSet<WeakKey>;
+    readonly describeElement: SnapshotElementDescriber;
+    readonly normalizeIdString: (value: string) => string;
 };
 
 type IdReplacementState = {
@@ -57,7 +65,7 @@ function isNormalizableSnapshotObject(value: unknown): value is Readonly<Record<
     return isRecord(value) && typeof value !== 'function' && isPlainObject(value);
 }
 
-function isCircularValue(value: unknown, state: SnapshotValueNormalizationState): boolean {
+function isCircularValue(value: unknown, state: SnapshotPropsNormalization): boolean {
     return isRecord(value) && state.ancestors.has(value);
 }
 
@@ -65,18 +73,22 @@ function normalizeCircularValue(): string {
     return '[Circular]';
 }
 
+function childLocation(location: string, key: PropertyKey): string {
+    return location === '' ? String(key) : `${location}.${String(key)}`;
+}
+
 const snapshotValueNormalizer = {
     normalizeArray(
         value: readonly unknown[],
-        normalizeIdString: (value: string) => string,
-        state: SnapshotValueNormalizationState
+        state: SnapshotPropsNormalization,
+        location: string
     ): readonly unknown[] {
         state.ancestors.add(value);
 
-        const normalized = Object.freeze(value.map(function normalizeArrayItem(item) {
+        const normalized = Object.freeze(value.map(function normalizeArrayItem(item, index) {
             return isCircularValue(item, state)
                 ? normalizeCircularValue()
-                : snapshotValueNormalizer.normalizeValue(item, normalizeIdString, state);
+                : snapshotValueNormalizer.normalizeValue(item, state, childLocation(location, index));
         }));
 
         state.ancestors.delete(value);
@@ -85,8 +97,8 @@ const snapshotValueNormalizer = {
     },
     normalizePlainObject(
         value: Readonly<Record<PropertyKey, unknown>>,
-        normalizeIdString: (value: string) => string,
-        state: SnapshotValueNormalizationState
+        state: SnapshotPropsNormalization,
+        location: string
     ): Readonly<Record<PropertyKey, unknown>> {
         const normalized: Record<PropertyKey, unknown> = {};
 
@@ -97,37 +109,24 @@ const snapshotValueNormalizer = {
 
             normalized[key] = isCircularValue(child, state)
                 ? normalizeCircularValue()
-                : snapshotValueNormalizer.normalizeValue(child, normalizeIdString, state);
+                : snapshotValueNormalizer.normalizeValue(child, state, childLocation(location, key));
         }
 
         state.ancestors.delete(value);
 
         return Object.freeze(normalized);
     },
-    normalizeReactElement(
-        value: React.ReactElement<Readonly<Record<PropertyKey, unknown>>>,
-        normalizeIdString: (value: string) => string,
-        state: SnapshotValueNormalizationState
-    ): Readonly<Record<PropertyKey, unknown>> {
-        const props = snapshotValueNormalizer.normalizePlainObject(value.props, normalizeIdString, state);
-
-        return Object.freeze({
-            key: value.key,
-            props,
-            type: value.type
-        });
-    },
     normalizeValue(
         value: unknown,
-        normalizeIdString: (value: string) => string,
-        state: SnapshotValueNormalizationState
+        state: SnapshotPropsNormalization,
+        location: string
     ): unknown {
         if (typeof value === 'string') {
-            return normalizeIdString(value);
+            return state.normalizeIdString(value);
         }
 
         if (Array.isArray(value)) {
-            return snapshotValueNormalizer.normalizeArray(value, normalizeIdString, state);
+            return snapshotValueNormalizer.normalizeArray(value, state, location);
         }
 
         if (isReactPortalValue(value)) {
@@ -135,14 +134,28 @@ const snapshotValueNormalizer = {
         }
 
         if (React.isValidElement<Readonly<Record<PropertyKey, unknown>>>(value)) {
-            return snapshotValueNormalizer.normalizeReactElement(value, normalizeIdString, state);
+            return state.describeElement(value, location, function normalizeElementProps() {
+                return snapshotValueNormalizer.normalizePlainObject(value.props, state, location);
+            });
         }
 
         return isNormalizableSnapshotObject(value)
-            ? snapshotValueNormalizer.normalizePlainObject(value, normalizeIdString, state)
+            ? snapshotValueNormalizer.normalizePlainObject(value, state, location)
             : value;
     }
 };
+
+function describeElementAsPlainData(
+    element: React.ReactElement<Readonly<Record<PropertyKey, unknown>>>,
+    _location: string,
+    normalizeElementProps: () => Readonly<Record<PropertyKey, unknown>>
+): Readonly<Record<PropertyKey, unknown>> {
+    return Object.freeze({
+        key: element.key,
+        props: normalizeElementProps(),
+        type: element.type
+    });
+}
 
 export function createIdNormalizer(idNormalization: IntrospectionIdNormalization): (value: string) => string {
     const state: IdReplacementState = {
@@ -162,19 +175,19 @@ export function createIdNormalizer(idNormalization: IntrospectionIdNormalization
 
 export function normalizeSnapshotProps(
     props: Readonly<Record<PropertyKey, unknown>>,
-    normalizeIdString: (value: string) => string
+    normalization: SnapshotPropsNormalization
 ): Readonly<Record<PropertyKey, unknown>> {
-    return snapshotValueNormalizer.normalizePlainObject(
-        props,
-        normalizeIdString,
-        { ancestors: new WeakSet() }
-    );
+    return snapshotValueNormalizer.normalizePlainObject(props, normalization, '');
 }
 
-export function normalizeSnapshotValue(
-    value: unknown,
-    normalizeIdString: (value: string) => string,
-    state: SnapshotValueNormalizationState = { ancestors: new WeakSet() }
-): unknown {
-    return snapshotValueNormalizer.normalizeValue(value, normalizeIdString, state);
+export function normalizeSnapshotValue(value: unknown, normalizeIdString: (value: string) => string): unknown {
+    return snapshotValueNormalizer.normalizeValue(
+        value,
+        {
+            ancestors: new WeakSet(),
+            describeElement: describeElementAsPlainData,
+            normalizeIdString
+        },
+        ''
+    );
 }

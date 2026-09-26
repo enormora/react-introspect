@@ -433,6 +433,28 @@ assert.ok(button);
 button.props.onSave();
 ```
 
+React elements inside props are introspection nodes, also inside arrays and plain objects:
+
+```tsx
+type TabProps = {
+    icon: React.ReactElement<IconProps>;
+    badge: React.ReactNode;
+    label: string;
+};
+
+const tab = view.find(Tab);
+
+assert.ok(tab);
+assert.equal(tab.props.icon.type, Icon);
+assert.equal(tab.props.icon.props.name, 'inbox');
+assert.equal(tab.props.icon.path, 'Toolbar > Tab[0] > Icon[icon]');
+assert.equal(tab.props.label, 'Inbox');
+```
+
+Their types follow: `React.ReactElement` becomes `IntrospectionNode`. A `React.ReactNode` prop can also hold a string, number, or `null` at runtime, so it stays a union; type slot props as `React.ReactElement` when they always hold an element.
+
+`view.find()` does not search inside props. Search from the prop node instead: `tab.props.icon.find('svg')`.
+
 ### `node.pickProps(keys)` and `node.omitProps(keys)`
 
 Both methods are type-aware.

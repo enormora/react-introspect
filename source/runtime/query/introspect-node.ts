@@ -4,10 +4,11 @@ import type {
     RuntimeIntrospectionNode,
     RuntimeRenderedChildren
 } from '../types/introspect-runtime-types.ts';
-import type {
-    IntrospectionSnapshot,
-    SnapshotNode,
-    SnapshotProps
+import {
+    type IntrospectionSnapshot,
+    isSnapshotNode,
+    type SnapshotNode,
+    type SnapshotProps
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
 import { createIntrospectionList } from './introspect-list.ts';
@@ -91,12 +92,62 @@ function findSnapshotNode(snapshot: IntrospectionSnapshot, id: number): Snapshot
     });
 }
 
+function isPlainPropObject(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
+    return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+const propElementExposure = {
+    exposeProps(
+        props: SnapshotProps,
+        createPropNode: (propNode: SnapshotNode) => RuntimeIntrospectionNode
+    ): SnapshotProps {
+        const exposed: Record<PropertyKey, unknown> = {};
+
+        for (const key of Reflect.ownKeys(props)) {
+            exposed[key] = propElementExposure.exposeValue(props[key], createPropNode);
+        }
+
+        return Object.freeze(exposed);
+    },
+    exposeValue(value: unknown, createPropNode: (propNode: SnapshotNode) => RuntimeIntrospectionNode): unknown {
+        if (isSnapshotNode(value)) {
+            return createPropNode(value);
+        }
+
+        if (Array.isArray(value)) {
+            return Object.freeze(value.map(function exposeItem(item: unknown) {
+                return propElementExposure.exposeValue(item, createPropNode);
+            }));
+        }
+
+        return isPlainPropObject(value) ? propElementExposure.exposeProps(value, createPropNode) : value;
+    }
+};
+
+const exposedPropsBySnapshotNode = new WeakMap<SnapshotNode, SnapshotProps>();
+
 export function createIntrospectionNode(
     reader: SnapshotReader,
     snapshot: IntrospectionSnapshot,
     node: SnapshotNode
 ): RuntimeIntrospectionNode {
     const context = { reader, snapshot };
+
+    function readProps(): SnapshotProps {
+        const cachedProps = exposedPropsBySnapshotNode.get(node);
+
+        if (cachedProps !== undefined) {
+            return cachedProps;
+        }
+
+        const exposedProps = propElementExposure.exposeProps(node.props, function createPropNode(propNode) {
+            return createIntrospectionNode(reader, snapshot, propNode);
+        });
+
+        exposedPropsBySnapshotNode.set(node, exposedProps);
+
+        return exposedProps;
+    }
 
     function createNodeList(nodes: readonly SnapshotNode[]): RuntimeIntrospectionList {
         return createIntrospectionList(nodes.map(function createChildNode(child) {
@@ -157,7 +208,7 @@ export function createIntrospectionNode(
             return node.path;
         },
         get props() {
-            return node.props;
+            return readProps();
         },
         get renderedChildren() {
             return readRenderedChildren();
@@ -203,10 +254,10 @@ export function createIntrospectionNode(
             return formatNode(node, 0);
         },
         omitProps(keys: readonly PropertyKey[]) {
-            return omitProperties(node.props, keys);
+            return omitProperties(readProps(), keys);
         },
         pickProps(keys: readonly PropertyKey[]) {
-            return pickProperties(node.props, keys);
+            return pickProperties(readProps(), keys);
         },
         sendEvent(name: string, ...parameters: readonly unknown[]) {
             const eventName = `on${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;

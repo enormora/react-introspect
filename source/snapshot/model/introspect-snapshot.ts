@@ -14,25 +14,28 @@ import {
     getTextContent,
     getTypeName
 } from '../shape/introspect-snapshot-shape.ts';
-import type {
-    ChildSnapshotsRequest,
-    ChildSnapshotsResult,
-    ElementNodeRequest,
-    NodeIdAllocation,
-    IntrospectionSnapshot,
-    SnapshotBuild,
-    SnapshotNodeInput,
-    SnapshotNodeRequest,
-    SnapshotNodeResult,
-    SnapshotProps,
-    SnapshotSourceElement,
-    SnapshotSourceNode,
-    SnapshotVisibility,
-    SourceChildSnapshotsRequest,
-    SourceElementChildrenRequest,
-    SourceElementNodeRequest,
-    SourceElementRenderedChildrenRequest,
-    SourceSnapshotNodeRequest
+import {
+    type ChildSnapshotsRequest,
+    type ChildSnapshotsResult,
+    type ElementNodeRequest,
+    type IntrospectionSnapshot,
+    type NodeIdAllocation,
+    type PropsSnapshotRequest,
+    type PropsSnapshotResult,
+    registerSnapshotNode,
+    type SnapshotBuild,
+    type SnapshotNodeInput,
+    type SnapshotNodeRequest,
+    type SnapshotNodeResult,
+    type SnapshotProps,
+    type SnapshotSourceElement,
+    type SnapshotSourceNode,
+    type SnapshotVisibility,
+    type SourceChildSnapshotsRequest,
+    type SourceElementChildrenRequest,
+    type SourceElementNodeRequest,
+    type SourceElementRenderedChildrenRequest,
+    type SourceSnapshotNodeRequest
 } from './introspect-snapshot-contract.ts';
 
 function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
@@ -76,14 +79,15 @@ function allocateNodeId(build: SnapshotBuild): NodeIdAllocation {
         build: {
             nextId: build.nextId + 1,
             nodes: build.nodes,
-            normalizeIdString: build.normalizeIdString
+            normalizeIdString: build.normalizeIdString,
+            valueAncestors: build.valueAncestors
         },
         id: build.nextId
     };
 }
 
 function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNodeInput): SnapshotNodeResult {
-    const node = Object.freeze(input);
+    const node = registerSnapshotNode(Object.freeze(input));
 
     return {
         build: {
@@ -92,7 +96,8 @@ function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNodeInput): Snaps
             nodes: Object.freeze([
                 ...build.nodes,
                 node
-            ])
+            ]),
+            valueAncestors: build.valueAncestors
         },
         node
     };
@@ -153,7 +158,15 @@ const snapshotOperations = {
             parentPath: path
         });
         const childrenState = getElementChildrenState(type, childrenResult.nodes);
-        const result = pushSnapshotNode(childrenResult.build, {
+        const propsResult = snapshotOperations.createPropsSnapshot({
+            build: childrenResult.build,
+            idNormalization: request.idNormalization,
+            inheritedVisibility: request.inheritedVisibility,
+            ownerId: idAllocation.id,
+            ownerPath: path,
+            props: freezePropsWithoutChildren(props)
+        });
+        const result = pushSnapshotNode(propsResult.build, {
             activityMode: undefined,
             givenChildren: childrenResult.nodes,
             error: undefined,
@@ -163,7 +176,7 @@ const snapshotOperations = {
             name,
             parentId: request.parentId,
             path,
-            props: normalizeSnapshotProps(freezePropsWithoutChildren(props), request.build.normalizeIdString),
+            props: propsResult.props,
             renderedChildren: childrenState.renderedChildren,
             renderedReason: childrenState.renderedReason,
             textContent: childrenState.textContent,
@@ -195,10 +208,19 @@ const snapshotOperations = {
             ...childrenRequest,
             givenChildrenResult
         });
-        const renderedChildren = renderedChildrenResult.nodes;
-        const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildrenResult.nodes;
+        const visibleChildren = renderedChildrenResult.nodes.length > 0
+            ? renderedChildrenResult.nodes
+            : givenChildrenResult.nodes;
+        const propsResult = snapshotOperations.createPropsSnapshot({
+            build: renderedChildrenResult.build,
+            idNormalization: request.idNormalization,
+            inheritedVisibility: visibility,
+            ownerId: idAllocation.id,
+            ownerPath: path,
+            props: request.element.props
+        });
 
-        return pushSnapshotNode(renderedChildrenResult.build, {
+        return pushSnapshotNode(propsResult.build, {
             activityMode: request.element.activityMode,
             givenChildren: givenChildrenResult.nodes,
             error: request.element.error,
@@ -208,13 +230,38 @@ const snapshotOperations = {
             name,
             parentId: request.parentId,
             path,
-            props: normalizeSnapshotProps(request.element.props, request.build.normalizeIdString),
-            renderedChildren,
+            props: propsResult.props,
+            renderedChildren: renderedChildrenResult.nodes,
             renderedReason: request.element.renderedReason,
             textContent: getTextContent(visibleChildren),
             type: request.element.type,
             visibility
         });
+    },
+    createPropsSnapshot(request: PropsSnapshotRequest): PropsSnapshotResult {
+        let currentBuild = request.build;
+        const props = normalizeSnapshotProps(request.props, {
+            ancestors: request.build.valueAncestors,
+            describeElement(element, location) {
+                const elementResult = snapshotOperations.createElementSnapshotNode({
+                    build: currentBuild,
+                    element,
+                    idNormalization: request.idNormalization,
+                    index: location,
+                    inheritedVisibility: request.inheritedVisibility,
+                    node: element,
+                    parentId: request.ownerId,
+                    parentPath: request.ownerPath
+                });
+
+                currentBuild = elementResult.build;
+
+                return elementResult.node;
+            },
+            normalizeIdString: request.build.normalizeIdString
+        });
+
+        return { build: currentBuild, props };
     },
     createSourceElementGivenChildren(request: SourceElementChildrenRequest): ChildSnapshotsResult {
         return request.element.givenChildrenKind === 'source'
@@ -444,7 +491,8 @@ export function createIntrospectionSnapshotFromSource(
         build: {
             nextId: 0,
             nodes: Object.freeze([]),
-            normalizeIdString: createIdNormalizer(idNormalization)
+            normalizeIdString: createIdNormalizer(idNormalization),
+            valueAncestors: new WeakSet()
         },
         children,
         idNormalization,
