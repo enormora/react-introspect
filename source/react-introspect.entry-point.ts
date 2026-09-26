@@ -50,7 +50,7 @@ export type {
     RenderedChildren
 } from './public/introspect-public-types.js';
 
-export function introspect<HostSchema extends Record<string, unknown> = Record<string, unknown>>(
+export function introspect<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema>(
     element: React.ReactElement,
     options?: IntrospectionOptions<HostSchema>
 ): IntrospectionView<HostSchema>;

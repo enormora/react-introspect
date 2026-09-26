@@ -129,6 +129,21 @@ Options:
 | `transparent` | `[]`        | Components that execute without consuming `depth`.                       |
 | `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.                 |
 
+### Typed host props
+
+Pass a host schema to type host element props. `React.JSX.IntrinsicElements` works as is.
+
+```tsx
+const view = introspect<React.JSX.IntrinsicElements>(<SignupForm />);
+
+const submit = view.find('button');
+
+assert.ok(submit);
+assert.equal(submit.props.type, 'submit'); // 'button' | 'reset' | 'submit' | undefined
+```
+
+Any object type works as a schema. Tags missing from it have `unknown` props. `children` is never part of host props; use `givenChildren`.
+
 View properties are lazy views of the latest committed snapshot.
 
 Node properties read the snapshot that produced that node. Query again after updates.

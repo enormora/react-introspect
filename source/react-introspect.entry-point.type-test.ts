@@ -197,3 +197,11 @@ expect({ refs: refMatcher }).type.toBeAssignableTo<IntrospectionOptions<HostSche
 if (refMatcher.rules[0] !== undefined) {
     expect(refMatcher.rules[0]).type.toBeAssignableTo<IntrospectionRefRule<HostSchema>>();
 }
+
+const intrinsicView = introspect<React.JSX.IntrinsicElements>(React.createElement('form'));
+const intrinsicButton = intrinsicView.find('button');
+
+if (intrinsicButton !== undefined) {
+    expect(intrinsicButton.props.type).type.toBe<'button' | 'reset' | 'submit' | undefined>();
+    expect(intrinsicButton.props).type.not.toHaveProperty('children');
+}

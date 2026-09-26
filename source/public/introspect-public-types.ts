@@ -32,7 +32,7 @@ export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = In
     readonly warningMode?: 'capture' | 'ignore' | 'throw';
 };
 
-export type IntrospectionHostSchema = Readonly<Record<string, unknown>>;
+export type IntrospectionHostSchema = Readonly<Record<never, unknown>>;
 
 export type IntrospectionNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
 
@@ -153,7 +153,7 @@ type IntrospectionNodeProps<
 type IntrospectionHostProps<
     HostSchema extends IntrospectionHostSchema,
     Type extends string
-> = Type extends keyof HostSchema ? HostSchema[Type] : unknown;
+> = Type extends keyof HostSchema ? IntrospectionWithoutKeys<HostSchema[Type], 'children'> : unknown;
 
 type IntrospectionElementProps<Type> = Type extends React.JSXElementConstructor<infer Props> ? Props
     : IntrospectionComponentProps<Type>;
