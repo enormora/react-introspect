@@ -129,6 +129,23 @@ Options:
 | `transparent` | `[]`        | Components that execute without consuming `depth`.                       |
 | `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.                 |
 
+### `createIntrospect(defaults)`
+
+Returns an `introspect` function with preset options, for a shared test harness.
+
+```tsx
+import { createIntrospect } from 'react-introspect';
+
+export const introspectPage = createIntrospect<React.JSX.IntrinsicElements>({
+    transparent: [ AppProviders ],
+    waitTimeout: 500
+});
+
+const view = introspectPage(<SettingsPage />, { depth: 2 });
+```
+
+Per-call options override the defaults key by key. Arrays such as `transparent` replace the default; they are not merged.
+
 ### Typed host props
 
 Pass a host schema to type host element props. `React.JSX.IntrinsicElements` works as is.

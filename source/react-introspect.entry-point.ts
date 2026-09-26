@@ -58,6 +58,19 @@ export function introspect(element: React.ReactElement, options: IntrospectionOp
     return introspectionView.createView(element, options);
 }
 
+export function createIntrospect<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema>(
+    defaults: IntrospectionOptions<HostSchema>
+): (element: React.ReactElement, options?: IntrospectionOptions<HostSchema>) => IntrospectionView<HostSchema>;
+export function createIntrospect(
+    defaults: IntrospectionOptions
+): (element: React.ReactElement, options?: IntrospectionOptions) => unknown {
+    const createView = introspectionView.preconfigure(defaults);
+
+    return function introspectWithDefaults(element, options = {}) {
+        return createView(element, options);
+    };
+}
+
 export const createFakeRefNode: <Node>(node: Node) => IntrospectionFakeRefNode<Node> = createFakeRefNodeImplementation;
 
 export const matchRefs: <HostSchema extends IntrospectionHostSchema>(

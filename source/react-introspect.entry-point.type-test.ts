@@ -22,6 +22,7 @@ import {
     matchRefs
 } from './refs/introspect-ref.ts';
 import {
+    createIntrospect,
     introspect
 } from './react-introspect.entry-point.ts';
 
@@ -205,3 +206,13 @@ if (intrinsicButton !== undefined) {
     expect(intrinsicButton.props.type).type.toBe<'button' | 'reset' | 'submit' | undefined>();
     expect(intrinsicButton.props).type.not.toHaveProperty('children');
 }
+
+const introspectForm = createIntrospect<React.JSX.IntrinsicElements>({ depth: 2, transparent: [ Button ] });
+
+expect(introspectForm(React.createElement('form')).find('button')?.props.type)
+    .type
+    .toBe<'button' | 'reset' | 'submit' | undefined>();
+expect(introspectForm(React.createElement('form'), { depth: 'full' })).type.toBe<
+    IntrospectionView<React.JSX.IntrinsicElements>
+>();
+expect(introspectForm).type.not.toBeCallableWith(React.createElement('form'), { depth: 'deep' });
