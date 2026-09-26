@@ -93,7 +93,8 @@ function createIntrospectionViewWithDependencies(
         },
         get currentSnapshot() {
             return currentSnapshot;
-        }
+        },
+        hostEvent: options.hostEvent ?? {}
     };
 
     function rootNode(): RuntimeIntrospectionNode | undefined {

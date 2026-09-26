@@ -121,6 +121,7 @@ Options:
 | `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.                    |
 | `depthFrom`   | none        | Starts counting `depth` at the first instance of this component.         |
 | `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.              |
+| `hostEvent`   | `{}`        | Default fields for event stubs sent to host elements.                    |
 | `idPrefix`    | generated   | Prefix passed to React for `useId`.                                      |
 | `idGenerator` | none        | Rewrites React-generated ids in React Introspect snapshots after commit. |
 | `refs`        | none        | Injects fake host ref nodes.                                             |
@@ -594,6 +595,28 @@ Mapping:
 - `change` -> `onChange`
 - `myCustomEvent` -> `onMyCustomEvent`
 - `pressCapture` -> `onPressCapture`
+
+Component nodes receive the arguments as passed.
+
+Host nodes receive an event stub, because their handlers expect an event:
+
+```tsx
+const form = view.find('form');
+
+assert.ok(form);
+form.sendEvent('submit');
+// onSubmit({ type: 'submit', preventDefault, stopPropagation, defaultPrevented, ... })
+
+const input = view.find('input');
+
+assert.ok(input);
+input.sendEvent('change', { target: { value: 'Ada' } });
+// onChange({ type: 'change', preventDefault, ..., target: { value: 'Ada' } })
+```
+
+An object as first argument is merged over the stub. Any other first argument is passed as is. The stub has `type`, `defaultPrevented`, `preventDefault()`, `isDefaultPrevented()`, `stopPropagation()`, and `isPropagationStopped()`. Add defaults with the `hostEvent` option.
+
+Use `locate()` for actions when the target may be missing. `view.locate(Button).sendEvent('save')` throws on a missing node; `view.find(Button)?.sendEvent('save')` silently does nothing.
 
 ### `node.callProp(propName, ...args)`
 

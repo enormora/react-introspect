@@ -70,6 +70,7 @@ function createReader(snapshot: IntrospectionSnapshot, count: Count): SnapshotRe
         act(action: () => unknown) {
             return action();
         },
+        hostEvent: {},
         get currentSnapshot() {
             return {
                 nodes: snapshot.nodes,

@@ -12,6 +12,67 @@ function Button(props: ButtonProps): React.ReactNode {
     return React.createElement('button', { onClick: props.onPress }, props.label);
 }
 
+type RecordedEvent = {
+    readonly defaultPrevented: unknown;
+    readonly defaultPreventedByMethod: unknown;
+    readonly nativeEvent: unknown;
+    readonly propagationStopped: unknown;
+    readonly target: unknown;
+    readonly type: unknown;
+};
+
+type HostEventStub = {
+    readonly defaultPrevented: boolean;
+    readonly isDefaultPrevented: () => boolean;
+    readonly isPropagationStopped: () => boolean;
+    readonly nativeEvent: unknown;
+    readonly preventDefault: () => void;
+    readonly stopPropagation: () => void;
+    readonly target: unknown;
+    readonly type: string;
+};
+
+type SaveButtonProps = {
+    readonly onSave: (...values: readonly unknown[]) => void;
+};
+
+function SaveButton(props: SaveButtonProps): React.ReactNode {
+    return React.createElement('button', { onClick: props.onSave }, 'Save');
+}
+
+function createEventForm(record: (event: RecordedEvent) => void): React.ReactElement {
+    function recordEvent(event: HostEventStub, handle: (stub: HostEventStub) => void): void {
+        handle(event);
+        record({
+            defaultPrevented: event.defaultPrevented,
+            defaultPreventedByMethod: event.isDefaultPrevented(),
+            nativeEvent: event.nativeEvent,
+            propagationStopped: event.isPropagationStopped(),
+            target: event.target,
+            type: event.type
+        });
+    }
+
+    return React.createElement(
+        'form',
+        {
+            onSubmit(event: HostEventStub) {
+                recordEvent(event, function cancelSubmit(stub) {
+                    stub.preventDefault();
+                    stub.stopPropagation();
+                });
+            }
+        },
+        React.createElement('input', {
+            onChange(event: HostEventStub) {
+                recordEvent(event, function ignoreChange() {
+                    return undefined;
+                });
+            }
+        })
+    );
+}
+
 function IdLabel(): React.ReactNode {
     return React.createElement('span', { id: React.useId() }, 'label');
 }
@@ -61,6 +122,84 @@ export const testNode = suite('introspection view', [
             withDefault: 'label',
             withReplacement: undefined
         });
+
+        return scope.assert.collect();
+    }),
+    test('passes an event stub with per-call overrides to host event handlers', function (scope) {
+        const recorded: RecordedEvent[] = [];
+        const view = createUnitIntrospectionView(
+            createEventForm(function recordEvent(event) {
+                recorded.push(event);
+            }),
+            { strictMode: false }
+        );
+
+        view.find('form')?.sendEvent('submit');
+        view.find('input')?.sendEvent('change', { target: { value: 'Ada' } });
+
+        scope.assert.deepEqual(recorded, [
+            {
+                defaultPrevented: true,
+                defaultPreventedByMethod: true,
+                nativeEvent: undefined,
+                propagationStopped: true,
+                target: undefined,
+                type: 'submit'
+            },
+            {
+                defaultPrevented: false,
+                defaultPreventedByMethod: false,
+                nativeEvent: undefined,
+                propagationStopped: false,
+                target: { value: 'Ada' },
+                type: 'change'
+            }
+        ]);
+
+        return scope.assert.collect();
+    }),
+    test('layers hostEvent defaults under per-call overrides', function (scope) {
+        const recorded: RecordedEvent[] = [];
+        const view = createUnitIntrospectionView(
+            createEventForm(function recordEvent(event) {
+                recorded.push(event);
+            }),
+            {
+                hostEvent: { nativeEvent: { isTrusted: false }, target: { value: 'default' } },
+                strictMode: false
+            }
+        );
+
+        view.find('input')?.sendEvent('change');
+        view.find('input')?.sendEvent('change', { target: { value: 'Ada' } });
+
+        scope.assert.deepEqual(
+            recorded.map(function readEventData(event) {
+                return { nativeEvent: structuredClone(event.nativeEvent), target: event.target };
+            }),
+            [
+                { nativeEvent: { isTrusted: false }, target: { value: 'default' } },
+                { nativeEvent: { isTrusted: false }, target: { value: 'Ada' } }
+            ]
+        );
+
+        return scope.assert.collect();
+    }),
+    test('passes component event arguments verbatim', function (scope) {
+        const received: (readonly unknown[])[] = [];
+        const view = createUnitIntrospectionView(
+            React.createElement(SaveButton, {
+                onSave(...values) {
+                    received.push(values);
+                }
+            }),
+            { depth: 0, strictMode: false }
+        );
+
+        view.find(SaveButton)?.sendEvent('save', 42);
+        view.find(SaveButton)?.sendEvent('save');
+
+        scope.assert.deepEqual(received, [ [ 42 ], [] ]);
 
         return scope.assert.collect();
     }),

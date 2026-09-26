@@ -101,7 +101,7 @@ if (button !== undefined) {
 
     // @ts-expect-error: Type '"missing"' is not assignable to type '"label" | "disabled" | "onSave"'.
     button.pickProps([ 'missing' ]);
-    // @ts-expect-error: Property 'children' does not exist on type 'IntrospectionPropValues<IntrospectionWithoutKeys<ButtonProps & { children?: ReactNode; }, "children">, Record<string, unknown>>'.
+    // @ts-expect-error: Property 'children' does not exist on type 'IntrospectionPropValues<IntrospectionWithoutKeys<ButtonProps & { children?: ReactNode; }, "children">, Readonly<Record<never, unknown>>>'.
     String(button.props.children);
 }
 
