@@ -1,5 +1,6 @@
 import type { IntrospectionHostSchema, IntrospectionSelector } from '../../public/introspect-public-types.ts';
 import type { RuntimeIntrospectionNode } from '../types/introspect-runtime-types.ts';
+import { matchesTargetCriteria } from '../../matching/introspect-target-criteria.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
 
 const selectorFields = Object.freeze([
@@ -19,47 +20,6 @@ function isSelectorObject(value: unknown): value is IntrospectionSelector {
     return isObject(value) && !hasProperty(value, '$$typeof') && selectorFields.some(function hasSelectorField(field) {
         return hasProperty(value, field);
     });
-}
-
-function matchesPartial(value: unknown, partial: unknown): boolean {
-    if (Object.is(value, partial)) {
-        return true;
-    }
-
-    if (Array.isArray(value) && Array.isArray(partial)) {
-        return partial.every(function matchesArrayItem(item, index) {
-            return matchesPartial(value[index], item);
-        });
-    }
-
-    if (!isObject(value) || !isObject(partial)) {
-        return false;
-    }
-
-    return Reflect.ownKeys(partial).every(function matchesKey(key) {
-        return matchesPartial(value[key], partial[key]);
-    });
-}
-
-function typeMatches<HostSchema extends IntrospectionHostSchema>(
-    node: RuntimeIntrospectionNode,
-    selector: IntrospectionSelector<HostSchema>
-): boolean {
-    return !hasProperty(selector, 'type') || selector.type === node.type;
-}
-
-function keyMatches<HostSchema extends IntrospectionHostSchema>(
-    node: RuntimeIntrospectionNode,
-    selector: IntrospectionSelector<HostSchema>
-): boolean {
-    return !hasProperty(selector, 'key') || selector.key === node.key;
-}
-
-function propsMatch<HostSchema extends IntrospectionHostSchema>(
-    node: RuntimeIntrospectionNode,
-    selector: IntrospectionSelector<HostSchema>
-): boolean {
-    return !hasProperty(selector, 'props') || matchesPartial(node.props, selector.props);
 }
 
 function regexpMatches(pattern: RegExp, value: string): boolean {
@@ -117,9 +77,7 @@ export function nodeMatchesSelector<HostSchema extends IntrospectionHostSchema>(
     node: RuntimeIntrospectionNode,
     selector: IntrospectionSelector<HostSchema>
 ): boolean {
-    return typeMatches(node, selector) &&
-        keyMatches(node, selector) &&
-        propsMatch(node, selector) &&
+    return matchesTargetCriteria(selector, node) &&
         textContentMatches(node, selector) &&
         hasMatches(node, selector) &&
         whereMatches(node, selector);

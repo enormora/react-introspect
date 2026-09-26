@@ -7,6 +7,7 @@ import type {
     IntrospectionRefShorthand,
     IntrospectionRefTarget
 } from '../public/introspect-public-types.js';
+import { matchesTargetCriteria } from '../matching/introspect-target-criteria.ts';
 import { isObject } from '../values/introspect-value-kinds.ts';
 
 const matcherType = 'matchRefs';
@@ -30,51 +31,12 @@ export function matchRefs<HostSchema extends IntrospectionHostSchema>(
     });
 }
 
-function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Object.hasOwn(value, property);
-}
-
-function matchesPartial(value: unknown, partial: unknown): boolean {
-    if (Object.is(value, partial)) {
-        return true;
-    }
-
-    if (Array.isArray(value) && Array.isArray(partial)) {
-        return partial.every(function matchesArrayItem(item, index) {
-            return matchesPartial(value[index], item);
-        });
-    }
-
-    if (!isObject(value) || !isObject(partial)) {
-        return false;
-    }
-
-    return Reflect.ownKeys(partial).every(function matchesKey(key) {
-        return matchesPartial(value[key], partial[key]);
-    });
-}
-
-function ruleTypeMatches(rule: IntrospectionRefRule, target: IntrospectionRefHostTarget): boolean {
-    return !hasProperty(rule, 'type') || rule.type === target.type;
-}
-
-function ruleKeyMatches(rule: IntrospectionRefRule, target: IntrospectionRefHostTarget): boolean {
-    return !hasProperty(rule, 'key') || rule.key === target.key;
-}
-
-function rulePropsMatch(rule: IntrospectionRefRule, target: IntrospectionRefHostTarget): boolean {
-    return !hasProperty(rule, 'props') || matchesPartial(target.props, rule.props);
-}
-
 function ruleWhereMatches(rule: IntrospectionRefRule, target: IntrospectionRefHostTarget): boolean {
     return rule.where === undefined || Reflect.apply(rule.where, undefined, [ target ]);
 }
 
 function ruleMatchesTarget(rule: IntrospectionRefRule, target: IntrospectionRefHostTarget): boolean {
-    return ruleTypeMatches(rule, target) &&
-        ruleKeyMatches(rule, target) &&
-        rulePropsMatch(rule, target) &&
-        ruleWhereMatches(rule, target);
+    return matchesTargetCriteria(rule, target) && ruleWhereMatches(rule, target);
 }
 
 function matchingRules(
