@@ -3,6 +3,7 @@ import {
     createUnsupportedReactValueError,
     isReactPortalValue
 } from '../../render/frame/introspect-unsupported-react.ts';
+import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 export type IntrospectionIdNormalization = {
     readonly generator: ((generatedId: string) => string) | undefined;
@@ -28,10 +29,6 @@ type IdReplacementState = {
 };
 
 type IdReplacementMap = Map<string, string>;
-
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
 
 function isPlainObject(value: Readonly<Record<PropertyKey, unknown>>): boolean {
     const prototype: unknown = Object.getPrototypeOf(value);
@@ -62,11 +59,11 @@ function replaceGeneratedId(state: IdReplacementState, generatedId: string): str
 }
 
 function isNormalizableSnapshotObject(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return isRecord(value) && typeof value !== 'function' && isPlainObject(value);
+    return isObjectOrFunction(value) && typeof value !== 'function' && isPlainObject(value);
 }
 
 function isCircularValue(value: unknown, state: SnapshotPropsNormalization): boolean {
-    return isRecord(value) && state.ancestors.has(value);
+    return isObjectOrFunction(value) && state.ancestors.has(value);
 }
 
 function normalizeCircularValue(): string {

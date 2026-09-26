@@ -7,21 +7,18 @@ import type {
     IntrospectionRefShorthand,
     IntrospectionRefTarget
 } from '../public/introspect-public-types.js';
+import { isObject } from '../values/introspect-value-kinds.ts';
 
 const matcherType = 'matchRefs';
 
 export type IntrospectionRefHostTarget = IntrospectionRefTarget<Readonly<Record<PropertyKey, unknown>>, string>;
-
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null;
-}
 
 export function createFakeRefNode<Node>(node: Node): IntrospectionFakeRefNode<Node> {
     return node;
 }
 
 function isIntrospectionRefMatcher(value: unknown): value is IntrospectionRefMatcher {
-    return isRecord(value) && value.type === matcherType && Array.isArray(value.rules);
+    return isObject(value) && value.type === matcherType && Array.isArray(value.rules);
 }
 
 export function matchRefs<HostSchema extends IntrospectionHostSchema>(
@@ -48,7 +45,7 @@ function matchesPartial(value: unknown, partial: unknown): boolean {
         });
     }
 
-    if (!isRecord(value) || !isRecord(partial)) {
+    if (!isObject(value) || !isObject(partial)) {
         return false;
     }
 

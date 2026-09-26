@@ -14,6 +14,7 @@ import {
     getTextContent,
     getTypeName
 } from '../shape/introspect-snapshot-shape.ts';
+import { isIterable } from '../../values/introspect-value-kinds.ts';
 import {
     type ChildSnapshotsRequest,
     type ChildSnapshotsResult,
@@ -38,10 +39,6 @@ import {
     type SourceSnapshotNodeRequest
 } from './introspect-snapshot-contract.ts';
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
 function visibilityFromSource(
     inheritedVisibility: SnapshotVisibility,
     sourceVisibility: SnapshotVisibility,
@@ -60,10 +57,6 @@ function readElementProps(element: React.ReactElement<SnapshotProps>): SnapshotP
 
 function isEmptyNode(node: unknown): boolean {
     return node === null || node === undefined || typeof node === 'boolean';
-}
-
-function isIterable(value: unknown): value is Iterable<unknown> {
-    return isRecord(value) && typeof value[Symbol.iterator] === 'function';
 }
 
 function isSourceElementNode(node: SnapshotSourceNode): node is SnapshotSourceElement {

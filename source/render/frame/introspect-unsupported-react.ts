@@ -1,13 +1,10 @@
 import React from 'react';
+import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 const reactPortalType = Symbol.for('react.portal');
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
 export function isReactPortalValue(value: unknown): boolean {
-    return isRecord(value) && value.$$typeof === reactPortalType;
+    return isObjectOrFunction(value) && value.$$typeof === reactPortalType;
 }
 
 export function createUnsupportedReactValueError(): Error {
@@ -27,7 +24,7 @@ export function assertSupportedReactValue(value: unknown): void {
         return;
     }
 
-    if (React.isValidElement(value) && isRecord(value.props)) {
+    if (React.isValidElement(value) && isObjectOrFunction(value.props)) {
         assertSupportedReactValue(value.props.children);
     }
 }

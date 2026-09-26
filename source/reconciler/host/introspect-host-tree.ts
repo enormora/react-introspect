@@ -20,6 +20,7 @@ import {
     type SnapshotSourceNode
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
+import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 export type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -95,10 +96,6 @@ function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: Pr
     return Object.hasOwn(value, property);
 }
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
 function isPublicHostPropKey(key: PropertyKey): boolean {
     return key !== 'children' &&
         key !== 'key' &&
@@ -121,7 +118,7 @@ function publicProps(props: IntrospectionHostProps): IntrospectionHostProps {
 }
 
 function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
-    return isRecord(value) &&
+    return isObjectOrFunction(value) &&
         introspectionComponentMetadataKeys.every(function hasMetadataKey(key) {
             return hasProperty(value, key);
         });

@@ -1,5 +1,6 @@
 import type { IntrospectionHostSchema, IntrospectionSelector } from '../../public/introspect-public-types.ts';
 import type { RuntimeIntrospectionNode } from '../types/introspect-runtime-types.ts';
+import { isObject } from '../../values/introspect-value-kinds.ts';
 
 const selectorFields = Object.freeze([
     'has',
@@ -14,12 +15,8 @@ function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: Pr
     return Reflect.has(value, property);
 }
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null;
-}
-
 function isSelectorObject(value: unknown): value is IntrospectionSelector {
-    return isRecord(value) && !hasProperty(value, '$$typeof') && selectorFields.some(function hasSelectorField(field) {
+    return isObject(value) && !hasProperty(value, '$$typeof') && selectorFields.some(function hasSelectorField(field) {
         return hasProperty(value, field);
     });
 }
@@ -35,7 +32,7 @@ function matchesPartial(value: unknown, partial: unknown): boolean {
         });
     }
 
-    if (!isRecord(value) || !isRecord(partial)) {
+    if (!isObject(value) || !isObject(partial)) {
         return false;
     }
 

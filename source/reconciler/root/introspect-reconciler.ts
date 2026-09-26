@@ -29,6 +29,7 @@ import {
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
+import { isObject } from '../../values/introspect-value-kinds.ts';
 import {
     createIntrospectionReconcilerRuntime,
     type IntrospectionReconcilerRuntime
@@ -309,14 +310,10 @@ function actSession(session: IntrospectionReconcilerSession, action: () => unkno
     });
 }
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null;
-}
-
 function hasScheduledRootTask(session: IntrospectionReconcilerSession): boolean {
     const task = session.root.callbackNode;
 
-    return isRecord(task) && typeof task.callback === 'function';
+    return isObject(task) && typeof task.callback === 'function';
 }
 
 async function flushMicrotasks(session: IntrospectionReconcilerSession): Promise<void> {

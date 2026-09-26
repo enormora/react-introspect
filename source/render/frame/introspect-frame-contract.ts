@@ -1,5 +1,6 @@
 import React from 'react';
 import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
+import { isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import { assertSupportedReactValue } from './introspect-unsupported-react.ts';
 
 export const introspectionComponentHostType = 'react-introspect-internal-component';
@@ -48,19 +49,11 @@ export type IntrospectionComponentMetadata = {
 
 const introspectionRenderErrors = new WeakSet();
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
 function isPublicPropKey(key: PropertyKey): boolean {
     return key !== 'children' &&
         key !== 'key' &&
         key !== 'ref' &&
         key !== introspectionElementKeyMetadata;
-}
-
-function isThenable(value: unknown): boolean {
-    return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
 }
 
 function publicProps(props: Readonly<Record<PropertyKey, unknown>>): Readonly<Record<PropertyKey, unknown>> {
@@ -155,7 +148,7 @@ export function createEmptyHost(value: unknown): React.ReactElement {
 }
 
 export function throwIntrospectionRenderError(error: unknown): never {
-    if (isRecord(error) && !isThenable(error)) {
+    if (isObjectOrFunction(error) && !isThenable(error)) {
         introspectionRenderErrors.add(error);
     }
 
@@ -163,5 +156,5 @@ export function throwIntrospectionRenderError(error: unknown): never {
 }
 
 export function isIntrospectionRenderError(error: unknown): boolean {
-    return isRecord(error) && introspectionRenderErrors.has(error);
+    return isObjectOrFunction(error) && introspectionRenderErrors.has(error);
 }
