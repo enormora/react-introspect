@@ -50,12 +50,25 @@ export type {
     RenderedChildren
 } from './public/introspect-public-types.js';
 
-export function introspect<HostSchema extends Record<string, unknown> = Record<string, unknown>>(
+export function introspect<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema>(
     element: React.ReactElement,
     options?: IntrospectionOptions<HostSchema>
 ): IntrospectionView<HostSchema>;
 export function introspect(element: React.ReactElement, options: IntrospectionOptions = {}): unknown {
     return introspectionView.createView(element, options);
+}
+
+export function createIntrospect<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema>(
+    defaults: IntrospectionOptions<HostSchema>
+): (element: React.ReactElement, options?: IntrospectionOptions<HostSchema>) => IntrospectionView<HostSchema>;
+export function createIntrospect(
+    defaults: IntrospectionOptions
+): (element: React.ReactElement, options?: IntrospectionOptions) => unknown {
+    const createView = introspectionView.preconfigure(defaults);
+
+    return function introspectWithDefaults(element, options = {}) {
+        return createView(element, options);
+    };
 }
 
 export const createFakeRefNode: <Node>(node: Node) => IntrospectionFakeRefNode<Node> = createFakeRefNodeImplementation;

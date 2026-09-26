@@ -8,13 +8,22 @@ import type {
 } from '../types/introspect-runtime-types.ts';
 import type { IntrospectionRuntimeDependencies } from './introspect-runtime-dependencies-types.ts';
 import { createUnitRuntimeDependencies } from './introspect-runtime-dependencies.test.ts';
-import { createIntrospectionViewModule } from './introspect-view.ts';
+import { createIntrospectionViewModule, type IntrospectionViewModule } from './introspect-view.ts';
 
 const isolatedConsoleDiagnostics: IntrospectionConsoleDiagnostics = Object.freeze({
     subscribe() {
         return undefined;
     }
 });
+
+export function createUnitIntrospectionViewModule(): IntrospectionViewModule {
+    return createIntrospectionViewModule({
+        consoleDiagnostics: isolatedConsoleDiagnostics,
+        reconciler: createIntrospectionReconcilerModule({
+            runtime: createUnitRuntimeDependencies()
+        })
+    });
+}
 
 export function createUnitIntrospectionView(
     element: React.ReactElement,

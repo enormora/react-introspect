@@ -27,11 +27,14 @@ import {
     createEmptyIntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 
+type IntrospectionViewFactory = (
+    element: React.ReactElement,
+    options: RuntimeIntrospectionOptions
+) => RuntimeIntrospectionView;
+
 export type IntrospectionViewModule = {
-    readonly createView: (
-        element: React.ReactElement,
-        options: RuntimeIntrospectionOptions
-    ) => RuntimeIntrospectionView;
+    readonly createView: IntrospectionViewFactory;
+    readonly preconfigure: (defaults: RuntimeIntrospectionOptions) => IntrospectionViewFactory;
 };
 
 export type IntrospectionViewModuleDependencies = {
@@ -172,6 +175,11 @@ export function createIntrospectionViewModule(
     return Object.freeze({
         createView(element, options) {
             return createIntrospectionViewWithDependencies(element, options, dependencies);
+        },
+        preconfigure(defaults) {
+            return function createPreconfiguredView(element, options) {
+                return createIntrospectionViewWithDependencies(element, { ...defaults, ...options }, dependencies);
+            };
         }
     });
 }
