@@ -25,7 +25,8 @@ import {
     type PropsSnapshotResult,
     registerSnapshotNode,
     type SnapshotBuild,
-    type SnapshotNodeInput,
+    type SnapshotChildPlacement,
+    type SnapshotNode,
     type SnapshotNodeRequest,
     type SnapshotNodeResult,
     type SnapshotProps,
@@ -79,7 +80,7 @@ function allocateNodeId(build: SnapshotBuild): NodeIdAllocation {
     };
 }
 
-function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNodeInput): SnapshotNodeResult {
+function pushSnapshotNode(build: SnapshotBuild, input: SnapshotNode): SnapshotNodeResult {
     const node = registerSnapshotNode(Object.freeze(input));
 
     return {
@@ -108,33 +109,93 @@ function flattenReactNodes(children: unknown): readonly unknown[] {
     return Object.freeze([ children ]);
 }
 
+type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
+
+function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf): SnapshotNodeResult {
+    const idAllocation = allocateNodeId(request.build);
+
+    return pushSnapshotNode(idAllocation.build, {
+        ...leaf,
+        activityMode: undefined,
+        error: undefined,
+        givenChildren: Object.freeze([]),
+        id: idAllocation.id,
+        key: null,
+        parentId: request.parentId,
+        path: getIndexedPath(request.parentPath, request.index, leaf.name),
+        props: Object.freeze({
+            value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
+        }),
+        renderedChildren: Object.freeze([]),
+        visibility: request.inheritedVisibility
+    });
+}
+
+function createEmptySnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
+    return pushLeafSnapshotNode(request, {
+        kind: 'empty',
+        name: '#empty',
+        renderedReason: undefined,
+        textContent: '',
+        type: '#empty'
+    });
+}
+
+function createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
+    return pushLeafSnapshotNode(request, {
+        kind: 'opaque',
+        name: 'Opaque',
+        renderedReason: 'unsupported',
+        textContent: '',
+        type: 'opaque'
+    });
+}
+
+function createTextSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
+    return pushLeafSnapshotNode(request, {
+        kind: 'text',
+        name: '#text',
+        renderedReason: undefined,
+        textContent: request.build.normalizeIdString(String(request.node)),
+        type: '#text'
+    });
+}
+
+const sourceLeafSnapshotFactories = {
+    empty: createEmptySnapshotNode,
+    opaque: createOpaqueSnapshotNode,
+    text: createTextSnapshotNode
+};
+
+function createSiblingSnapshots<Child>(
+    placement: SnapshotChildPlacement,
+    children: readonly Child[],
+    createNode: (request: SnapshotNodeRequest & { readonly node: Child; }) => SnapshotNodeResult
+): ChildSnapshotsResult {
+    return children.reduce<ChildSnapshotsResult>(
+        function addChild(result, child, index) {
+            const childResult = createNode({ ...placement, build: result.build, index, node: child });
+
+            return {
+                build: childResult.build,
+                nodes: Object.freeze([
+                    ...result.nodes,
+                    childResult.node
+                ])
+            };
+        },
+        {
+            build: placement.build,
+            nodes: Object.freeze([])
+        }
+    );
+}
+
 const snapshotOperations = {
     createChildSnapshots(request: ChildSnapshotsRequest): ChildSnapshotsResult {
-        return flattenReactNodes(request.children).reduce<ChildSnapshotsResult>(
-            function addChild(result, child, index) {
-                const childResult = snapshotOperations.createSnapshotNode({
-                    build: result.build,
-                    idNormalization: request.idNormalization,
-                    index,
-                    inheritedVisibility: request.inheritedVisibility,
-                    node: child,
-                    parentId: request.parentId,
-                    parentPath: request.parentPath
-                });
+        const { children, ...placement } = request;
 
-                return {
-                    build: childResult.build,
-                    nodes: Object.freeze([
-                        ...result.nodes,
-                        childResult.node
-                    ])
-                };
-            },
-            {
-                build: request.build,
-                nodes: Object.freeze([])
-            }
-        );
+        return createSiblingSnapshots(placement, flattenReactNodes(children), snapshotOperations.createSnapshotNode);
     },
     createElementSnapshotNode(request: ElementNodeRequest): SnapshotNodeResult {
         const props = readElementProps(request.element);
@@ -257,23 +318,11 @@ const snapshotOperations = {
         return { build: currentBuild, props };
     },
     createSourceElementGivenChildren(request: SourceElementChildrenRequest): ChildSnapshotsResult {
-        return request.element.givenChildrenKind === 'source'
-            ? snapshotOperations.createSourceChildSnapshots({
-                build: request.build,
-                children: request.element.givenChildren,
-                idNormalization: request.idNormalization,
-                inheritedVisibility: request.inheritedVisibility,
-                parentId: request.parentId,
-                parentPath: request.parentPath
-            })
-            : snapshotOperations.createChildSnapshots({
-                build: request.build,
-                children: request.element.givenChildren,
-                idNormalization: request.idNormalization,
-                inheritedVisibility: request.inheritedVisibility,
-                parentId: request.parentId,
-                parentPath: request.parentPath
-            });
+        const { element, ...placement } = request;
+
+        return element.givenChildrenKind === 'source'
+            ? snapshotOperations.createSourceChildSnapshots({ ...placement, children: element.givenChildren })
+            : snapshotOperations.createChildSnapshots({ ...placement, children: element.givenChildren });
     },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): ChildSnapshotsResult {
         if (request.element.renderedReason === 'depth') {
@@ -300,59 +349,13 @@ const snapshotOperations = {
             parentPath: request.parentPath
         });
     },
-    createEmptySnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
-        const idAllocation = allocateNodeId(request.build);
-
-        return pushSnapshotNode(idAllocation.build, {
-            activityMode: undefined,
-            givenChildren: Object.freeze([]),
-            error: undefined,
-            id: idAllocation.id,
-            key: null,
-            kind: 'empty',
-            name: '#empty',
-            parentId: request.parentId,
-            path: getIndexedPath(request.parentPath, request.index, '#empty'),
-            props: Object.freeze({
-                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
-            }),
-            renderedChildren: Object.freeze([]),
-            renderedReason: undefined,
-            textContent: '',
-            type: '#empty',
-            visibility: request.inheritedVisibility
-        });
-    },
-    createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
-        const idAllocation = allocateNodeId(request.build);
-
-        return pushSnapshotNode(idAllocation.build, {
-            activityMode: undefined,
-            givenChildren: Object.freeze([]),
-            error: undefined,
-            id: idAllocation.id,
-            key: null,
-            kind: 'opaque',
-            name: 'Opaque',
-            parentId: request.parentId,
-            path: getIndexedPath(request.parentPath, request.index, 'Opaque'),
-            props: Object.freeze({
-                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
-            }),
-            renderedChildren: Object.freeze([]),
-            renderedReason: 'unsupported',
-            textContent: '',
-            type: 'opaque',
-            visibility: request.inheritedVisibility
-        });
-    },
     createSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
         if (isEmptyNode(request.node)) {
-            return snapshotOperations.createEmptySnapshotNode(request);
+            return createEmptySnapshotNode(request);
         }
 
         if (typeof request.node === 'string' || typeof request.node === 'number' || typeof request.node === 'bigint') {
-            return snapshotOperations.createTextSnapshotNode(request);
+            return createTextSnapshotNode(request);
         }
 
         if (React.isValidElement<SnapshotProps>(request.node)) {
@@ -362,34 +365,12 @@ const snapshotOperations = {
             });
         }
 
-        return snapshotOperations.createOpaqueSnapshotNode(request);
+        return createOpaqueSnapshotNode(request);
     },
     createSourceChildSnapshots(request: SourceChildSnapshotsRequest): ChildSnapshotsResult {
-        return request.children.reduce<ChildSnapshotsResult>(
-            function addChild(result, child, index) {
-                const childResult = snapshotOperations.createSourceSnapshotNode({
-                    build: result.build,
-                    idNormalization: request.idNormalization,
-                    index,
-                    inheritedVisibility: request.inheritedVisibility,
-                    node: child,
-                    parentId: request.parentId,
-                    parentPath: request.parentPath
-                });
+        const { children, ...placement } = request;
 
-                return {
-                    build: childResult.build,
-                    nodes: Object.freeze([
-                        ...result.nodes,
-                        childResult.node
-                    ])
-                };
-            },
-            {
-                build: request.build,
-                nodes: Object.freeze([])
-            }
-        );
+        return createSiblingSnapshots(placement, children, snapshotOperations.createSourceSnapshotNode);
     },
     createSourceSnapshotNode(request: SourceSnapshotNodeRequest): SnapshotNodeResult {
         if (isSourceElementNode(request.node)) {
@@ -399,57 +380,10 @@ const snapshotOperations = {
             });
         }
 
-        if (request.node.kind === 'text') {
-            return snapshotOperations.createTextSnapshotNode({
-                ...request,
-                inheritedVisibility: visibilityFromSource(
-                    request.inheritedVisibility,
-                    request.node.visibility,
-                    undefined
-                ),
-                node: request.node.value
-            });
-        }
-
-        if (request.node.kind === 'empty') {
-            return snapshotOperations.createEmptySnapshotNode({
-                ...request,
-                inheritedVisibility: visibilityFromSource(
-                    request.inheritedVisibility,
-                    request.node.visibility,
-                    undefined
-                ),
-                node: request.node.value
-            });
-        }
-
-        return snapshotOperations.createOpaqueSnapshotNode({
+        return sourceLeafSnapshotFactories[request.node.kind]({
             ...request,
             inheritedVisibility: visibilityFromSource(request.inheritedVisibility, request.node.visibility, undefined),
             node: request.node.value
-        });
-    },
-    createTextSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
-        const idAllocation = allocateNodeId(request.build);
-
-        return pushSnapshotNode(idAllocation.build, {
-            activityMode: undefined,
-            givenChildren: Object.freeze([]),
-            error: undefined,
-            id: idAllocation.id,
-            key: null,
-            kind: 'text',
-            name: '#text',
-            parentId: request.parentId,
-            path: getIndexedPath(request.parentPath, request.index, '#text'),
-            props: Object.freeze({
-                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
-            }),
-            renderedChildren: Object.freeze([]),
-            renderedReason: undefined,
-            textContent: request.build.normalizeIdString(String(request.node)),
-            type: '#text',
-            visibility: request.inheritedVisibility
         });
     }
 };

@@ -90,32 +90,17 @@ export type SnapshotBuild = {
 
 export type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: number; };
 
-export type SnapshotNodeInput = {
-    readonly activityMode: 'hidden' | 'visible' | undefined;
-    readonly error: IntrospectionError | undefined;
-    readonly givenChildren: readonly SnapshotNode[];
-    readonly id: number;
-    readonly key: string | null;
-    readonly kind: SnapshotNodeKind;
-    readonly name: string;
-    readonly parentId: number | undefined;
-    readonly path: string;
-    readonly props: SnapshotProps;
-    readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
-    readonly textContent: string;
-    readonly type: unknown;
-    readonly visibility: SnapshotVisibility;
-};
-
-export type SnapshotNodeRequest = {
+export type SnapshotChildPlacement = {
     readonly build: SnapshotBuild;
     readonly idNormalization: IntrospectionIdNormalization;
-    readonly index: number | string;
     readonly inheritedVisibility: SnapshotVisibility;
-    readonly node: unknown;
     readonly parentId: number | undefined;
     readonly parentPath: string;
+};
+
+export type SnapshotNodeRequest = SnapshotChildPlacement & {
+    readonly index: number | string;
+    readonly node: unknown;
 };
 
 export type ElementNodeRequest = SnapshotNodeRequest & {
@@ -126,35 +111,21 @@ export type SourceElementNodeRequest = SnapshotNodeRequest & {
     readonly element: SnapshotSourceElement;
 };
 
-export type ChildSnapshotsRequest = {
-    readonly build: SnapshotBuild;
+export type ChildSnapshotsRequest = SnapshotChildPlacement & {
     readonly children: unknown;
-    readonly idNormalization: IntrospectionIdNormalization;
-    readonly inheritedVisibility: SnapshotVisibility;
-    readonly parentId: number | undefined;
-    readonly parentPath: string;
 };
 
-export type SourceChildSnapshotsRequest = {
-    readonly build: SnapshotBuild;
+export type SourceChildSnapshotsRequest = SnapshotChildPlacement & {
     readonly children: readonly SnapshotSourceNode[];
-    readonly idNormalization: IntrospectionIdNormalization;
-    readonly inheritedVisibility: SnapshotVisibility;
-    readonly parentId: number | undefined;
-    readonly parentPath: string;
 };
 
 export type SourceSnapshotNodeRequest = SnapshotNodeRequest & {
     readonly node: SnapshotSourceNode;
 };
 
-export type SourceElementChildrenRequest = {
-    readonly build: SnapshotBuild;
+export type SourceElementChildrenRequest = SnapshotChildPlacement & {
     readonly element: SnapshotSourceElement;
-    readonly idNormalization: IntrospectionIdNormalization;
-    readonly inheritedVisibility: SnapshotVisibility;
     readonly parentId: number;
-    readonly parentPath: string;
 };
 
 export type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest & {
