@@ -136,6 +136,44 @@ async function actAsync(action: () => void): Promise<void> {
     }
 }
 
+async function withActEnvironment<Result>(action: () => Promise<Result>): Promise<Result> {
+    const hadActEnvironment = Object.hasOwn(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+    const previousActEnvironment: unknown = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+
+    Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
+
+    try {
+        return await action();
+    } finally {
+        if (hadActEnvironment) {
+            Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', previousActEnvironment);
+        } else {
+            Reflect.deleteProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+        }
+    }
+}
+
+type IdleProgress = {
+    readonly idling: Promise<void>;
+    readonly isIdle: () => boolean;
+};
+
+function startWaitingForIdle(view: IntrospectionView): IdleProgress {
+    let idle = false;
+
+    async function waitAndMarkIdle(): Promise<void> {
+        await view.waitForIdle();
+        idle = true;
+    }
+
+    return {
+        idling: waitAndMarkIdle(),
+        isIdle() {
+            return idle;
+        }
+    };
+}
+
 function waitForRetry(view: IntrospectionView): PendingRetry {
     const renderCount = view.renderCount + 1;
 
@@ -189,6 +227,49 @@ export const testNode = suite('runtime integration', [
             scope.assert.deepEqual(
                 { renderCount: view.renderCount, textContent: view.textContent },
                 { renderCount: 2, textContent: 'after' }
+            );
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'resolves waitForIdle while an outside act scope holds the work',
+        async function (scope) {
+            const listeners = new Set<(value: string) => void>();
+            const view = introspect(
+                React.createElement(TransitionValueReader, {
+                    subscribe(listener) {
+                        listeners.add(listener);
+                    }
+                }),
+                { depth: 'full', strictMode: false }
+            );
+            const release = Promise.withResolvers<undefined>();
+
+            const idleBeforeRelease = await withActEnvironment(async function holdActScopeOpen() {
+                const acting = Promise.resolve(React.act(async function publishInsideAct() {
+                    for (const listener of listeners) {
+                        listener('after');
+                    }
+                    await release.promise;
+                }));
+                const progress = startWaitingForIdle(view);
+
+                await timers.promises.setTimeout(50);
+                const wasIdle = progress.isIdle();
+
+                release.resolve(undefined);
+                await acting;
+                await progress.idling;
+
+                return wasIdle;
+            });
+
+            await view.waitForIdle();
+
+            scope.assert.deepEqual(
+                { idleBeforeRelease, textContent: view.textContent },
+                { idleBeforeRelease: true, textContent: 'after' }
             );
 
             return scope.assert.collect();
