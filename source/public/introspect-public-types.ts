@@ -201,64 +201,23 @@ type IntrospectionTypedSelector<
     readonly type: QueryType;
 };
 
-type IntrospectionFind<HostSchema extends IntrospectionHostSchema> = {
-    <QueryType extends string>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionNode<IntrospectionHostProps<HostSchema, QueryType>, QueryType, HostSchema> | undefined;
-    <QueryType>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionNode<IntrospectionNodeProps<QueryType, HostSchema>, QueryType, HostSchema> | undefined;
-    (selector: IntrospectionSelector<HostSchema>): IntrospectionNode<unknown, unknown, HostSchema> | undefined;
+type IntrospectionQueryResults<Props, QueryType, HostSchema extends IntrospectionHostSchema> = {
+    readonly list: IntrospectionList<Props, QueryType, HostSchema>;
+    readonly listLocator: IntrospectionListLocator<Props, QueryType, HostSchema>;
+    readonly locator: IntrospectionLocator<Props, QueryType, HostSchema>;
+    readonly node: IntrospectionNode<Props, QueryType, HostSchema> | undefined;
 };
 
-type IntrospectionFindAll<HostSchema extends IntrospectionHostSchema> = {
-    <QueryType extends string>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionList<IntrospectionHostProps<HostSchema, QueryType>, QueryType, HostSchema>;
-    <QueryType>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionList<IntrospectionNodeProps<QueryType, HostSchema>, QueryType, HostSchema>;
-    (selector: IntrospectionSelector<HostSchema>): IntrospectionList<unknown, unknown, HostSchema>;
-};
+type IntrospectionQueryResultKind = keyof IntrospectionQueryResults<unknown, unknown, IntrospectionHostSchema>;
 
-type IntrospectionFindClosest<HostSchema extends IntrospectionHostSchema> = {
+type IntrospectionQuery<HostSchema extends IntrospectionHostSchema, ResultKind extends IntrospectionQueryResultKind> = {
     <QueryType extends string>(
         selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionNode<IntrospectionHostProps<HostSchema, QueryType>, QueryType, HostSchema> | undefined;
+    ): IntrospectionQueryResults<IntrospectionHostProps<HostSchema, QueryType>, QueryType, HostSchema>[ResultKind];
     <QueryType>(
         selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionNode<IntrospectionNodeProps<QueryType, HostSchema>, QueryType, HostSchema> | undefined;
-    (selector: IntrospectionSelector<HostSchema>): IntrospectionNode<unknown, unknown, HostSchema> | undefined;
-};
-
-type IntrospectionFilterBy<HostSchema extends IntrospectionHostSchema> = {
-    <QueryType extends string>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionList<IntrospectionHostProps<HostSchema, QueryType>, QueryType, HostSchema>;
-    <QueryType>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionList<IntrospectionNodeProps<QueryType, HostSchema>, QueryType, HostSchema>;
-    (selector: IntrospectionSelector<HostSchema>): IntrospectionList<unknown, unknown, HostSchema>;
-};
-
-type IntrospectionLocate<HostSchema extends IntrospectionHostSchema> = {
-    <QueryType extends string>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionLocator<IntrospectionHostProps<HostSchema, QueryType>, QueryType, HostSchema>;
-    <QueryType>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionLocator<IntrospectionNodeProps<QueryType, HostSchema>, QueryType, HostSchema>;
-    (selector: IntrospectionSelector<HostSchema>): IntrospectionLocator<unknown, unknown, HostSchema>;
-};
-
-type IntrospectionLocateAll<HostSchema extends IntrospectionHostSchema> = {
-    <QueryType extends string>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionListLocator<IntrospectionHostProps<HostSchema, QueryType>, QueryType, HostSchema>;
-    <QueryType>(
-        selector: IntrospectionTypedSelector<HostSchema, QueryType> | QueryType
-    ): IntrospectionListLocator<IntrospectionNodeProps<QueryType, HostSchema>, QueryType, HostSchema>;
-    (selector: IntrospectionSelector<HostSchema>): IntrospectionListLocator<unknown, unknown, HostSchema>;
+    ): IntrospectionQueryResults<IntrospectionNodeProps<QueryType, HostSchema>, QueryType, HostSchema>[ResultKind];
+    (selector: IntrospectionSelector<HostSchema>): IntrospectionQueryResults<unknown, unknown, HostSchema>[ResultKind];
 };
 
 export type IntrospectionNode<
@@ -284,9 +243,9 @@ export type IntrospectionNode<
         ...parameters: Props[Property] extends (...callParameters: infer Parameters) => unknown ? Parameters
             : readonly never[]
     ) => Props[Property] extends (...callParameters: readonly never[]) => infer Result ? Result : unknown;
-    readonly find: IntrospectionFind<HostSchema>;
-    readonly findAll: IntrospectionFindAll<HostSchema>;
-    readonly findClosest: IntrospectionFindClosest<HostSchema>;
+    readonly find: IntrospectionQuery<HostSchema, 'node'>;
+    readonly findAll: IntrospectionQuery<HostSchema, 'list'>;
+    readonly findClosest: IntrospectionQuery<HostSchema, 'node'>;
     readonly formatTree: () => string;
     readonly omitProps: <Key extends keyof Props>(keys: readonly Key[]) => IntrospectionWithoutKeys<Props, Key>;
     readonly pickProps: <Key extends keyof Props>(keys: readonly Key[]) => Pick<Props, Key>;
@@ -302,7 +261,7 @@ export type IntrospectionList<
     readonly last: IntrospectionNode<Props, Type, HostSchema> | undefined;
     readonly length: number;
     readonly at: (index: number) => IntrospectionNode<Props, Type, HostSchema> | undefined;
-    readonly filterBy: IntrospectionFilterBy<HostSchema>;
+    readonly filterBy: IntrospectionQuery<HostSchema, 'list'>;
 };
 
 export type IntrospectionLocator<
@@ -349,11 +308,11 @@ export type IntrospectionView<HostSchema extends IntrospectionHostSchema = Intro
     readonly root: IntrospectionNode<unknown, unknown, HostSchema> | undefined;
     readonly textContent: string;
     readonly warnings: readonly IntrospectionWarning[];
-    readonly find: IntrospectionFind<HostSchema>;
-    readonly findAll: IntrospectionFindAll<HostSchema>;
+    readonly find: IntrospectionQuery<HostSchema, 'node'>;
+    readonly findAll: IntrospectionQuery<HostSchema, 'list'>;
     readonly formatTree: () => string;
-    readonly locate: IntrospectionLocate<HostSchema>;
-    readonly locateAll: IntrospectionLocateAll<HostSchema>;
+    readonly locate: IntrospectionQuery<HostSchema, 'locator'>;
+    readonly locateAll: IntrospectionQuery<HostSchema, 'listLocator'>;
     readonly unmount: () => void;
     readonly update: (element: React.ReactElement) => void;
     readonly waitForIdle: () => Promise<void>;
