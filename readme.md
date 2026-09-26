@@ -929,6 +929,26 @@ Everything above `SettingsPage` executes. On each branch, `depth` counts from th
 
 Components beside the path to `depthFrom`, such as a layout's header, also execute. If `depthFrom` never renders, the whole tree executes.
 
+### Updates outside `act`
+
+Store, router, and timer updates need no `act`. `waitForIdle()` commits them.
+
+```tsx
+const view = introspect(<RouterProvider router={router} />, {
+    depthFrom: SettingsPage
+});
+
+router.navigate('/settings');
+
+await view.waitForIdle();
+
+assert.ok(view.find(SettingsPage));
+```
+
+React Introspect sets `IS_REACT_ACT_ENVIRONMENT` only while it runs its own `act` calls, and restores it afterwards.
+
+If your suite sets `IS_REACT_ACT_ENVIRONMENT = true` globally, React warns about every update outside `act`. The flag only controls those warnings. Scope it to the tests that need it instead of the whole suite.
+
 ### Render props
 
 Render props are user code.
