@@ -220,6 +220,34 @@ type IntrospectionQuery<HostSchema extends IntrospectionHostSchema, ResultKind e
     (selector: IntrospectionSelector<HostSchema>): IntrospectionQueryResults<unknown, unknown, HostSchema>[ResultKind];
 };
 
+type IntrospectionCallProp<Props> = <Property extends keyof Props>(
+    property: Property,
+    ...parameters: Props[Property] extends (...callParameters: infer Parameters) => unknown ? Parameters
+        : readonly never[]
+) => Props[Property] extends (...callParameters: readonly never[]) => infer Result ? Result : unknown;
+
+export type IntrospectionSendEvent = (name: string, ...parameters: readonly unknown[]) => unknown;
+
+type IntrospectionNodeSequence<
+    Props,
+    Type,
+    HostSchema extends IntrospectionHostSchema
+> = Iterable<IntrospectionNode<Props, Type, HostSchema>> & {
+    readonly first: IntrospectionNode<Props, Type, HostSchema> | undefined;
+    readonly last: IntrospectionNode<Props, Type, HostSchema> | undefined;
+    readonly length: number;
+    readonly at: (index: number) => IntrospectionNode<Props, Type, HostSchema> | undefined;
+};
+
+export type IntrospectionRenderControl = {
+    readonly unmount: () => void;
+    readonly update: (element: React.ReactElement) => void;
+    readonly waitForIdle: () => Promise<void>;
+    readonly waitForNextRender: () => Promise<void>;
+    readonly waitForRenderCount: (count: number) => Promise<void>;
+    readonly waitUntil: (predicate: () => boolean) => Promise<void>;
+};
+
 export type IntrospectionNode<
     Props = unknown,
     NodeType = unknown,
@@ -238,29 +266,21 @@ export type IntrospectionNode<
     readonly textContent: string;
     readonly type: NodeType;
     readonly visibility: 'hidden' | 'notRendered' | 'visible';
-    readonly callProp: <Property extends keyof Props>(
-        property: Property,
-        ...parameters: Props[Property] extends (...callParameters: infer Parameters) => unknown ? Parameters
-            : readonly never[]
-    ) => Props[Property] extends (...callParameters: readonly never[]) => infer Result ? Result : unknown;
+    readonly callProp: IntrospectionCallProp<Props>;
     readonly find: IntrospectionQuery<HostSchema, 'node'>;
     readonly findAll: IntrospectionQuery<HostSchema, 'list'>;
     readonly findClosest: IntrospectionQuery<HostSchema, 'node'>;
     readonly formatTree: () => string;
     readonly omitProps: <Key extends keyof Props>(keys: readonly Key[]) => IntrospectionWithoutKeys<Props, Key>;
     readonly pickProps: <Key extends keyof Props>(keys: readonly Key[]) => Pick<Props, Key>;
-    readonly sendEvent: (name: string, ...parameters: readonly unknown[]) => unknown;
+    readonly sendEvent: IntrospectionSendEvent;
 };
 
 export type IntrospectionList<
     Props = unknown,
     Type = unknown,
     HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
-> = Iterable<IntrospectionNode<Props, Type, HostSchema>> & {
-    readonly first: IntrospectionNode<Props, Type, HostSchema> | undefined;
-    readonly last: IntrospectionNode<Props, Type, HostSchema> | undefined;
-    readonly length: number;
-    readonly at: (index: number) => IntrospectionNode<Props, Type, HostSchema> | undefined;
+> = IntrospectionNodeSequence<Props, Type, HostSchema> & {
     readonly filterBy: IntrospectionQuery<HostSchema, 'list'>;
 };
 
@@ -277,28 +297,19 @@ export type IntrospectionLocator<
     readonly props: Props | undefined;
     readonly textContent: string | undefined;
     readonly type: Type | undefined;
-    readonly callProp: <Property extends keyof Props>(
-        property: Property,
-        ...parameters: Props[Property] extends (...callParameters: infer Parameters) => unknown ? Parameters
-            : readonly never[]
-    ) => Props[Property] extends (...callParameters: readonly never[]) => infer Result ? Result : unknown;
+    readonly callProp: IntrospectionCallProp<Props>;
     readonly omitProps: <Key extends keyof Props>(
         keys: readonly Key[]
     ) => IntrospectionWithoutKeys<Props, Key> | undefined;
     readonly pickProps: <Key extends keyof Props>(keys: readonly Key[]) => Pick<Props, Key> | undefined;
-    readonly sendEvent: (name: string, ...parameters: readonly unknown[]) => unknown;
+    readonly sendEvent: IntrospectionSendEvent;
 };
 
 export type IntrospectionListLocator<
     Props = unknown,
     Type = unknown,
     HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
-> = Iterable<IntrospectionNode<Props, Type, HostSchema>> & {
-    readonly first: IntrospectionNode<Props, Type, HostSchema> | undefined;
-    readonly last: IntrospectionNode<Props, Type, HostSchema> | undefined;
-    readonly length: number;
-    readonly at: (index: number) => IntrospectionNode<Props, Type, HostSchema> | undefined;
-};
+> = IntrospectionNodeSequence<Props, Type, HostSchema>;
 
 export type IntrospectionView<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema> = {
     readonly errors: readonly IntrospectionError[];
@@ -313,10 +324,4 @@ export type IntrospectionView<HostSchema extends IntrospectionHostSchema = Intro
     readonly formatTree: () => string;
     readonly locate: IntrospectionQuery<HostSchema, 'locator'>;
     readonly locateAll: IntrospectionQuery<HostSchema, 'listLocator'>;
-    readonly unmount: () => void;
-    readonly update: (element: React.ReactElement) => void;
-    readonly waitForIdle: () => Promise<void>;
-    readonly waitForNextRender: () => Promise<void>;
-    readonly waitForRenderCount: (count: number) => Promise<void>;
-    readonly waitUntil: (predicate: () => boolean) => Promise<void>;
-};
+} & IntrospectionRenderControl;

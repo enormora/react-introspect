@@ -1,10 +1,11 @@
-import type React from 'react';
 import type {
     IntrospectionError,
     IntrospectionNodeKind,
     IntrospectionNodeState,
     IntrospectionNotRenderedReason,
     IntrospectionOptions,
+    IntrospectionRenderControl,
+    IntrospectionSendEvent,
     IntrospectionWarning
 } from '../../public/introspect-public-types.ts';
 
@@ -19,6 +20,13 @@ type RuntimeNotRenderedChildren = {
 };
 
 export type RuntimeRenderedChildren = RuntimeNotRenderedChildren | RuntimeRenderedChildNodes;
+
+export type RuntimeNodeSequence = Iterable<RuntimeIntrospectionNode> & {
+    readonly first: RuntimeIntrospectionNode | undefined;
+    readonly last: RuntimeIntrospectionNode | undefined;
+    readonly length: number;
+    readonly at: (index: number) => RuntimeIntrospectionNode | undefined;
+};
 
 export type RuntimeIntrospectionNode = {
     readonly error: IntrospectionError | undefined;
@@ -41,14 +49,10 @@ export type RuntimeIntrospectionNode = {
     readonly formatTree: () => string;
     readonly omitProps: (keys: readonly PropertyKey[]) => Readonly<Record<PropertyKey, unknown>>;
     readonly pickProps: (keys: readonly PropertyKey[]) => Readonly<Record<PropertyKey, unknown>>;
-    readonly sendEvent: (name: string, ...parameters: readonly unknown[]) => unknown;
+    readonly sendEvent: IntrospectionSendEvent;
 };
 
-export type RuntimeIntrospectionList = Iterable<RuntimeIntrospectionNode> & {
-    readonly first: RuntimeIntrospectionNode | undefined;
-    readonly last: RuntimeIntrospectionNode | undefined;
-    readonly length: number;
-    readonly at: (index: number) => RuntimeIntrospectionNode | undefined;
+export type RuntimeIntrospectionList = RuntimeNodeSequence & {
     readonly filterBy: (selector: unknown) => RuntimeIntrospectionList;
 };
 
@@ -64,17 +68,10 @@ export type RuntimeIntrospectionLocator = {
     readonly callProp: (property: PropertyKey, ...parameters: readonly unknown[]) => unknown;
     readonly omitProps: (keys: readonly PropertyKey[]) => Readonly<Record<PropertyKey, unknown>> | undefined;
     readonly pickProps: (keys: readonly PropertyKey[]) => Readonly<Record<PropertyKey, unknown>> | undefined;
-    readonly sendEvent: (name: string, ...parameters: readonly unknown[]) => unknown;
+    readonly sendEvent: IntrospectionSendEvent;
 };
 
-export type RuntimeIntrospectionListLocator = Iterable<RuntimeIntrospectionNode> & {
-    readonly first: RuntimeIntrospectionNode | undefined;
-    readonly last: RuntimeIntrospectionNode | undefined;
-    readonly length: number;
-    readonly at: (index: number) => RuntimeIntrospectionNode | undefined;
-};
-
-export type RuntimeIntrospectionView = {
+export type RuntimeIntrospectionView = IntrospectionRenderControl & {
     readonly errors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
     readonly renderCount: number;
@@ -86,13 +83,7 @@ export type RuntimeIntrospectionView = {
     readonly findAll: (selector: unknown) => RuntimeIntrospectionList;
     readonly formatTree: () => string;
     readonly locate: (selector: unknown) => RuntimeIntrospectionLocator;
-    readonly locateAll: (selector: unknown) => RuntimeIntrospectionListLocator;
-    readonly unmount: () => void;
-    readonly update: (element: React.ReactElement) => void;
-    readonly waitForIdle: () => Promise<void>;
-    readonly waitForNextRender: () => Promise<void>;
-    readonly waitForRenderCount: (count: number) => Promise<void>;
-    readonly waitUntil: (predicate: () => boolean) => Promise<void>;
+    readonly locateAll: (selector: unknown) => RuntimeNodeSequence;
 };
 
 export type RuntimeIntrospectionOptions = IntrospectionOptions;

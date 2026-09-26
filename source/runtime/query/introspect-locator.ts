@@ -1,8 +1,8 @@
 import type {
-    RuntimeIntrospectionListLocator,
     RuntimeIntrospectionLocator,
     RuntimeIntrospectionNode,
-    RuntimeIntrospectionView
+    RuntimeIntrospectionView,
+    RuntimeNodeSequence
 } from '../types/introspect-runtime-types.ts';
 
 type LocatorTarget = {
@@ -79,7 +79,7 @@ export function createIntrospectionLocator(
 export function createIntrospectionListLocator(
     view: RuntimeIntrospectionView,
     selector: unknown
-): RuntimeIntrospectionListLocator {
+): RuntimeNodeSequence {
     const target = { selector, view };
 
     return Object.freeze({

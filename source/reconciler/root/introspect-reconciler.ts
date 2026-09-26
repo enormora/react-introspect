@@ -23,7 +23,7 @@ import {
     unhideTextInstance,
     validateContainerRefs
 } from '../host/introspect-host-tree.ts';
-import type { IntrospectionRefs } from '../../public/introspect-public-types.ts';
+import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
 import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot
@@ -51,14 +51,8 @@ type IntrospectionReconcilerRootOptions = {
     readonly waitTimeout: number;
 };
 
-type IntrospectionReconcilerRoot = {
+type IntrospectionReconcilerRoot = IntrospectionRenderControl & {
     readonly act: (action: () => unknown) => unknown;
-    readonly unmount: () => void;
-    readonly update: (element: React.ReactElement) => void;
-    readonly waitForIdle: () => Promise<void>;
-    readonly waitForNextRender: () => Promise<void>;
-    readonly waitForRenderCount: (count: number) => Promise<void>;
-    readonly waitUntil: (predicate: () => boolean) => Promise<void>;
 };
 
 export type IntrospectionReconcilerModule = {
