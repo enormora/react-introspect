@@ -393,6 +393,7 @@ function createFrameElement(element: IntrospectionElement, depth: IntrospectionF
             createFrameElement,
             depth,
             element,
+            key: element.key ?? undefined,
             transformNode,
             type: element.type
         });
@@ -402,6 +403,7 @@ function createFrameElement(element: IntrospectionElement, depth: IntrospectionF
         createFrameElement,
         depth,
         element,
+        key: element.key ?? undefined,
         transformNode
     });
 }
