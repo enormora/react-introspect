@@ -37,6 +37,17 @@ type TransformedChildren = readonly IntrospectionTransformedNode[];
 
 export type IntrospectionTransformedNode = TransformedChildren | TransformedElement | number | string;
 
+export type IntrospectionFrameElementFactory = (
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth
+) => React.ReactElement;
+
+export type IntrospectionTransformNode = (
+    node: unknown,
+    depth: IntrospectionFrameDepth,
+    createFrameElement: IntrospectionFrameElementFactory
+) => IntrospectionTransformedNode;
+
 export type IntrospectionComponentMetadata = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly error: IntrospectionError | undefined;

@@ -7,23 +7,14 @@ import {
     createEmptyHost,
     nextDepth,
     type IntrospectionElement,
+    type IntrospectionFrameElementFactory,
     type IntrospectionFrameDepth,
     type IntrospectionTransformedNode,
+    type IntrospectionTransformNode,
     readElementProps,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
-
-type IntrospectionFrameElementFactory = (
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth
-) => React.ReactElement;
-
-type IntrospectionTransformNode = (
-    node: unknown,
-    depth: IntrospectionFrameDepth,
-    createFrameElement: IntrospectionFrameElementFactory
-) => IntrospectionTransformedNode;
 
 export type IntrospectionClassFrameProps = {
     readonly createFrameElement: IntrospectionFrameElementFactory;

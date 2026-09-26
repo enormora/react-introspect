@@ -9,10 +9,12 @@ import {
     enterComponentDepth,
     nextDepth,
     type IntrospectionElement,
+    type IntrospectionFrameElementFactory,
     introspectionElementKeyMetadata,
     type IntrospectionFrameDepth,
     introspectionOpaqueHostType,
     type IntrospectionTransformedNode,
+    type IntrospectionTransformNode,
     introspectionValueMetadata,
     readElementProps,
     readElementRef,
@@ -40,17 +42,6 @@ type IntrospectionForwardRefType = IntrospectionFrameType & {
 };
 
 type IntrospectionFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
-
-type IntrospectionFrameElementFactory = (
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth
-) => React.ReactElement;
-
-type IntrospectionTransformNode = (
-    node: unknown,
-    depth: IntrospectionFrameDepth,
-    createFrameElement: IntrospectionFrameElementFactory
-) => IntrospectionTransformedNode;
 
 type IntrospectionSuspenseTransformRequest = {
     readonly createFrameElement: IntrospectionFrameElementFactory;
