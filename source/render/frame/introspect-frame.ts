@@ -1,4 +1,5 @@
 import React from 'react';
+import { isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
 import {
     createComponentHost,
@@ -8,10 +9,12 @@ import {
     enterComponentDepth,
     nextDepth,
     type IntrospectionElement,
+    type IntrospectionFrameElementFactory,
     introspectionElementKeyMetadata,
     type IntrospectionFrameDepth,
     introspectionOpaqueHostType,
     type IntrospectionTransformedNode,
+    type IntrospectionTransformNode,
     introspectionValueMetadata,
     readElementProps,
     readElementRef,
@@ -40,30 +43,12 @@ type IntrospectionForwardRefType = IntrospectionFrameType & {
 
 type IntrospectionFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
 
-type IntrospectionFrameElementFactory = (
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth
-) => React.ReactElement;
-
-type IntrospectionTransformNode = (
-    node: unknown,
-    depth: IntrospectionFrameDepth,
-    createFrameElement: IntrospectionFrameElementFactory
-) => IntrospectionTransformedNode;
-
 type IntrospectionSuspenseTransformRequest = {
     readonly createFrameElement: IntrospectionFrameElementFactory;
     readonly depth: IntrospectionFrameDepth;
     readonly element: IntrospectionElement;
     readonly transformedChildren: IntrospectionTransformedNode;
     readonly transformNode: IntrospectionTransformNode;
-};
-
-type IntrospectionThenable = {
-    readonly then: (
-        resolve: (value: unknown) => void,
-        reject: (reason: unknown) => void
-    ) => unknown;
 };
 
 type IntrospectionLazyInitializer = (payload: unknown) => unknown;
@@ -77,26 +62,18 @@ const viewTransitionType: unknown = Symbol.for('react.view_transition');
 const lazyInitializerKey = '_init';
 const lazyPayloadKey = '_payload';
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
-function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Object.hasOwn(value, property);
-}
-
 function hasReactType(value: unknown, type: symbol): value is IntrospectionFrameType {
-    return isRecord(value) && value.$$typeof === type;
+    return isObjectOrFunction(value) && value.$$typeof === type;
 }
 
 function isMemoType(value: unknown): value is IntrospectionMemoType {
-    return hasReactType(value, memoType) && hasProperty(value, 'type');
+    return hasReactType(value, memoType) && Object.hasOwn(value, 'type');
 }
 
 function isForwardRefType(value: unknown): value is IntrospectionForwardRefType {
-    return isRecord(value) &&
+    return isObjectOrFunction(value) &&
         value.$$typeof === forwardRefType &&
-        hasProperty(value, 'render') &&
+        Object.hasOwn(value, 'render') &&
         typeof value.render === 'function';
 }
 
@@ -111,10 +88,10 @@ function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): Int
 }
 
 function isLazyType(value: unknown): value is IntrospectionFrameType {
-    return isRecord(value) &&
+    return isObjectOrFunction(value) &&
         value.$$typeof === lazyType &&
-        hasProperty(value, lazyInitializerKey) &&
-        hasProperty(value, lazyPayloadKey) &&
+        Object.hasOwn(value, lazyInitializerKey) &&
+        Object.hasOwn(value, lazyPayloadKey) &&
         readLazyInitializer(value) !== undefined;
 }
 
@@ -126,16 +103,8 @@ function isFunctionComponent(value: unknown): value is IntrospectionFunctionComp
     return typeof value === 'function';
 }
 
-function isIterable(value: unknown): value is Iterable<unknown> {
-    return isRecord(value) && typeof value[Symbol.iterator] === 'function';
-}
-
-function isThenable(value: unknown): value is IntrospectionThenable {
-    return isRecord(value) && typeof Reflect.get(value, 'then') === 'function';
-}
-
 function isIntrospectionElement(element: React.ReactElement): element is IntrospectionElement {
-    return isRecord(element.props);
+    return isObjectOrFunction(element.props);
 }
 
 function readElementChildren(element: IntrospectionElement): unknown {

@@ -23,12 +23,13 @@ import {
     unhideTextInstance,
     validateContainerRefs
 } from '../host/introspect-host-tree.ts';
-import type { IntrospectionRefs } from '../../public/introspect-public-types.ts';
+import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
 import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
+import { isObject } from '../../values/introspect-value-kinds.ts';
 import {
     createIntrospectionReconcilerRuntime,
     type IntrospectionReconcilerRuntime
@@ -50,14 +51,8 @@ type IntrospectionReconcilerRootOptions = {
     readonly waitTimeout: number;
 };
 
-type IntrospectionReconcilerRoot = {
+type IntrospectionReconcilerRoot = IntrospectionRenderControl & {
     readonly act: (action: () => unknown) => unknown;
-    readonly unmount: () => void;
-    readonly update: (element: React.ReactElement) => void;
-    readonly waitForIdle: () => Promise<void>;
-    readonly waitForNextRender: () => Promise<void>;
-    readonly waitForRenderCount: (count: number) => Promise<void>;
-    readonly waitUntil: (predicate: () => boolean) => Promise<void>;
 };
 
 export type IntrospectionReconcilerModule = {
@@ -309,14 +304,10 @@ function actSession(session: IntrospectionReconcilerSession, action: () => unkno
     });
 }
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null;
-}
-
 function hasScheduledRootTask(session: IntrospectionReconcilerSession): boolean {
     const task = session.root.callbackNode;
 
-    return isRecord(task) && typeof task.callback === 'function';
+    return isObject(task) && typeof task.callback === 'function';
 }
 
 async function flushMicrotasks(session: IntrospectionReconcilerSession): Promise<void> {

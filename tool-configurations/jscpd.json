@@ -1,7 +1,7 @@
 {
     "output": "./target/reports/duplication",
     "minLines": 3,
-    "threshold": 12,
+    "threshold": 0.1,
     "reporters": ["console", "json"],
     "format": ["typescript"],
     "absolute": false,

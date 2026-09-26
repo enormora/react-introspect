@@ -20,6 +20,7 @@ import {
     type SnapshotSourceNode
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
+import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 export type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -91,14 +92,6 @@ function createChildStore(): IntrospectionChildStore {
     });
 }
 
-function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Object.hasOwn(value, property);
-}
-
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
 function isPublicHostPropKey(key: PropertyKey): boolean {
     return key !== 'children' &&
         key !== 'key' &&
@@ -121,9 +114,9 @@ function publicProps(props: IntrospectionHostProps): IntrospectionHostProps {
 }
 
 function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
-    return isRecord(value) &&
+    return isObjectOrFunction(value) &&
         introspectionComponentMetadataKeys.every(function hasMetadataKey(key) {
-            return hasProperty(value, key);
+            return Object.hasOwn(value, key);
         });
 }
 
@@ -205,13 +198,7 @@ function collectRefTargets(child: IntrospectionHostChild): readonly Introspectio
     ]);
 }
 
-function detachChild(child: IntrospectionHostChild): void {
-    const parent = parentByChild.get(child);
-
-    if (parent === undefined) {
-        return;
-    }
-
+export function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
     const children = parent.readChildren();
     const index = children.indexOf(child);
 
@@ -220,6 +207,14 @@ function detachChild(child: IntrospectionHostChild): void {
     }
 
     parentByChild.delete(child);
+}
+
+function detachChild(child: IntrospectionHostChild): void {
+    const parent = parentByChild.get(child);
+
+    if (parent !== undefined) {
+        removeChild(parent, child);
+    }
 }
 
 function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
@@ -384,17 +379,6 @@ export function insertBefore(
 
     parent.writeChildren(children.toSpliced(children.indexOf(beforeChild), 0, child));
     parentByChild.set(child, parent);
-}
-
-export function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
-    const children = parent.readChildren();
-    const index = children.indexOf(child);
-
-    if (index !== -1) {
-        parent.writeChildren(children.toSpliced(index, 1));
-    }
-
-    parentByChild.delete(child);
 }
 
 export function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot {

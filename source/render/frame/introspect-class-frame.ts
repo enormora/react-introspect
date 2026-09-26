@@ -1,28 +1,20 @@
 import React from 'react';
 import type { IntrospectionError } from '../../public/introspect-public-types.ts';
+import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
     nextDepth,
     type IntrospectionElement,
+    type IntrospectionFrameElementFactory,
     type IntrospectionFrameDepth,
     type IntrospectionTransformedNode,
+    type IntrospectionTransformNode,
     readElementProps,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
-
-type IntrospectionFrameElementFactory = (
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth
-) => React.ReactElement;
-
-type IntrospectionTransformNode = (
-    node: unknown,
-    depth: IntrospectionFrameDepth,
-    createFrameElement: IntrospectionFrameElementFactory
-) => IntrospectionTransformedNode;
 
 export type IntrospectionClassFrameProps = {
     readonly createFrameElement: IntrospectionFrameElementFactory;
@@ -98,14 +90,10 @@ const emptyErrorInfo = Object.freeze({ componentStack: '' });
 const noCatchOnlyBoundaryRecovery = Symbol('noCatchOnlyBoundaryRecovery');
 const catchOnlyBoundaryRecoveries = new WeakMap<IntrospectionClassComponent, Map<string, unknown>>();
 
-function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null || typeof value === 'function';
-}
-
 export function isClassComponent(value: unknown): value is IntrospectionClassComponent {
     const prototype: unknown = typeof value === 'function' ? Reflect.get(value, 'prototype') : undefined;
 
-    return isRecord(prototype) && prototype.isReactComponent !== undefined;
+    return isObjectOrFunction(prototype) && prototype.isReactComponent !== undefined;
 }
 
 function isErrorBoundary(type: IntrospectionClassComponent): boolean {
@@ -139,7 +127,7 @@ function shallowStateEquals(left: unknown, right: unknown): boolean {
         return true;
     }
 
-    return isRecord(left) && isRecord(right) ? shallowEquals(left, right) : false;
+    return isObjectOrFunction(left) && isObjectOrFunction(right) ? shallowEquals(left, right) : false;
 }
 
 function mergeState(state: unknown, partialState: unknown): unknown {
@@ -147,9 +135,9 @@ function mergeState(state: unknown, partialState: unknown): unknown {
         return state;
     }
 
-    const baseState = isRecord(state) ? state : {};
+    const baseState = isObjectOrFunction(state) ? state : {};
 
-    return isRecord(partialState)
+    return isObjectOrFunction(partialState)
         ? Object.freeze({
             ...baseState,
             ...partialState
@@ -204,7 +192,7 @@ function applyElementRef(ref: unknown, value: IntrospectionClassInstance | null)
         return;
     }
 
-    if (isRecord(ref)) {
+    if (isObjectOrFunction(ref)) {
         Reflect.set(ref, 'current', value);
     }
 }
