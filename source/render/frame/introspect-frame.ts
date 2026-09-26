@@ -62,22 +62,18 @@ const viewTransitionType: unknown = Symbol.for('react.view_transition');
 const lazyInitializerKey = '_init';
 const lazyPayloadKey = '_payload';
 
-function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Object.hasOwn(value, property);
-}
-
 function hasReactType(value: unknown, type: symbol): value is IntrospectionFrameType {
     return isObjectOrFunction(value) && value.$$typeof === type;
 }
 
 function isMemoType(value: unknown): value is IntrospectionMemoType {
-    return hasReactType(value, memoType) && hasProperty(value, 'type');
+    return hasReactType(value, memoType) && Object.hasOwn(value, 'type');
 }
 
 function isForwardRefType(value: unknown): value is IntrospectionForwardRefType {
     return isObjectOrFunction(value) &&
         value.$$typeof === forwardRefType &&
-        hasProperty(value, 'render') &&
+        Object.hasOwn(value, 'render') &&
         typeof value.render === 'function';
 }
 
@@ -94,8 +90,8 @@ function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): Int
 function isLazyType(value: unknown): value is IntrospectionFrameType {
     return isObjectOrFunction(value) &&
         value.$$typeof === lazyType &&
-        hasProperty(value, lazyInitializerKey) &&
-        hasProperty(value, lazyPayloadKey) &&
+        Object.hasOwn(value, lazyInitializerKey) &&
+        Object.hasOwn(value, lazyPayloadKey) &&
         readLazyInitializer(value) !== undefined;
 }
 

@@ -12,14 +12,11 @@ const selectorFields = Object.freeze([
     'where'
 ]);
 
-function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Object.hasOwn(value, property);
-}
-
 function isSelectorObject(value: unknown): value is IntrospectionSelector {
-    return isObject(value) && !hasProperty(value, '$$typeof') && selectorFields.some(function hasSelectorField(field) {
-        return hasProperty(value, field);
-    });
+    return isObject(value) && !Object.hasOwn(value, '$$typeof') &&
+        selectorFields.some(function hasSelectorField(field) {
+            return Object.hasOwn(value, field);
+        });
 }
 
 function regexpMatches(pattern: RegExp, value: string): boolean {
@@ -32,7 +29,7 @@ function textContentMatches<HostSchema extends IntrospectionHostSchema>(
     node: RuntimeIntrospectionNode,
     selector: IntrospectionSelector<HostSchema>
 ): boolean {
-    if (!hasProperty(selector, 'textContent')) {
+    if (!Object.hasOwn(selector, 'textContent')) {
         return true;
     }
 
@@ -51,7 +48,7 @@ function hasMatches<HostSchema extends IntrospectionHostSchema>(
     node: RuntimeIntrospectionNode,
     selector: IntrospectionSelector<HostSchema>
 ): boolean {
-    return !hasProperty(selector, 'has') || node.find(selector.has) !== undefined;
+    return !Object.hasOwn(selector, 'has') || node.find(selector.has) !== undefined;
 }
 
 function whereMatches<HostSchema extends IntrospectionHostSchema>(

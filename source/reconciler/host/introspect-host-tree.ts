@@ -92,10 +92,6 @@ function createChildStore(): IntrospectionChildStore {
     });
 }
 
-function hasProperty(value: Readonly<Record<PropertyKey, unknown>>, property: PropertyKey): boolean {
-    return Object.hasOwn(value, property);
-}
-
 function isPublicHostPropKey(key: PropertyKey): boolean {
     return key !== 'children' &&
         key !== 'key' &&
@@ -120,7 +116,7 @@ function publicProps(props: IntrospectionHostProps): IntrospectionHostProps {
 function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
     return isObjectOrFunction(value) &&
         introspectionComponentMetadataKeys.every(function hasMetadataKey(key) {
-            return hasProperty(value, key);
+            return Object.hasOwn(value, key);
         });
 }
 
