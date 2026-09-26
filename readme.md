@@ -2,7 +2,14 @@
 
 # React Introspect
 
+[![npm version](https://img.shields.io/npm/v/react-introspect)](https://www.npmjs.com/package/react-introspect)
+[![CI](https://img.shields.io/github/actions/workflow/status/enormora/react-introspect/continuous-integration.yml?branch=main&label=CI)](https://github.com/enormora/react-introspect/actions/workflows/continuous-integration.yml)
+
 Simple component tests. No DOM. No globals. No compiler plugin. No browser.
+
+```sh
+npm install --save-dev react-introspect
+```
 
 React Introspect is for unit testing React components by their render surface.
 
