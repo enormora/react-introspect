@@ -616,6 +616,8 @@ input.sendEvent('change', { target: { value: 'Ada' } });
 
 An object as first argument is merged over the stub. Any other first argument is passed as is. The stub has `type`, `defaultPrevented`, `preventDefault()`, `isDefaultPrevented()`, `stopPropagation()`, and `isPropagationStopped()`. Add defaults with the `hostEvent` option.
 
+Use `locate()` for actions when the target may be missing. `view.locate(Button).sendEvent('save')` throws on a missing node; `view.find(Button)?.sendEvent('save')` silently does nothing.
+
 ### `node.callProp(propName, ...args)`
 
 Low-level API for exact function props.
