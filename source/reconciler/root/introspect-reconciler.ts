@@ -313,19 +313,15 @@ function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBef
     target.diagnostics.recordUncaughtError(new Error(message));
 }
 
-function updateRootElement(root: ReconcilerRoot, element: Readonly<React.ReactElement> | null): void {
-    renderer.flushSyncFromReconciler(function updateContainer() {
-        renderer.updateContainer(element, root, null, null);
-    });
-}
-
 function renderRootElement(
     runtime: IntrospectionRuntimeDependencies,
     root: ReconcilerRoot,
     element: Readonly<React.ReactElement> | null
 ): void {
     actAndFlush(runtime, function renderElement() {
-        updateRootElement(root, element);
+        renderer.flushSyncFromReconciler(function updateContainer() {
+            renderer.updateContainer(element, root, null, null);
+        });
     });
 }
 
