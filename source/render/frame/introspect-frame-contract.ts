@@ -79,12 +79,8 @@ function publicProps(props: Readonly<Record<PropertyKey, unknown>>): Readonly<Re
     return result;
 }
 
-export function readElementProps(element: IntrospectionElement): Readonly<Record<PropertyKey, unknown>> {
-    return element.props;
-}
-
 export function readElementRef(element: IntrospectionElement): unknown {
-    return readElementProps(element).ref;
+    return element.props.ref;
 }
 
 export function createFrameDepth(options: IntrospectionDepthOptions): IntrospectionFrameDepth {
@@ -124,7 +120,7 @@ export function createComponentMetadata(
     caughtError?: IntrospectionError,
     activityMode?: 'hidden' | 'visible'
 ): IntrospectionComponentMetadata {
-    const props = readElementProps(element);
+    const { props } = element;
 
     assertSupportedReactValue(props.children);
 

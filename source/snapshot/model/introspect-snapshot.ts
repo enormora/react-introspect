@@ -10,11 +10,10 @@ import {
     getElementChildrenState,
     getElementKind,
     getIndexedPath,
-    getSourceElementKind,
     getTextContent,
     getTypeName
 } from '../shape/introspect-snapshot-shape.ts';
-import { isIterable } from '../../values/introspect-value-kinds.ts';
+import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kinds.ts';
 import {
     type ChildSnapshotsRequest,
     type ChildSnapshotsResult,
@@ -50,14 +49,6 @@ function visibilityFromSource(
     }
 
     return 'visible';
-}
-
-function readElementProps(element: React.ReactElement<SnapshotProps>): SnapshotProps {
-    return element.props;
-}
-
-function isEmptyNode(node: unknown): boolean {
-    return node === null || node === undefined || typeof node === 'boolean';
 }
 
 function isSourceElementNode(node: SnapshotSourceNode): node is SnapshotSourceElement {
@@ -198,7 +189,7 @@ const snapshotOperations = {
         return createSiblingSnapshots(placement, flattenReactNodes(children), snapshotOperations.createSnapshotNode);
     },
     createElementSnapshotNode(request: ElementNodeRequest): SnapshotNodeResult {
-        const props = readElementProps(request.element);
+        const { props } = request.element;
         const { type } = request.element;
         const idAllocation = allocateNodeId(request.build);
         const name = getTypeName(type);
@@ -276,7 +267,7 @@ const snapshotOperations = {
             caughtError: request.element.caughtError,
             id: idAllocation.id,
             key: request.element.key,
-            kind: getSourceElementKind(request.element),
+            kind: getElementKind(request.element.type),
             name,
             parentId: request.parentId,
             path,
@@ -344,7 +335,7 @@ const snapshotOperations = {
         });
     },
     createSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
-        if (isEmptyNode(request.node)) {
+        if (isEmptyReactNode(request.node)) {
             return createEmptySnapshotNode(request);
         }
 

@@ -1,10 +1,8 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import {
-    assertSupportedReactValue,
-    createUnsupportedReactValueError,
-    isReactPortalValue
-} from './introspect-unsupported-react.ts';
+import { assertNotPortal, assertSupportedReactValue } from './introspect-unsupported-react.ts';
+
+const portalErrorMessage = 'React Introspect cannot represent portal output yet.';
 
 function createPortalValue(): unknown {
     return {
@@ -23,9 +21,13 @@ function requireError(action: () => void): Error {
 }
 
 export const testNode = suite('unsupported React values', [
-    test('identifies React portal records', function (scope) {
-        scope.assert.equal(isReactPortalValue(createPortalValue()), true);
-        scope.assert.equal(isReactPortalValue({ $$typeof: Symbol.for('react.element') }), false);
+    test('rejects React portal records and accepts other React records', function (scope) {
+        const error = requireError(function validatePortal() {
+            assertNotPortal(createPortalValue());
+        });
+
+        assertNotPortal({ $$typeof: Symbol.for('react.element') });
+        scope.assert.equal(error.message, portalErrorMessage);
 
         return scope.assert.collect();
     }),
@@ -38,7 +40,7 @@ export const testNode = suite('unsupported React values', [
             ));
         });
 
-        scope.assert.equal(error.message, createUnsupportedReactValueError().message);
+        scope.assert.equal(error.message, portalErrorMessage);
 
         return scope.assert.collect();
     })

@@ -3,18 +3,14 @@ import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 const reactPortalType = Symbol.for('react.portal');
 
-export function isReactPortalValue(value: unknown): boolean {
-    return isObjectOrFunction(value) && value.$$typeof === reactPortalType;
-}
-
-export function createUnsupportedReactValueError(): Error {
-    return new TypeError('React Introspect cannot represent portal output yet.');
+export function assertNotPortal(value: unknown): void {
+    if (isObjectOrFunction(value) && value.$$typeof === reactPortalType) {
+        throw new TypeError('React Introspect cannot represent portal output yet.');
+    }
 }
 
 export function assertSupportedReactValue(value: unknown): void {
-    if (isReactPortalValue(value)) {
-        throw createUnsupportedReactValueError();
-    }
+    assertNotPortal(value);
 
     if (Array.isArray(value)) {
         for (const item of value) {

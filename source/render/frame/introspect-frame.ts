@@ -1,5 +1,5 @@
 import React from 'react';
-import { isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
+import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
 import {
     createComponentHost,
@@ -16,11 +16,10 @@ import {
     type IntrospectionTransformedNode,
     type IntrospectionTransformNode,
     introspectionValueMetadata,
-    readElementProps,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
-import { createUnsupportedReactValueError, isReactPortalValue } from './introspect-unsupported-react.ts';
+import { assertNotPortal } from './introspect-unsupported-react.ts';
 
 type IntrospectionFrameProps = {
     readonly createFrameElement: IntrospectionFrameElementFactory;
@@ -107,12 +106,8 @@ function isIntrospectionElement(element: React.ReactElement): element is Introsp
     return isObjectOrFunction(element.props);
 }
 
-function readElementChildren(element: IntrospectionElement): unknown {
-    return readElementProps(element).children;
-}
-
 function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
-    return readElementProps(element).mode === 'hidden' ? 'hidden' : 'visible';
+    return element.props.mode === 'hidden' ? 'hidden' : 'visible';
 }
 
 function createOpaqueHost(value: unknown): React.ReactElement {
@@ -157,27 +152,14 @@ function executeWrappedElement(
     return isForwardRefType(type) ? type.render(props, ref) : createOpaqueHost(type);
 }
 
-function executeElement(element: IntrospectionElement): React.ReactNode {
-    const { type } = element;
-    const props = readElementProps(element);
-
-    if (isFunctionComponent(type) && !isClassComponent(type)) {
-        return type(props);
-    }
-
-    return executeWrappedElement(type, props, readElementRef(element));
-}
-
 function executeIntrospectionFrameElement(element: IntrospectionElement): React.ReactNode {
     try {
-        return unwrapThenableNode(executeElement(element));
+        return unwrapThenableNode(
+            executeWrappedElement(element.type, element.props, readElementRef(element))
+        );
     } catch (error) {
         return throwIntrospectionRenderError(error);
     }
-}
-
-function isEmptyRenderable(node: unknown): boolean {
-    return node === null || node === undefined || typeof node === 'boolean';
 }
 
 function cloneElementWithChildren(
@@ -194,7 +176,7 @@ function cloneElementWithChildren(
 }
 
 function cloneSuspenseElement(request: IntrospectionSuspenseTransformRequest): React.ReactElement {
-    const props = readElementProps(request.element);
+    const { props } = request.element;
 
     return React.cloneElement(request.element, {
         [introspectionElementKeyMetadata]: request.element.key,
@@ -259,7 +241,7 @@ function transformComponentElement(
 }
 
 function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | undefined {
-    if (isEmptyRenderable(node)) {
+    if (isEmptyReactNode(node)) {
         return createEmptyHost(node);
     }
 
@@ -278,7 +260,7 @@ function transformRenderableElement(
 ): React.ReactElement {
     return cloneElementWithChildren(
         element,
-        transformChildNode(readElementChildren(element), depth, frameFactory)
+        transformChildNode(element.props.children, depth, frameFactory)
     );
 }
 
@@ -292,7 +274,7 @@ function transformSuspenseElement(
         createFrameElement: frameFactory,
         depth,
         element,
-        transformedChildren: transformChildNode(readElementChildren(element), depth, frameFactory),
+        transformedChildren: transformChildNode(element.props.children, depth, frameFactory),
         transformNode: transformChildNode
     });
 }
@@ -305,7 +287,7 @@ function transformActivityElement(
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
-        cloneWrapperElement(element, transformChildNode(readElementChildren(element), depth, frameFactory))
+        cloneWrapperElement(element, transformChildNode(element.props.children, depth, frameFactory))
     );
 }
 
@@ -317,7 +299,7 @@ function transformViewTransitionElement(
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined),
-        cloneWrapperElement(element, transformChildNode(readElementChildren(element), depth, frameFactory))
+        cloneWrapperElement(element, transformChildNode(element.props.children, depth, frameFactory))
     );
 }
 
@@ -353,9 +335,7 @@ function transformNode(
     depth: IntrospectionFrameDepth,
     frameFactory: IntrospectionFrameElementFactory
 ): IntrospectionTransformedNode {
-    if (isReactPortalValue(node)) {
-        throw createUnsupportedReactValueError();
-    }
+    assertNotPortal(node);
 
     const primitiveNode = transformPrimitiveNode(node);
 
@@ -412,9 +392,7 @@ export function createIntrospectionRenderElement(
     element: React.ReactElement,
     depth: IntrospectionFrameDepth
 ): React.ReactElement {
-    if (isReactPortalValue(element)) {
-        throw createUnsupportedReactValueError();
-    }
+    assertNotPortal(element);
 
     return transformElement(createIntrospectionElement(element), depth, transformNode, createFrameElement);
 }

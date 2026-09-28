@@ -6,7 +6,6 @@ import {
     getElementChildrenState,
     getElementKind,
     getIndexedPath,
-    getSourceElementKind,
     getTextContent,
     getTypeName
 } from './introspect-snapshot-shape.ts';
@@ -51,21 +50,6 @@ export const testNode = suite('introspection snapshot shape', [
         scope.assert.equal(getIndexedPath('form', 1, 'button'), 'form > button[1]');
         scope.assert.equal(getElementKind('button'), 'host');
         scope.assert.equal(getElementKind(React.Fragment), 'fragment');
-        scope.assert.equal(
-            getSourceElementKind({
-                activityMode: undefined,
-                children: [],
-                caughtError: undefined,
-                givenChildren: [],
-                givenChildrenKind: 'source',
-                key: null,
-                props: {},
-                renderedReason: undefined,
-                type: 'button',
-                visibility: 'visible'
-            }),
-            'host'
-        );
 
         return scope.assert.collect();
     }),

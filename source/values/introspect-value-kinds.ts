@@ -12,6 +12,10 @@ export function isIterable(value: unknown): value is Iterable<unknown> {
     return isObjectOrFunction(value) && typeof value[Symbol.iterator] === 'function';
 }
 
+export function isEmptyReactNode(value: unknown): boolean {
+    return value === null || value === undefined || typeof value === 'boolean';
+}
+
 export function isThenable(value: unknown): value is PromiseLike<unknown> {
     return isObjectOrFunction(value) && typeof Reflect.get(value, 'then') === 'function';
 }

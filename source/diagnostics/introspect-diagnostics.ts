@@ -80,16 +80,14 @@ function recordIntrospectionConsoleDiagnostic(message: unknown): void {
     storage.getStore()?.recordConsoleWarning(consoleMessage);
 }
 
-const subscribeConsoleDiagnostics = (function createConsoleDiagnosticsSubscription() {
-    return function subscribe(consoleDiagnostics: IntrospectionConsoleDiagnostics): void {
-        if (subscribedConsoleDiagnostics.has(consoleDiagnostics)) {
-            return;
-        }
+function subscribeConsoleDiagnostics(consoleDiagnostics: IntrospectionConsoleDiagnostics): void {
+    if (subscribedConsoleDiagnostics.has(consoleDiagnostics)) {
+        return;
+    }
 
-        consoleDiagnostics.subscribe(recordIntrospectionConsoleDiagnostic);
-        subscribedConsoleDiagnostics.add(consoleDiagnostics);
-    };
-})();
+    consoleDiagnostics.subscribe(recordIntrospectionConsoleDiagnostic);
+    subscribedConsoleDiagnostics.add(consoleDiagnostics);
+}
 
 export function createIntrospectionDiagnostics(
     options: IntrospectionDiagnosticsOptions,
