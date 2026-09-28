@@ -5,7 +5,6 @@ type IntrospectionTimeoutIdentifier = ReturnType<IntrospectionRuntimeDependencie
 
 export type IntrospectionReconcilerRuntime = {
     readonly cancelTimeout: (timeoutIdentifier: IntrospectionTimeoutIdentifier) => void;
-    readonly enter: (runtime: IntrospectionRuntimeDependencies) => void;
     readonly readEventTimestamp: () => number;
     readonly run: <Result>(runtime: IntrospectionRuntimeDependencies, action: () => Result) => Result;
     readonly scheduleMicrotask: (action: () => void) => void;
@@ -14,15 +13,17 @@ export type IntrospectionReconcilerRuntime = {
         delayInMilliseconds: number,
         ...handlerArguments: HandlerArguments
     ) => IntrospectionTimeoutIdentifier;
+    readonly makeDefault: (runtime: IntrospectionRuntimeDependencies) => void;
 };
 
 export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerRuntime {
     const runtimeStorage = new AsyncLocalStorage<IntrospectionRuntimeDependencies>();
+    let defaultRuntime: IntrospectionRuntimeDependencies | null = null;
 
     function currentRuntime(): IntrospectionRuntimeDependencies {
-        const runtime = runtimeStorage.getStore();
+        const runtime = runtimeStorage.getStore() ?? defaultRuntime;
 
-        if (runtime === undefined) {
+        if (runtime === null) {
             throw new Error('Expected Introspection runtime dependencies.');
         }
 
@@ -40,9 +41,6 @@ export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerR
         cancelTimeout(timeoutIdentifier) {
             currentRuntime().clock.clearTimeout(timeoutIdentifier);
         },
-        enter(runtime) {
-            runtimeStorage.enterWith(runtime);
-        },
         readEventTimestamp() {
             return currentRuntime().clock.currentUnixEpochMilliseconds;
         },
@@ -56,6 +54,9 @@ export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerR
         },
         scheduleTimeout(handler, delayInMilliseconds, ...handlerArguments) {
             return currentRuntime().clock.setTimeout(handler, delayInMilliseconds, ...handlerArguments);
+        },
+        makeDefault(runtime) {
+            defaultRuntime = runtime;
         }
     });
 }

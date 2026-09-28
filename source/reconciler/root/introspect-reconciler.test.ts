@@ -586,5 +586,20 @@ export const testNode = suite('custom reconciler host layer', [
         );
 
         return scope.assert.collect();
+    }),
+    test('routes scheduler hooks outside a runtime scope to the default runtime', async function (scope) {
+        const runtime = createUnitRuntimeDependencies();
+        const microtaskEvents: string[] = [];
+        const reconcilerRuntime = createIntrospectionReconcilerRuntime();
+
+        reconcilerRuntime.makeDefault(runtime);
+        reconcilerRuntime.scheduleMicrotask(function recordMicrotask() {
+            microtaskEvents.push('microtask');
+        });
+        await runtime.microtasks.flush();
+
+        scope.assert.deepEqual(microtaskEvents, [ 'microtask' ]);
+
+        return scope.assert.collect();
     })
 ]);

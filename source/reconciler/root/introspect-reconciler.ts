@@ -275,7 +275,6 @@ function createIntrospectionReconcilerSession(
         }
     });
     const container = createSessionContainer(options, state);
-    moduleState.reconcilerRuntime.enter(moduleState.runtime);
     const root = moduleState.reconcilerRuntime.run(moduleState.runtime, function createContainerWithRuntime() {
         return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
@@ -507,6 +506,8 @@ export function createIntrospectionReconcilerModule(
         reconcilerRuntime,
         runtime: dependencies.runtime
     });
+
+    reconcilerRuntime.makeDefault(dependencies.runtime);
 
     return Object.freeze({
         createRoot(options) {
