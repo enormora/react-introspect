@@ -181,8 +181,6 @@ export function createIntrospectionNode(
     snapshot: IntrospectionSnapshot,
     node: SnapshotNode
 ): RuntimeIntrospectionNode {
-    const context = { reader, snapshot };
-
     function readProps(): SnapshotProps {
         const cachedProps = exposedPropsBySnapshotNode.get(node);
 
@@ -201,7 +199,7 @@ export function createIntrospectionNode(
 
     function createNodeList(nodes: readonly SnapshotNode[]): RuntimeIntrospectionList {
         return createIntrospectionList(nodes.map(function createChildNode(child) {
-            return createIntrospectionNode(context.reader, context.snapshot, child);
+            return createIntrospectionNode(reader, snapshot, child);
         }));
     }
 
