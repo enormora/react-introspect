@@ -4,11 +4,11 @@ import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 import {
-    createFrameDepth,
     isIntrospectionRenderError,
     introspectionComponentHostType,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
+import { createFrameDepth } from './introspect-frame-depth.ts';
 import { createIntrospectionRenderElement } from './introspect-frame.ts';
 
 type Counts = {

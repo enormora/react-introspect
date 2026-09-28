@@ -4,19 +4,21 @@ import { isClassComponent, readClassFrameType } from './introspect-class-frame.t
 import {
     createComponentHost,
     createComponentMetadata,
-    canExecuteComponent,
     createEmptyHost,
-    enterComponentDepth,
-    nextDepth,
     type IntrospectionElement,
     introspectionElementKeyMetadata,
-    type IntrospectionFrameDepth,
     introspectionOpaqueHostType,
     type IntrospectionTransformedNode,
     introspectionValueMetadata,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
+import {
+    canExecuteComponent,
+    enterComponentDepth,
+    type IntrospectionFrameDepth,
+    nextDepth
+} from './introspect-frame-depth.ts';
 import { assertNotPortal } from './introspect-unsupported-react.ts';
 
 type IntrospectionFrameProps = {

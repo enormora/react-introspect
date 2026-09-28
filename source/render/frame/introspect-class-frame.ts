@@ -5,14 +5,13 @@ import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
-    nextDepth,
     type IntrospectionElement,
-    type IntrospectionFrameDepth,
     type IntrospectionRenderChildren,
     type IntrospectionTransformedNode,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
+import { type IntrospectionFrameDepth, nextDepth } from './introspect-frame-depth.ts';
 
 export type IntrospectionClassFrameProps = {
     readonly depth: IntrospectionFrameDepth;

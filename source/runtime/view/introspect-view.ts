@@ -4,7 +4,7 @@ import {
     type IntrospectionConsoleDiagnostics,
     type IntrospectionDiagnosticsOptions
 } from '../../diagnostics/introspect-diagnostics.ts';
-import { createFrameDepth } from '../../render/frame/introspect-frame-contract.ts';
+import { createFrameDepth } from '../../render/frame/introspect-frame-depth.ts';
 import { createIntrospectionRenderElement } from '../../render/frame/introspect-frame.ts';
 import {
     createIntrospectionListLocator,

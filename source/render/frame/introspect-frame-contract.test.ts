@@ -4,11 +4,9 @@ import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
-    createFrameDepth,
     introspectionComponentMetadata,
     introspectionValueMetadata,
     isIntrospectionRenderError,
-    nextDepth,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
 
@@ -65,17 +63,6 @@ export const testNode = suite('introspection frame contract', [
         scope.assert.equal(catchThrown(thenable), thenable);
         scope.assert.equal(isIntrospectionRenderError(error), true);
         scope.assert.equal(isIntrospectionRenderError(thenable), false);
-
-        return scope.assert.collect();
-    }),
-    test('decrements numeric depth and preserves full depth', function (scope) {
-        function readNextBudget(budget: number | 'full'): number | 'full' {
-            return nextDepth(createFrameDepth({ budget, depthFrom: undefined, transparent: [] }), 'span').budget;
-        }
-
-        scope.assert.equal(readNextBudget('full'), 'full');
-        scope.assert.equal(readNextBudget(2), 1);
-        scope.assert.equal(readNextBudget(0), 0);
 
         return scope.assert.collect();
     })
