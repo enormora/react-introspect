@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { IntrospectionView } from '../../public/introspect-public-types.ts';
+import type { IntrospectionError, IntrospectionView } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 
 type Recorder = {
@@ -37,6 +37,10 @@ function createPassingBoundaryState(): BoundaryState {
 
 function createBoundaryState(failed: boolean): BoundaryState {
     return { failed };
+}
+
+function readErrorMessage(error: IntrospectionError): string {
+    return error.message;
 }
 
 function requireValue<Value>(value: Value | undefined): Value {
@@ -494,9 +498,9 @@ export const testNode = suite('class components and error boundaries', [
         );
 
         scope.assert.deepEqual(recorder.entries, [ 'boom' ]);
-        scope.assert.equal(view.errors.length, 0);
-        scope.assert.equal(view.root?.error?.message, 'boom');
-        scope.assert.true(view.root?.error?.handled);
+        scope.assert.deepEqual(view.caughtErrors.map(readErrorMessage), [ 'boom' ]);
+        scope.assert.equal(view.uncaughtErrors.length, 0);
+        scope.assert.equal(view.root?.caughtError?.message, 'boom');
         scope.assert.equal(view.find('span')?.textContent, 'fallback');
 
         return scope.assert.collect();
@@ -517,7 +521,8 @@ export const testNode = suite('class components and error boundaries', [
         await view.waitForIdle();
 
         scope.assert.deepEqual(recorder.entries, [ 'boom' ]);
-        scope.assert.equal(view.root?.error?.message, 'boom');
+        scope.assert.deepEqual(view.caughtErrors.map(readErrorMessage), [ 'boom' ]);
+        scope.assert.equal(view.root?.caughtError?.message, 'boom');
         scope.assert.equal(view.find('span')?.textContent, 'fallback');
 
         return scope.assert.collect();
@@ -537,7 +542,8 @@ export const testNode = suite('class components and error boundaries', [
         await view.waitForIdle();
 
         scope.assert.deepEqual(recorder.entries, [ 'boom', 'recovered' ]);
-        scope.assert.equal(view.root?.error?.message, 'boom');
+        scope.assert.deepEqual(view.caughtErrors.map(readErrorMessage), [ 'boom' ]);
+        scope.assert.equal(view.root?.caughtError?.message, 'boom');
         scope.assert.equal(view.find('span')?.textContent, 'catch fallback');
 
         return scope.assert.collect();
@@ -550,8 +556,8 @@ export const testNode = suite('class components and error boundaries', [
             warningMode: 'capture'
         });
 
-        scope.assert.equal(view.errors.length, 1);
-        scope.assert.equal(view.errors[0]?.message, 'class render failed');
+        scope.assert.deepEqual(view.uncaughtErrors.map(readErrorMessage), [ 'class render failed' ]);
+        scope.assert.equal(view.caughtErrors.length, 0);
         scope.assert.undefined(view.root);
 
         return scope.assert.collect();
@@ -613,7 +619,7 @@ export const testNode = suite('class components and error boundaries', [
             }
         );
 
-        scope.assert.equal(view.root?.error?.message, 'string boom');
+        scope.assert.equal(view.root?.caughtError?.message, 'string boom');
         scope.assert.equal(view.find('span')?.textContent, 'primitive fallback');
 
         return scope.assert.collect();
@@ -635,8 +641,7 @@ export const testNode = suite('class components and error boundaries', [
         );
 
         scope.assert.deepEqual(recorder.entries, [ 'boom', 'recovered' ]);
-        scope.assert.equal(view.root?.error?.message, 'boom');
-        scope.assert.true(view.root?.error?.handled);
+        scope.assert.equal(view.root?.caughtError?.message, 'boom');
         scope.assert.equal(view.find('span')?.textContent, 'catch fallback');
 
         return scope.assert.collect();

@@ -392,7 +392,7 @@ function captureMissingInitialCommit(session: IntrospectionReconcilerSession, re
     if (
         renderCountBefore > 0 ||
         session.state.readRenderCount() > renderCountBefore ||
-        session.options.diagnostics.errors.length > 0
+        session.options.diagnostics.uncaughtErrors.length > 0
     ) {
         return;
     }

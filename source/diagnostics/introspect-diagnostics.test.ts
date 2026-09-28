@@ -1,6 +1,7 @@
 import { recordSink, suite, test, transcriptUsage } from '@overkill-dev/test';
 import React from 'react';
 import { createUnitIntrospectionView as introspect } from '../runtime/view/introspect-unit-view.test.ts';
+import type { IntrospectionError } from '../public/introspect-public-types.ts';
 import {
     createIntrospectionDiagnostics,
     type IntrospectionConsoleDiagnostics,
@@ -26,6 +27,10 @@ function requireError(action: () => unknown): Error {
     }
 
     throw new Error('Expected action to throw.');
+}
+
+function readErrorMessage(error: IntrospectionError): string {
+    return error.message;
 }
 
 function ThrowingComponent(): React.ReactNode {
@@ -80,9 +85,9 @@ export const testNode = suite('diagnostics', [
             warningMode: 'capture'
         });
 
-        scope.assert.equal(view.errors.length, 1);
-        scope.assert.equal(view.errors[0]?.message, 'render failed');
-        scope.assert.false(view.errors[0]?.handled);
+        scope.assert.equal(view.uncaughtErrors.length, 1);
+        scope.assert.equal(view.uncaughtErrors[0]?.message, 'render failed');
+        scope.assert.equal(view.caughtErrors.length, 0);
         scope.assert.equal(view.warnings.length, 0);
         scope.assert.undefined(view.root);
         scope.assert.equal(view.renderCount, 1);
@@ -202,14 +207,18 @@ export const testNode = suite('diagnostics', [
 
         return scope.assert.collect();
     }),
-    test('does not double-report caught errors', function (scope) {
-        const diagnostics = createIsolatedDiagnostics('capture');
+    test('records caught errors without throwing in error throw mode', function (scope) {
+        const diagnostics = createIntrospectionDiagnostics({
+            errorMode: 'throw',
+            warningMode: 'capture'
+        }, createConsoleDiagnosticPublisher().source);
 
         diagnostics.run(function recordCaughtError() {
-            diagnostics.recordCaughtError(new Error('handled'));
+            diagnostics.recordCaughtError(new Error('caught'));
         });
 
-        scope.assert.equal(diagnostics.errors.length, 0);
+        scope.assert.equal(diagnostics.caughtErrors[0]?.message, 'caught');
+        scope.assert.equal(diagnostics.uncaughtErrors.length, 0);
         scope.assert.equal(diagnostics.warnings.length, 0);
 
         return scope.assert.collect();
@@ -223,20 +232,20 @@ export const testNode = suite('diagnostics', [
             diagnostics.recordUncaughtError(error);
         });
 
-        scope.assert.equal(diagnostics.errors.length, 1);
-        scope.assert.equal(diagnostics.errors[0]?.message, 'same failure');
+        scope.assert.equal(diagnostics.uncaughtErrors.length, 1);
+        scope.assert.equal(diagnostics.uncaughtErrors[0]?.message, 'same failure');
 
         return scope.assert.collect();
     }),
     test('maps React root error callbacks', function (scope) {
         const diagnostics = createIsolatedDiagnostics('capture');
 
-        diagnostics.recordCaughtError(new Error('handled failure'));
+        diagnostics.recordCaughtError(new Error('caught failure'));
         diagnostics.recordRecoverableError(new Error('recoverable failure'));
         diagnostics.recordUncaughtError(new Error('uncaught failure'));
 
-        scope.assert.equal(diagnostics.errors.length, 1);
-        scope.assert.equal(diagnostics.errors[0]?.message, 'uncaught failure');
+        scope.assert.deepEqual(diagnostics.caughtErrors.map(readErrorMessage), [ 'caught failure' ]);
+        scope.assert.deepEqual(diagnostics.uncaughtErrors.map(readErrorMessage), [ 'uncaught failure' ]);
         scope.assert.equal(diagnostics.warnings.length, 1);
         scope.assert.equal(diagnostics.warnings[0]?.message, 'recoverable failure');
 

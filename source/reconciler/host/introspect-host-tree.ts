@@ -70,7 +70,7 @@ const internalHostTypes = Object.freeze([
 ]);
 const introspectionComponentMetadataKeys = Object.freeze([
     'activityMode',
-    'error',
+    'caughtError',
     'givenChildren',
     'key',
     'props',
@@ -144,7 +144,7 @@ function readComponentMetadata(instance: IntrospectionHostInstance): Introspecti
     if (!isIntrospectionComponentMetadata(value)) {
         return Object.freeze({
             activityMode: undefined,
-            error: undefined,
+            caughtError: undefined,
             givenChildren: undefined,
             key: null,
             props: Object.freeze({}),
@@ -236,7 +236,7 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
         return {
             activityMode: metadata.activityMode,
             children: child.readChildren().map(toSourceNode),
-            error: metadata.error,
+            caughtError: metadata.caughtError,
             givenChildren: metadata.givenChildren,
             givenChildrenKind: 'react',
             key: metadata.key,
@@ -252,7 +252,7 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
     return {
         activityMode: undefined,
         children,
-        error: undefined,
+        caughtError: undefined,
         givenChildren: children,
         givenChildrenKind: 'source',
         key: readHostKey(child),

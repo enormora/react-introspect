@@ -18,7 +18,7 @@ type SnapshotNodeSeed = {
 function createSnapshotNode(seed: SnapshotNodeSeed): SnapshotNode {
     return {
         activityMode: undefined,
-        error: undefined,
+        caughtError: undefined,
         givenChildren: [],
         id: seed.id,
         key: null,

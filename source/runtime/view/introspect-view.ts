@@ -111,8 +111,8 @@ function createIntrospectionViewWithDependencies(
         get currentSnapshot() {
             return currentSnapshot;
         },
-        get errors() {
-            return diagnostics.errors;
+        get caughtErrors() {
+            return diagnostics.caughtErrors;
         },
         get hasWarnings() {
             return diagnostics.hasWarnings;
@@ -130,6 +130,9 @@ function createIntrospectionViewWithDependencies(
         },
         get textContent() {
             return rootNode()?.textContent ?? '';
+        },
+        get uncaughtErrors() {
+            return diagnostics.uncaughtErrors;
         },
         get warnings() {
             return diagnostics.warnings;

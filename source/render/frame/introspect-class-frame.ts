@@ -1,5 +1,5 @@
 import React from 'react';
-import type { IntrospectionError } from '../../public/introspect-public-types.ts';
+import { createDiagnosticRecord } from '../../diagnostics/introspect-diagnostics.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
@@ -103,14 +103,6 @@ export function isClassComponent(value: unknown): value is IntrospectionClassCom
 function isErrorBoundary(type: IntrospectionClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
         typeof type.prototype.componentDidCatch === 'function';
-}
-
-function createIntrospectionError(cause: unknown, handled: boolean): IntrospectionError {
-    return Object.freeze({
-        cause,
-        handled,
-        message: cause instanceof Error ? cause.message : String(cause)
-    });
 }
 
 function shallowEquals(
@@ -271,7 +263,7 @@ const IntrospectionClassFrameBase = class
             createComponentMetadata(
                 this.props.element,
                 undefined,
-                boundaryErrorCause === undefined ? undefined : createIntrospectionError(boundaryErrorCause, true)
+                boundaryErrorCause === undefined ? undefined : createDiagnosticRecord(boundaryErrorCause)
             ),
             renderPass.next.node
         );

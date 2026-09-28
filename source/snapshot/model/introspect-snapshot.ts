@@ -117,7 +117,7 @@ function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf):
     return pushSnapshotNode(idAllocation.build, {
         ...leaf,
         activityMode: undefined,
-        error: undefined,
+        caughtError: undefined,
         givenChildren: Object.freeze([]),
         id: idAllocation.id,
         key: null,
@@ -223,7 +223,7 @@ const snapshotOperations = {
         const result = pushSnapshotNode(propsResult.build, {
             activityMode: undefined,
             givenChildren: childrenResult.nodes,
-            error: undefined,
+            caughtError: undefined,
             id: idAllocation.id,
             key: request.element.key ?? null,
             kind: getElementKind(type),
@@ -277,7 +277,7 @@ const snapshotOperations = {
         return pushSnapshotNode(propsResult.build, {
             activityMode: request.element.activityMode,
             givenChildren: givenChildrenResult.nodes,
-            error: request.element.error,
+            caughtError: request.element.caughtError,
             id: idAllocation.id,
             key: request.element.key,
             kind: getSourceElementKind(request.element),
@@ -399,7 +399,7 @@ export function createIntrospectionSnapshotFromSource(
                 {
                     activityMode: undefined,
                     children,
-                    error: undefined,
+                    caughtError: undefined,
                     givenChildren: [],
                     givenChildrenKind: 'source',
                     key: null,

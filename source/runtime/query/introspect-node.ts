@@ -236,8 +236,8 @@ export function createIntrospectionNode(
     }
 
     return Object.freeze({
-        get error() {
-            return node.error;
+        get caughtError() {
+            return node.caughtError;
         },
         get givenChildren() {
             return createNodeList(node.givenChildren);

@@ -7,7 +7,7 @@ function createNode(name: string, textContent: string): RuntimeIntrospectionNode
         callProp() {
             return undefined;
         },
-        error: undefined,
+        caughtError: undefined,
         find() {
             return undefined;
         },

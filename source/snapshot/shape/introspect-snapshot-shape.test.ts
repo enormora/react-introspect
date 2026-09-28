@@ -14,7 +14,7 @@ import {
 function createTextNode(textContent: string): SnapshotNode {
     return {
         activityMode: undefined,
-        error: undefined,
+        caughtError: undefined,
         givenChildren: [],
         id: 1,
         key: null,
@@ -55,7 +55,7 @@ export const testNode = suite('introspection snapshot shape', [
             getSourceElementKind({
                 activityMode: undefined,
                 children: [],
-                error: undefined,
+                caughtError: undefined,
                 givenChildren: [],
                 givenChildrenKind: 'source',
                 key: null,

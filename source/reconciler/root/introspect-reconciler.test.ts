@@ -452,7 +452,7 @@ export const testNode = suite('custom reconciler host layer', [
             scope.assert.equal(view.renderCount, 1);
             scope.assert.undefined(view.root);
             scope.assert.equal(
-                view.errors.at(-1)?.message,
+                view.uncaughtErrors.at(-1)?.message,
                 'React Introspect cannot commit a suspended root. Wrap lazy, async, or promise-using roots in React.Suspense.'
             );
 
@@ -525,7 +525,7 @@ export const testNode = suite('custom reconciler host layer', [
             );
 
             scope.assert.undefined(view.root);
-            scope.assert.equal(view.errors.at(-1)?.cause, error);
+            scope.assert.equal(view.uncaughtErrors.at(-1)?.cause, error);
 
             return scope.assert.collect();
         }

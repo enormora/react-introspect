@@ -50,7 +50,7 @@ export type IntrospectionTransformNode = (
 
 export type IntrospectionComponentMetadata = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
-    readonly error: IntrospectionError | undefined;
+    readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: unknown;
     readonly key: string | null;
     readonly props: Readonly<Record<PropertyKey, unknown>>;
@@ -121,7 +121,7 @@ export function nextDepth(depth: IntrospectionFrameDepth, type: unknown): Intros
 export function createComponentMetadata(
     element: IntrospectionElement,
     renderedReason: IntrospectionNotRenderedReason | undefined,
-    error?: IntrospectionError,
+    caughtError?: IntrospectionError,
     activityMode?: 'hidden' | 'visible'
 ): IntrospectionComponentMetadata {
     const props = readElementProps(element);
@@ -130,7 +130,7 @@ export function createComponentMetadata(
 
     return Object.freeze({
         activityMode,
-        error,
+        caughtError,
         givenChildren: props.children,
         key: element.key,
         props: publicProps(props),
