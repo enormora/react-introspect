@@ -1,15 +1,16 @@
 import React from 'react';
 import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
-import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
 import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
+    createOpaqueHost,
+    elementKeyProps
+} from '../protocol/introspect-host-protocol.ts';
+import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
+import {
     type IntrospectionElement,
-    introspectionElementKeyMetadata,
-    introspectionOpaqueHostType,
     type IntrospectionTransformedNode,
-    introspectionValueMetadata,
     readElementRef
 } from './introspect-frame-contract.ts';
 import { throwIntrospectionRenderError } from './introspect-render-error.ts';
@@ -98,12 +99,6 @@ function isIntrospectionElement(element: React.ReactElement): element is Introsp
 
 function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
     return element.props.mode === 'hidden' ? 'hidden' : 'visible';
-}
-
-function createOpaqueHost(value: unknown): React.ReactElement {
-    return React.createElement(introspectionOpaqueHostType, {
-        [introspectionValueMetadata]: value
-    });
 }
 
 function createIntrospectionElement(element: React.ReactElement): IntrospectionElement {
@@ -226,16 +221,14 @@ function transformRenderableElement(element: IntrospectionElement, depth: Intros
         return React.createElement(React.Fragment, null, children);
     }
 
-    return React.cloneElement(element, {
-        [introspectionElementKeyMetadata]: element.key
-    }, children);
+    return React.cloneElement(element, elementKeyProps(element), children);
 }
 
 function transformSuspenseElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
     const children = transformNode(element.props.children, depth);
 
     return React.cloneElement(element, {
-        [introspectionElementKeyMetadata]: element.key,
+        ...elementKeyProps(element),
         fallback: transformNode(element.props.fallback, depth)
     }, children);
 }

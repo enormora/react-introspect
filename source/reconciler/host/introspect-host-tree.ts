@@ -6,7 +6,7 @@ import {
     introspectionEmptyHostType,
     introspectionOpaqueHostType,
     introspectionValueMetadata
-} from '../../render/frame/introspect-frame-contract.ts';
+} from '../../render/protocol/introspect-host-protocol.ts';
 import type { IntrospectionIdNormalization } from '../../snapshot/normalization/introspect-id-normalization.ts';
 import type { IntrospectionRefs } from '../../public/introspect-public-types.ts';
 import {

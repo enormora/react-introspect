@@ -4,7 +4,9 @@ import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
     createComponentMetadata,
-    createEmptyHost,
+    createEmptyHost
+} from '../protocol/introspect-host-protocol.ts';
+import {
     type IntrospectionElement,
     type IntrospectionRenderChildren,
     type IntrospectionTransformedNode,

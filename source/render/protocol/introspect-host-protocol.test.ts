@@ -6,9 +6,9 @@ import {
     createEmptyHost,
     introspectionComponentMetadata,
     introspectionValueMetadata
-} from './introspect-frame-contract.ts';
+} from './introspect-host-protocol.ts';
 
-export const testNode = suite('introspection frame contract', [
+export const testNode = suite('introspection host protocol', [
     test('creates public component metadata from React elements', function (scope) {
         const element = React.createElement('button', {
             children: 'Save',
