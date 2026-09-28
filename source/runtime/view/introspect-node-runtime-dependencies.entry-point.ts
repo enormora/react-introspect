@@ -49,12 +49,10 @@ const realMicrotasks: IntrospectionMicrotasks = {
     }
 };
 
-const createNodeClock: () => IntrospectionRuntimeDependencies['clock'] = createClock;
-
 export function createNodeRuntimeDependencies(): IntrospectionRuntimeDependencies {
     return {
         actEnvironment: realActEnvironment,
-        clock: createNodeClock(),
+        clock: createClock(),
         macrotasks: realMacrotasks,
         microtasks: realMicrotasks
     };
