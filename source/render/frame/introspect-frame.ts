@@ -133,14 +133,12 @@ function transformNode(node: unknown, depth: IntrospectionFrameDepth): Introspec
     return isIterable(node) ? transformCollection(Array.from(node), depth) : createOpaqueHost(node);
 }
 
+function transformFragmentElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    return React.createElement(React.Fragment, null, transformNode(element.props.children, depth));
+}
+
 function transformRenderableElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    const children = transformNode(element.props.children, depth);
-
-    if (element.type === React.Fragment) {
-        return React.createElement(React.Fragment, null, children);
-    }
-
-    return React.cloneElement(element, elementKeyProps(element), children);
+    return React.cloneElement(element, elementKeyProps(element), transformNode(element.props.children, depth));
 }
 
 function transformSuspenseElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
@@ -226,7 +224,7 @@ const elementTransforms: Readonly<
     activity: transformActivityElement,
     context: transformRenderableElement,
     forwardRef: transformComponentElement,
-    fragment: transformRenderableElement,
+    fragment: transformFragmentElement,
     function: transformComponentElement,
     host: transformRenderableElement,
     lazy: transformComponentElement,
