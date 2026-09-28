@@ -385,7 +385,7 @@ const snapshotOperations = {
 export function createIntrospectionSnapshotFromSource(
     children: readonly SnapshotSourceNode[],
     renderCount: number,
-    idNormalization: IntrospectionIdNormalization = { generator: undefined, prefix: '' }
+    idNormalization: IntrospectionIdNormalization
 ): IntrospectionSnapshot {
     if (children.length !== 1) {
         return createIntrospectionSnapshotFromSource(
