@@ -1,10 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { TimeoutIdentifier } from '@enormora/clock';
 import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
 
-type IntrospectionTimeoutIdentifier = ReturnType<IntrospectionRuntimeDependencies['clock']['setTimeout']>;
-
 export type IntrospectionReconcilerRuntime = {
-    readonly cancelTimeout: (timeoutIdentifier: IntrospectionTimeoutIdentifier) => void;
+    readonly cancelTimeout: (timeoutIdentifier: TimeoutIdentifier) => void;
     readonly readEventTimestamp: () => number;
     readonly run: <Result>(runtime: IntrospectionRuntimeDependencies, action: () => Result) => Result;
     readonly scheduleMicrotask: (action: () => void) => void;
@@ -12,7 +11,7 @@ export type IntrospectionReconcilerRuntime = {
         handler: (...handlerArguments: HandlerArguments) => void,
         delayInMilliseconds: number,
         ...handlerArguments: HandlerArguments
-    ) => IntrospectionTimeoutIdentifier;
+    ) => TimeoutIdentifier;
     readonly makeDefault: (runtime: IntrospectionRuntimeDependencies) => void;
 };
 
