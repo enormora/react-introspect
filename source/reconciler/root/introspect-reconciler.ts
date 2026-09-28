@@ -174,11 +174,6 @@ function createIntrospectionReconcilerHostConfig(reconcilerRuntime: Introspectio
     };
 }
 
-type IntrospectionReconcilerModuleState = {
-    readonly reconcilerRuntime: IntrospectionReconcilerRuntime;
-    readonly runtime: IntrospectionRuntimeDependencies;
-};
-
 const reconcilerRuntime = createIntrospectionReconcilerRuntime();
 const renderer = createReconciler(createIntrospectionReconcilerHostConfig(reconcilerRuntime));
 
@@ -202,197 +197,111 @@ function createReconcilerContainer(
     );
 }
 
-type IntrospectionReconcilerState = {
-    readonly readRenderCount: () => number;
-    readonly readWaiters: () => readonly Waiter[];
-    readonly writeRenderCount: (count: number) => void;
-    readonly writeWaiters: (waiters: readonly Waiter[]) => void;
+type WaiterQueue = {
+    readonly settle: () => void;
+    readonly wait: (predicate: () => boolean) => Promise<void>;
 };
 
 type IntrospectionReconcilerSession = {
-    readonly container: IntrospectionHostContainer;
-    readonly moduleState: IntrospectionReconcilerModuleState;
-    readonly options: IntrospectionReconcilerRootOptions;
-    readonly root: Readonly<Record<string, unknown>>;
-    readonly state: IntrospectionReconcilerState;
+    readonly act: (action: () => unknown) => unknown;
+    readonly readRenderCount: () => number;
+    readonly render: (element: Readonly<React.ReactElement> | null) => void;
+    readonly waitForIdle: () => Promise<void>;
+    readonly waitUntil: (predicate: () => boolean) => Promise<void>;
 };
 
-function settleWaiters(sessionState: IntrospectionReconcilerState): void {
-    const settledWaiters = sessionState.readWaiters().filter(function isSettled(waiter) {
-        return waiter.predicate();
-    });
+type SessionRenderTarget = {
+    readonly container: IntrospectionHostContainer;
+    readonly diagnostics: IntrospectionDiagnostics;
+    readonly publish: (snapshot: IntrospectionSnapshot) => void;
+    readonly readRenderCount: () => number;
+};
 
-    for (const waiter of settledWaiters) {
-        sessionState.writeWaiters(
-            sessionState.readWaiters().toSpliced(
-                sessionState.readWaiters().indexOf(waiter),
-                1
-            )
-        );
-        waiter.resolve();
-    }
-}
-
-function createSessionContainer(
-    options: IntrospectionReconcilerRootOptions,
-    state: IntrospectionReconcilerState
-): IntrospectionHostContainer {
-    return createHostContainer(
-        function publishSnapshot(snapshot) {
-            state.writeRenderCount(snapshot.renderCount);
-            options.publish(snapshot);
-            settleWaiters(state);
-        },
-        function readNextRenderCount() {
-            return state.readRenderCount() + 1;
-        },
-        {
-            generator: options.idGenerator,
-            prefix: options.idPrefix
-        },
-        options.refs
-    );
-}
-
-function createIntrospectionReconcilerSession(
-    moduleState: IntrospectionReconcilerModuleState,
-    options: IntrospectionReconcilerRootOptions
-): IntrospectionReconcilerSession {
-    let renderCount = 0;
-    let waiters: readonly Waiter[] = [];
-    const state = {
-        readRenderCount() {
-            return renderCount;
-        },
-        readWaiters() {
-            return waiters;
-        },
-        writeRenderCount(count: number) {
-            renderCount = count;
-        },
-        writeWaiters(nextWaiters: readonly Waiter[]) {
-            waiters = nextWaiters;
-        }
-    };
-    const container = createSessionContainer(options, state);
-    const root = moduleState.reconcilerRuntime.run(moduleState.runtime, function createContainerWithRuntime() {
-        return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
-    });
+function createWaiterQueue(): WaiterQueue {
+    const waiters = new Set<Waiter>();
 
     return {
-        container,
-        moduleState,
-        options,
-        root,
-        state
+        settle() {
+            const settledWaiters = Array.from(waiters).filter(function isSettled(waiter) {
+                return waiter.predicate();
+            });
+
+            for (const waiter of settledWaiters) {
+                waiters.delete(waiter);
+                waiter.resolve();
+            }
+        },
+        async wait(predicate) {
+            const { promise, resolve } = Promise.withResolvers<undefined>();
+
+            waiters.add({
+                predicate,
+                resolve() {
+                    resolve(undefined);
+                }
+            });
+
+            return promise;
+        }
     };
 }
 
-function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
-    return session.options.diagnostics.run(function actWithDiagnostics() {
-        return session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function actWithRuntime() {
-            return session.moduleState.runtime.actEnvironment.act(function runAction() {
-                const result = action();
+function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => unknown): unknown {
+    return reconcilerRuntime.run(runtime, function actWithRuntime() {
+        return runtime.actEnvironment.act(function runAction() {
+            const result = action();
 
-                renderer.flushSyncWork();
-                renderer.flushPassiveEffects();
+            renderer.flushSyncWork();
+            renderer.flushPassiveEffects();
 
-                return result;
-            });
+            return result;
         });
     });
 }
 
-function hasScheduledRootTask(session: IntrospectionReconcilerSession): boolean {
-    const task = session.root.callbackNode;
+function hasScheduledRootTask(root: ReconcilerRoot): boolean {
+    const task = root.callbackNode;
 
     return isObject(task) && typeof task.callback === 'function';
 }
 
-async function flushMicrotasks(session: IntrospectionReconcilerSession): Promise<void> {
-    await session.moduleState.reconcilerRuntime.run(
-        session.moduleState.runtime,
-        async function flushMicrotasksWithRuntime() {
-            await session.moduleState.runtime.microtasks.flush();
-        }
-    );
+async function flushMicrotasks(runtime: IntrospectionRuntimeDependencies): Promise<void> {
+    await reconcilerRuntime.run(runtime, async function flushMicrotasksWithRuntime() {
+        await runtime.microtasks.flush();
+    });
 }
 
-async function flushScheduledWork(session: IntrospectionReconcilerSession): Promise<void> {
-    await flushMicrotasks(session);
+async function flushScheduledWork(runtime: IntrospectionRuntimeDependencies, root: ReconcilerRoot): Promise<void> {
+    await flushMicrotasks(runtime);
 
     do {
-        await session.moduleState.runtime.macrotasks.waitForNext();
-        await flushMicrotasks(session);
-    } while (hasScheduledRootTask(session));
+        await runtime.macrotasks.waitForNext();
+        await flushMicrotasks(runtime);
+    } while (hasScheduledRootTask(root));
 }
 
-async function waitForIdleSession(session: IntrospectionReconcilerSession): Promise<void> {
-    await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-        await flushScheduledWork(session);
-        session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function flushWithRuntime() {
-            renderer.flushPassiveEffects();
-            settleWaiters(session.state);
-        });
-    });
+function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
+    const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
+
+    target.container.writeMounted(false);
+    target.container.writeChildren([]);
+    target.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
 }
 
-async function waitForSession(session: IntrospectionReconcilerSession, predicate: () => boolean): Promise<void> {
-    if (session.options.diagnostics.run(predicate)) {
-        return;
-    }
-
-    const waiting = new Promise<void>(function createWait(resolve) {
-        const waiter: Waiter = {
-            predicate,
-            resolve() {
-                resolve();
-            }
-        };
-
-        session.state.writeWaiters([
-            ...session.state.readWaiters(),
-            waiter
-        ]);
-    });
-
-    await waitForIdleSession(session);
-
-    if (!session.options.diagnostics.run(predicate)) {
-        await waiting;
-    }
-}
-
-function publishEmptySnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
-    const errorRenderCount = Math.max(session.state.readRenderCount(), renderCountBefore + 1);
-
-    session.options.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
-}
-
-function publishEmptyErrorSnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
-    session.container.writeMounted(false);
-    session.container.writeChildren([]);
-    publishEmptySnapshot(session, renderCountBefore);
-}
-
-function captureRenderError(
-    session: IntrospectionReconcilerSession,
-    error: unknown,
-    renderCountBefore: number
-): void {
+function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
     if (!isIntrospectionRenderError(error)) {
         throw error;
     }
 
-    publishEmptyErrorSnapshot(session, renderCountBefore);
-    session.options.diagnostics.recordUncaughtError(error);
+    publishEmptyErrorSnapshot(target, renderCountBefore);
+    target.diagnostics.recordUncaughtError(error);
 }
 
-function captureMissingInitialCommit(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
+function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBefore: number): void {
     if (
         renderCountBefore > 0 ||
-        session.state.readRenderCount() > renderCountBefore ||
-        session.options.diagnostics.uncaughtErrors.length > 0
+        target.readRenderCount() > renderCountBefore ||
+        target.diagnostics.uncaughtErrors.length > 0
     ) {
         return;
     }
@@ -400,118 +309,153 @@ function captureMissingInitialCommit(session: IntrospectionReconcilerSession, re
     const message = 'React Introspect cannot commit a suspended root. ' +
         'Wrap lazy, async, or promise-using roots in React.Suspense.';
 
-    publishEmptyErrorSnapshot(session, renderCountBefore);
-    session.options.diagnostics.recordUncaughtError(new Error(message));
-}
-
-function updateRootElement(
-    session: IntrospectionReconcilerSession,
-    element: Readonly<React.ReactElement> | null
-): void {
-    renderer.flushSyncFromReconciler(function updateContainer() {
-        renderer.updateContainer(element, session.root, null, null);
-    });
+    publishEmptyErrorSnapshot(target, renderCountBefore);
+    target.diagnostics.recordUncaughtError(new Error(message));
 }
 
 function renderRootElement(
-    session: IntrospectionReconcilerSession,
+    runtime: IntrospectionRuntimeDependencies,
+    root: ReconcilerRoot,
     element: Readonly<React.ReactElement> | null
 ): void {
-    session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function renderWithRuntime() {
-        session.moduleState.runtime.actEnvironment.act(function renderElement() {
-            updateRootElement(session, element);
-            renderer.flushSyncWork();
-            renderer.flushPassiveEffects();
+    actAndFlush(runtime, function renderElement() {
+        renderer.flushSyncFromReconciler(function updateContainer() {
+            renderer.updateContainer(element, root, null, null);
         });
     });
 }
 
-function renderWithDiagnostics(
-    session: IntrospectionReconcilerSession,
-    element: Readonly<React.ReactElement> | null
-): void {
-    const renderCountBefore = session.state.readRenderCount();
+function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, commitElement: () => void): void {
+    const renderCountBefore = target.readRenderCount();
 
-    session.container.writeMounted(element !== null);
+    target.container.writeMounted(mounted);
 
     try {
-        renderRootElement(session, element);
+        commitElement();
     } catch (error) {
-        captureRenderError(session, error, renderCountBefore);
+        captureRenderError(target, error, renderCountBefore);
 
         return;
     }
 
-    validateContainerRefs(session.container);
-    captureMissingInitialCommit(session, renderCountBefore);
+    validateContainerRefs(target.container);
+    captureMissingInitialCommit(target, renderCountBefore);
 }
 
-function flushElement(session: IntrospectionReconcilerSession, element: Readonly<React.ReactElement> | null): void {
-    session.options.diagnostics.run(function renderElementWithDiagnostics() {
-        renderWithDiagnostics(session, element);
+function createIntrospectionReconcilerSession(
+    runtime: IntrospectionRuntimeDependencies,
+    options: IntrospectionReconcilerRootOptions
+): IntrospectionReconcilerSession {
+    let renderCount = 0;
+    const waiters = createWaiterQueue();
+    const container = createHostContainer(
+        function publishSnapshot(snapshot) {
+            renderCount = snapshot.renderCount;
+            options.publish(snapshot);
+            waiters.settle();
+        },
+        function readNextRenderCount() {
+            return renderCount + 1;
+        },
+        {
+            generator: options.idGenerator,
+            prefix: options.idPrefix
+        },
+        options.refs
+    );
+    const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
+        return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
+    const target: SessionRenderTarget = {
+        container,
+        diagnostics: options.diagnostics,
+        publish: options.publish,
+        readRenderCount() {
+            return renderCount;
+        }
+    };
+    const session: IntrospectionReconcilerSession = {
+        act(action) {
+            return options.diagnostics.run(function actWithDiagnostics() {
+                return actAndFlush(runtime, action);
+            });
+        },
+        readRenderCount: target.readRenderCount,
+        render(element) {
+            options.diagnostics.run(function renderElementWithDiagnostics() {
+                renderWithDiagnostics(target, element !== null, function commitElement() {
+                    renderRootElement(runtime, root, element);
+                });
+            });
+        },
+        async waitForIdle() {
+            await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
+                await flushScheduledWork(runtime, root);
+                reconcilerRuntime.run(runtime, function flushWithRuntime() {
+                    renderer.flushPassiveEffects();
+                    waiters.settle();
+                });
+            });
+        },
+        async waitUntil(predicate) {
+            if (options.diagnostics.run(predicate)) {
+                return;
+            }
+
+            const waiting = waiters.wait(predicate);
+
+            await session.waitForIdle();
+
+            if (!options.diagnostics.run(predicate)) {
+                await waiting;
+            }
+        }
+    };
+
+    return session;
 }
 
-async function waitForNextRenderSession(session: IntrospectionReconcilerSession): Promise<void> {
-    const expectedRenderCount = session.state.readRenderCount() + 1;
-
-    return waitForSession(session, function didRender() {
-        return session.state.readRenderCount() >= expectedRenderCount;
-    });
-}
-
-async function waitForRenderCountSession(session: IntrospectionReconcilerSession, count: number): Promise<void> {
-    return waitForSession(session, function didRenderCount() {
-        return session.state.readRenderCount() >= count;
+async function waitForRenderCount(session: IntrospectionReconcilerSession, count: number): Promise<void> {
+    return session.waitUntil(function didRenderCount() {
+        return session.readRenderCount() >= count;
     });
 }
 
 function createIntrospectionReconcilerRoot(
-    moduleState: IntrospectionReconcilerModuleState,
+    runtime: IntrospectionRuntimeDependencies,
     options: IntrospectionReconcilerRootOptions
 ): IntrospectionReconcilerRoot {
-    const session = createIntrospectionReconcilerSession(moduleState, options);
+    const session = createIntrospectionReconcilerSession(runtime, options);
 
-    flushElement(session, options.element);
+    session.render(options.element);
 
     return {
-        act(action: () => unknown) {
-            return actSession(session, action);
-        },
+        act: session.act,
         unmount() {
-            flushElement(session, null);
+            session.render(null);
         },
         update(element: React.ReactElement) {
-            flushElement(session, element);
+            session.render(element);
         },
-        async waitForIdle() {
-            await waitForIdleSession(session);
-        },
+        waitForIdle: session.waitForIdle,
         async waitForNextRender() {
-            return waitForNextRenderSession(session);
+            return waitForRenderCount(session, session.readRenderCount() + 1);
         },
         async waitForRenderCount(count: number) {
-            return waitForRenderCountSession(session, count);
+            return waitForRenderCount(session, count);
         },
-        async waitUntil(predicate: () => boolean) {
-            return waitForSession(session, predicate);
-        }
+        waitUntil: session.waitUntil
     };
 }
 
 export function createIntrospectionReconcilerModule(
     dependencies: IntrospectionReconcilerModuleDependencies
 ): IntrospectionReconcilerModule {
-    const moduleState = {
-        reconcilerRuntime,
-        runtime: dependencies.runtime
-    };
-
     reconcilerRuntime.makeDefault(dependencies.runtime);
 
     return {
         createRoot(options) {
-            return createIntrospectionReconcilerRoot(moduleState, options);
+            return createIntrospectionReconcilerRoot(dependencies.runtime, options);
         }
     };
 }
