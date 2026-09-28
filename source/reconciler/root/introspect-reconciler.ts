@@ -197,23 +197,23 @@ function createReconcilerContainer(
     );
 }
 
-type IntrospectionReconcilerState = {
-    readonly readRenderCount: () => number;
-    readonly writeRenderCount: (count: number) => void;
-};
-
 type WaiterQueue = {
     readonly settle: () => void;
     readonly wait: (predicate: () => boolean) => Promise<void>;
 };
 
 type IntrospectionReconcilerSession = {
+    readonly act: (action: () => unknown) => unknown;
+    readonly readRenderCount: () => number;
+    readonly render: (element: Readonly<React.ReactElement> | null) => void;
+    readonly waitForIdle: () => Promise<void>;
+    readonly waitUntil: (predicate: () => boolean) => Promise<void>;
+};
+
+type SessionRenderTarget = {
     readonly container: IntrospectionHostContainer;
     readonly options: IntrospectionReconcilerRootOptions;
-    readonly root: Readonly<Record<string, unknown>>;
-    readonly runtime: IntrospectionRuntimeDependencies;
-    readonly state: IntrospectionReconcilerState;
-    readonly waiters: WaiterQueue;
+    readonly readRenderCount: () => number;
 };
 
 function createWaiterQueue(): WaiterQueue {
@@ -245,57 +245,6 @@ function createWaiterQueue(): WaiterQueue {
     };
 }
 
-function createSessionContainer(
-    options: IntrospectionReconcilerRootOptions,
-    state: IntrospectionReconcilerState,
-    waiters: WaiterQueue
-): IntrospectionHostContainer {
-    return createHostContainer(
-        function publishSnapshot(snapshot) {
-            state.writeRenderCount(snapshot.renderCount);
-            options.publish(snapshot);
-            waiters.settle();
-        },
-        function readNextRenderCount() {
-            return state.readRenderCount() + 1;
-        },
-        {
-            generator: options.idGenerator,
-            prefix: options.idPrefix
-        },
-        options.refs
-    );
-}
-
-function createIntrospectionReconcilerSession(
-    runtime: IntrospectionRuntimeDependencies,
-    options: IntrospectionReconcilerRootOptions
-): IntrospectionReconcilerSession {
-    let renderCount = 0;
-    const state = {
-        readRenderCount() {
-            return renderCount;
-        },
-        writeRenderCount(count: number) {
-            renderCount = count;
-        }
-    };
-    const waiters = createWaiterQueue();
-    const container = createSessionContainer(options, state, waiters);
-    const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
-        return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
-    });
-
-    return {
-        container,
-        options,
-        root,
-        runtime,
-        state,
-        waiters
-    };
-}
-
 function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => unknown): unknown {
     return reconcilerRuntime.run(runtime, function actWithRuntime() {
         return runtime.actEnvironment.act(function runAction() {
@@ -309,86 +258,49 @@ function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => un
     });
 }
 
-function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
-    return session.options.diagnostics.run(function actWithDiagnostics() {
-        return actAndFlush(session.runtime, action);
-    });
-}
-
-function hasScheduledRootTask(session: IntrospectionReconcilerSession): boolean {
-    const task = session.root.callbackNode;
+function hasScheduledRootTask(root: ReconcilerRoot): boolean {
+    const task = root.callbackNode;
 
     return isObject(task) && typeof task.callback === 'function';
 }
 
-async function flushMicrotasks(session: IntrospectionReconcilerSession): Promise<void> {
-    await reconcilerRuntime.run(
-        session.runtime,
-        async function flushMicrotasksWithRuntime() {
-            await session.runtime.microtasks.flush();
-        }
-    );
-}
-
-async function flushScheduledWork(session: IntrospectionReconcilerSession): Promise<void> {
-    await flushMicrotasks(session);
-
-    do {
-        await session.runtime.macrotasks.waitForNext();
-        await flushMicrotasks(session);
-    } while (hasScheduledRootTask(session));
-}
-
-async function waitForIdleSession(session: IntrospectionReconcilerSession): Promise<void> {
-    await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-        await flushScheduledWork(session);
-        reconcilerRuntime.run(session.runtime, function flushWithRuntime() {
-            renderer.flushPassiveEffects();
-            session.waiters.settle();
-        });
+async function flushMicrotasks(runtime: IntrospectionRuntimeDependencies): Promise<void> {
+    await reconcilerRuntime.run(runtime, async function flushMicrotasksWithRuntime() {
+        await runtime.microtasks.flush();
     });
 }
 
-async function waitForSession(session: IntrospectionReconcilerSession, predicate: () => boolean): Promise<void> {
-    if (session.options.diagnostics.run(predicate)) {
-        return;
-    }
+async function flushScheduledWork(runtime: IntrospectionRuntimeDependencies, root: ReconcilerRoot): Promise<void> {
+    await flushMicrotasks(runtime);
 
-    const waiting = session.waiters.wait(predicate);
-
-    await waitForIdleSession(session);
-
-    if (!session.options.diagnostics.run(predicate)) {
-        await waiting;
-    }
+    do {
+        await runtime.macrotasks.waitForNext();
+        await flushMicrotasks(runtime);
+    } while (hasScheduledRootTask(root));
 }
 
-function publishEmptyErrorSnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
-    const errorRenderCount = Math.max(session.state.readRenderCount(), renderCountBefore + 1);
+function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
+    const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
 
-    session.container.writeMounted(false);
-    session.container.writeChildren([]);
-    session.options.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
+    target.container.writeMounted(false);
+    target.container.writeChildren([]);
+    target.options.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
 }
 
-function captureRenderError(
-    session: IntrospectionReconcilerSession,
-    error: unknown,
-    renderCountBefore: number
-): void {
+function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
     if (!isIntrospectionRenderError(error)) {
         throw error;
     }
 
-    publishEmptyErrorSnapshot(session, renderCountBefore);
-    session.options.diagnostics.recordUncaughtError(error);
+    publishEmptyErrorSnapshot(target, renderCountBefore);
+    target.options.diagnostics.recordUncaughtError(error);
 }
 
-function captureMissingInitialCommit(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
+function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBefore: number): void {
     if (
         renderCountBefore > 0 ||
-        session.state.readRenderCount() > renderCountBefore ||
-        session.options.diagnostics.uncaughtErrors.length > 0
+        target.readRenderCount() > renderCountBefore ||
+        target.options.diagnostics.uncaughtErrors.length > 0
     ) {
         return;
     }
@@ -396,57 +308,122 @@ function captureMissingInitialCommit(session: IntrospectionReconcilerSession, re
     const message = 'React Introspect cannot commit a suspended root. ' +
         'Wrap lazy, async, or promise-using roots in React.Suspense.';
 
-    publishEmptyErrorSnapshot(session, renderCountBefore);
-    session.options.diagnostics.recordUncaughtError(new Error(message));
+    publishEmptyErrorSnapshot(target, renderCountBefore);
+    target.options.diagnostics.recordUncaughtError(new Error(message));
 }
 
-function updateRootElement(
-    session: IntrospectionReconcilerSession,
-    element: Readonly<React.ReactElement> | null
-): void {
+function updateRootElement(root: ReconcilerRoot, element: Readonly<React.ReactElement> | null): void {
     renderer.flushSyncFromReconciler(function updateContainer() {
-        renderer.updateContainer(element, session.root, null, null);
+        renderer.updateContainer(element, root, null, null);
     });
 }
 
 function renderRootElement(
-    session: IntrospectionReconcilerSession,
+    runtime: IntrospectionRuntimeDependencies,
+    root: ReconcilerRoot,
     element: Readonly<React.ReactElement> | null
 ): void {
-    actAndFlush(session.runtime, function renderElement() {
-        updateRootElement(session, element);
+    actAndFlush(runtime, function renderElement() {
+        updateRootElement(root, element);
     });
 }
 
 function renderWithDiagnostics(
-    session: IntrospectionReconcilerSession,
-    element: Readonly<React.ReactElement> | null
+    target: SessionRenderTarget,
+    element: Readonly<React.ReactElement> | null,
+    commitElement: () => void
 ): void {
-    const renderCountBefore = session.state.readRenderCount();
+    const renderCountBefore = target.readRenderCount();
 
-    session.container.writeMounted(element !== null);
+    target.container.writeMounted(element !== null);
 
     try {
-        renderRootElement(session, element);
+        commitElement();
     } catch (error) {
-        captureRenderError(session, error, renderCountBefore);
+        captureRenderError(target, error, renderCountBefore);
 
         return;
     }
 
-    validateContainerRefs(session.container);
-    captureMissingInitialCommit(session, renderCountBefore);
+    validateContainerRefs(target.container);
+    captureMissingInitialCommit(target, renderCountBefore);
 }
 
-function flushElement(session: IntrospectionReconcilerSession, element: Readonly<React.ReactElement> | null): void {
-    session.options.diagnostics.run(function renderElementWithDiagnostics() {
-        renderWithDiagnostics(session, element);
+function createIntrospectionReconcilerSession(
+    runtime: IntrospectionRuntimeDependencies,
+    options: IntrospectionReconcilerRootOptions
+): IntrospectionReconcilerSession {
+    let renderCount = 0;
+    const waiters = createWaiterQueue();
+    const container = createHostContainer(
+        function publishSnapshot(snapshot) {
+            renderCount = snapshot.renderCount;
+            options.publish(snapshot);
+            waiters.settle();
+        },
+        function readNextRenderCount() {
+            return renderCount + 1;
+        },
+        {
+            generator: options.idGenerator,
+            prefix: options.idPrefix
+        },
+        options.refs
+    );
+    const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
+        return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
+    const target: SessionRenderTarget = {
+        container,
+        options,
+        readRenderCount() {
+            return renderCount;
+        }
+    };
+    const session: IntrospectionReconcilerSession = {
+        act(action) {
+            return options.diagnostics.run(function actWithDiagnostics() {
+                return actAndFlush(runtime, action);
+            });
+        },
+        readRenderCount: target.readRenderCount,
+        render(element) {
+            options.diagnostics.run(function renderElementWithDiagnostics() {
+                renderWithDiagnostics(target, element, function commitElement() {
+                    renderRootElement(runtime, root, element);
+                });
+            });
+        },
+        async waitForIdle() {
+            await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
+                await flushScheduledWork(runtime, root);
+                reconcilerRuntime.run(runtime, function flushWithRuntime() {
+                    renderer.flushPassiveEffects();
+                    waiters.settle();
+                });
+            });
+        },
+        async waitUntil(predicate) {
+            if (options.diagnostics.run(predicate)) {
+                return;
+            }
+
+            const waiting = waiters.wait(predicate);
+
+            await session.waitForIdle();
+
+            if (!options.diagnostics.run(predicate)) {
+                await waiting;
+            }
+        }
+    };
+
+    return session;
 }
 
-async function waitForRenderCountSession(session: IntrospectionReconcilerSession, count: number): Promise<void> {
-    return waitForSession(session, function didRenderCount() {
-        return session.state.readRenderCount() >= count;
+async function waitForRenderCount(session: IntrospectionReconcilerSession, count: number): Promise<void> {
+    return session.waitUntil(function didRenderCount() {
+        return session.readRenderCount() >= count;
     });
 }
 
@@ -456,30 +433,24 @@ function createIntrospectionReconcilerRoot(
 ): IntrospectionReconcilerRoot {
     const session = createIntrospectionReconcilerSession(runtime, options);
 
-    flushElement(session, options.element);
+    session.render(options.element);
 
     return {
-        act(action: () => unknown) {
-            return actSession(session, action);
-        },
+        act: session.act,
         unmount() {
-            flushElement(session, null);
+            session.render(null);
         },
         update(element: React.ReactElement) {
-            flushElement(session, element);
+            session.render(element);
         },
-        async waitForIdle() {
-            await waitForIdleSession(session);
-        },
+        waitForIdle: session.waitForIdle,
         async waitForNextRender() {
-            return waitForRenderCountSession(session, session.state.readRenderCount() + 1);
+            return waitForRenderCount(session, session.readRenderCount() + 1);
         },
         async waitForRenderCount(count: number) {
-            return waitForRenderCountSession(session, count);
+            return waitForRenderCount(session, count);
         },
-        async waitUntil(predicate: () => boolean) {
-            return waitForSession(session, predicate);
-        }
+        waitUntil: session.waitUntil
     };
 }
 
