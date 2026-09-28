@@ -51,11 +51,14 @@ function isPublicPropKey(key: PropertyKey): boolean {
         key !== introspectionElementKeyMetadata;
 }
 
-function publicProps(props: Readonly<Record<PropertyKey, unknown>>): Readonly<Record<PropertyKey, unknown>> {
+function filterProps(
+    props: Readonly<Record<PropertyKey, unknown>>,
+    isKept: (key: PropertyKey) => boolean
+): Record<PropertyKey, unknown> {
     const result: Record<PropertyKey, unknown> = {};
 
     for (const key of Reflect.ownKeys(props)) {
-        if (isPublicPropKey(key)) {
+        if (isKept(key)) {
             result[key] = props[key];
         }
     }
@@ -81,7 +84,7 @@ export function createComponentMetadata(request: ComponentMetadataRequest): Intr
         caughtError,
         givenChildren: props.children,
         key: element.key,
-        props: publicProps(props),
+        props: filterProps(props, isPublicPropKey),
         renderedReason,
         type: element.type
     };
@@ -162,15 +165,7 @@ export function readInternalHost(type: string, props: Readonly<Record<PropertyKe
 export function readPublicHostProps(
     props: Readonly<Record<PropertyKey, unknown>>
 ): Readonly<Record<PropertyKey, unknown>> {
-    const result: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        if (isPublicHostPropKey(key)) {
-            result[key] = props[key];
-        }
-    }
-
-    return Object.freeze(result);
+    return Object.freeze(filterProps(props, isPublicHostPropKey));
 }
 
 export function readHostKey(props: Readonly<Record<PropertyKey, unknown>>): string | null {
