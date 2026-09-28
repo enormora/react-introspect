@@ -157,20 +157,11 @@ function executeWrappedElement(
     return isForwardRefType(type) ? type.render(props, ref) : createOpaqueHost(type);
 }
 
-function executeElement(element: IntrospectionElement): React.ReactNode {
-    const { type } = element;
-    const props = readElementProps(element);
-
-    if (isFunctionComponent(type) && !isClassComponent(type)) {
-        return type(props);
-    }
-
-    return executeWrappedElement(type, props, readElementRef(element));
-}
-
 function executeIntrospectionFrameElement(element: IntrospectionElement): React.ReactNode {
     try {
-        return unwrapThenableNode(executeElement(element));
+        return unwrapThenableNode(
+            executeWrappedElement(element.type, readElementProps(element), readElementRef(element))
+        );
     } catch (error) {
         return throwIntrospectionRenderError(error);
     }
