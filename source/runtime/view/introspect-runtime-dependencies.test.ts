@@ -6,7 +6,6 @@ import type { Clock } from '@enormora/clock';
 import React from 'react';
 import type {
     IntrospectionActEnvironment,
-    IntrospectionBrowserEnvironment,
     IntrospectionMacrotasks,
     IntrospectionMicrotasks,
     IntrospectionRuntimeDependencies
@@ -87,19 +86,9 @@ const unitActEnvironment: IntrospectionActEnvironment = {
     }
 };
 
-const emptyBrowserEnvironment: IntrospectionBrowserEnvironment = {
-    readDocument() {
-        return undefined;
-    },
-    readWindow() {
-        return undefined;
-    }
-};
-
 export function createUnitRuntimeDependencies(): IntrospectionRuntimeDependencies {
     return {
         actEnvironment: unitActEnvironment,
-        browserEnvironment: emptyBrowserEnvironment,
         clock: createUnitClock(),
         macrotasks: schedulerMacrotasks,
         microtasks: createQueuedMicrotasks()
@@ -123,15 +112,11 @@ export const testNode = suite('introspection runtime dependencies', [
         scope.assert.deepEqual({
             currentMonotonicMicroseconds: runtime.clock.currentMonotonicMicroseconds,
             currentUnixEpochMicroseconds: runtime.clock.currentUnixEpochMicroseconds,
-            currentUnixEpochMilliseconds: runtime.clock.currentUnixEpochMilliseconds,
-            document: runtime.browserEnvironment.readDocument(),
-            window: runtime.browserEnvironment.readWindow()
+            currentUnixEpochMilliseconds: runtime.clock.currentUnixEpochMilliseconds
         }, {
             currentMonotonicMicroseconds: 0n,
             currentUnixEpochMicroseconds: 0n,
-            currentUnixEpochMilliseconds: 0,
-            document: undefined,
-            window: undefined
+            currentUnixEpochMilliseconds: 0
         });
         scope.assert.deepEqual(microtaskEvents, [ 'first', 'second' ]);
 
