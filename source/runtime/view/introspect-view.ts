@@ -16,11 +16,11 @@ import {
     findIntrospectionNodes,
     type SnapshotReader
 } from '../query/introspect-node.ts';
+import type { IntrospectionOptions } from '../../public/introspect-public-types.ts';
 import type { IntrospectionReconcilerModule } from '../../reconciler/root/introspect-reconciler.ts';
 import type {
     RuntimeIntrospectionList,
     RuntimeIntrospectionNode,
-    RuntimeIntrospectionOptions,
     RuntimeIntrospectionView
 } from '../types/introspect-runtime-types.ts';
 import {
@@ -29,12 +29,12 @@ import {
 
 type IntrospectionViewFactory = (
     element: React.ReactElement,
-    options: RuntimeIntrospectionOptions
+    options: IntrospectionOptions
 ) => RuntimeIntrospectionView;
 
 export type IntrospectionViewModule = {
     readonly createView: IntrospectionViewFactory;
-    readonly preconfigure: (defaults: RuntimeIntrospectionOptions) => IntrospectionViewFactory;
+    readonly preconfigure: (defaults: IntrospectionOptions) => IntrospectionViewFactory;
 };
 
 export type IntrospectionViewModuleDependencies = {
@@ -53,7 +53,7 @@ const createDefaultIdPrefix = (function createDefaultIdPrefixFactory() {
     };
 })();
 
-function diagnosticsOptions(options: RuntimeIntrospectionOptions): IntrospectionDiagnosticsOptions {
+function diagnosticsOptions(options: IntrospectionOptions): IntrospectionDiagnosticsOptions {
     return {
         errorMode: options.errorMode ?? 'capture',
         warningMode: options.warningMode ?? 'throw'
@@ -62,7 +62,7 @@ function diagnosticsOptions(options: RuntimeIntrospectionOptions): Introspection
 
 function createIntrospectionViewWithDependencies(
     element: React.ReactElement,
-    options: RuntimeIntrospectionOptions,
+    options: IntrospectionOptions,
     dependencies: IntrospectionViewModuleDependencies
 ): RuntimeIntrospectionView {
     let currentSnapshot = createEmptyIntrospectionSnapshot(0);

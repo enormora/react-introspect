@@ -3,7 +3,6 @@ import type {
     IntrospectionNodeKind,
     IntrospectionNodeState,
     IntrospectionNotRenderedReason,
-    IntrospectionOptions,
     IntrospectionRenderControl,
     IntrospectionSendEvent,
     IntrospectionWarning
@@ -86,5 +85,3 @@ export type RuntimeIntrospectionView = IntrospectionRenderControl & {
     readonly locate: (selector: unknown) => RuntimeIntrospectionLocator;
     readonly locateAll: (selector: unknown) => RuntimeNodeSequence;
 };
-
-export type RuntimeIntrospectionOptions = IntrospectionOptions;

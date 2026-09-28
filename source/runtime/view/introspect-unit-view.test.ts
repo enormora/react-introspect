@@ -1,11 +1,9 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
+import type { IntrospectionOptions } from '../../public/introspect-public-types.ts';
 import { createIntrospectionReconcilerModule } from '../../reconciler/root/introspect-reconciler.ts';
-import type {
-    RuntimeIntrospectionOptions,
-    RuntimeIntrospectionView
-} from '../types/introspect-runtime-types.ts';
+import type { RuntimeIntrospectionView } from '../types/introspect-runtime-types.ts';
 import type { IntrospectionRuntimeDependencies } from './introspect-runtime-dependencies-types.ts';
 import { createUnitRuntimeDependencies } from './introspect-runtime-dependencies.test.ts';
 import { createIntrospectionViewModule, type IntrospectionViewModule } from './introspect-view.ts';
@@ -27,7 +25,7 @@ export function createUnitIntrospectionViewModule(): IntrospectionViewModule {
 
 export function createUnitIntrospectionView(
     element: React.ReactElement,
-    options: RuntimeIntrospectionOptions = {},
+    options: IntrospectionOptions = {},
     consoleDiagnostics: IntrospectionConsoleDiagnostics = isolatedConsoleDiagnostics,
     runtimeDependencies: IntrospectionRuntimeDependencies = createUnitRuntimeDependencies()
 ): RuntimeIntrospectionView {
