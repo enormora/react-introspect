@@ -313,16 +313,8 @@ async function withDeadline<Result>(
     }
 }
 
-async function waitForOutcome(
-    waiter: WaiterHandle,
-    flushUntilIdle: () => Promise<void>,
-    isSatisfied: () => boolean
-): Promise<WaiterOutcome> {
+async function waitForOutcome(waiter: WaiterHandle, flushUntilIdle: () => Promise<void>): Promise<WaiterOutcome> {
     await flushUntilIdle();
-
-    if (isSatisfied()) {
-        return { kind: 'satisfied' };
-    }
 
     return waiter.settled;
 }
@@ -502,9 +494,7 @@ function createIntrospectionReconcilerSession(
             }
 
             const waiter = waiters.wait(predicate);
-            const outcome = waitForOutcome(waiter, flushUntilIdle, function isSatisfied() {
-                return options.diagnostics.run(predicate);
-            });
+            const outcome = waitForOutcome(waiter, flushUntilIdle);
 
             await awaitWaiter(waiter, withDeadline(runtime.clock, options.waitTimeout, operation, outcome));
         }
