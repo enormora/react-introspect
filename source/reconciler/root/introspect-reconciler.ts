@@ -174,11 +174,6 @@ function createIntrospectionReconcilerHostConfig(reconcilerRuntime: Introspectio
     };
 }
 
-type IntrospectionReconcilerModuleState = {
-    readonly reconcilerRuntime: IntrospectionReconcilerRuntime;
-    readonly runtime: IntrospectionRuntimeDependencies;
-};
-
 const reconcilerRuntime = createIntrospectionReconcilerRuntime();
 const renderer = createReconciler(createIntrospectionReconcilerHostConfig(reconcilerRuntime));
 
@@ -211,9 +206,9 @@ type IntrospectionReconcilerState = {
 
 type IntrospectionReconcilerSession = {
     readonly container: IntrospectionHostContainer;
-    readonly moduleState: IntrospectionReconcilerModuleState;
     readonly options: IntrospectionReconcilerRootOptions;
     readonly root: Readonly<Record<string, unknown>>;
+    readonly runtime: IntrospectionRuntimeDependencies;
     readonly state: IntrospectionReconcilerState;
 };
 
@@ -255,7 +250,7 @@ function createSessionContainer(
 }
 
 function createIntrospectionReconcilerSession(
-    moduleState: IntrospectionReconcilerModuleState,
+    runtime: IntrospectionRuntimeDependencies,
     options: IntrospectionReconcilerRootOptions
 ): IntrospectionReconcilerSession {
     let renderCount = 0;
@@ -275,23 +270,23 @@ function createIntrospectionReconcilerSession(
         }
     };
     const container = createSessionContainer(options, state);
-    const root = moduleState.reconcilerRuntime.run(moduleState.runtime, function createContainerWithRuntime() {
+    const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
         return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
 
     return {
         container,
-        moduleState,
         options,
         root,
+        runtime,
         state
     };
 }
 
 function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
     return session.options.diagnostics.run(function actWithDiagnostics() {
-        return session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function actWithRuntime() {
-            return session.moduleState.runtime.actEnvironment.act(function runAction() {
+        return reconcilerRuntime.run(session.runtime, function actWithRuntime() {
+            return session.runtime.actEnvironment.act(function runAction() {
                 const result = action();
 
                 renderer.flushSyncWork();
@@ -310,10 +305,10 @@ function hasScheduledRootTask(session: IntrospectionReconcilerSession): boolean 
 }
 
 async function flushMicrotasks(session: IntrospectionReconcilerSession): Promise<void> {
-    await session.moduleState.reconcilerRuntime.run(
-        session.moduleState.runtime,
+    await reconcilerRuntime.run(
+        session.runtime,
         async function flushMicrotasksWithRuntime() {
-            await session.moduleState.runtime.microtasks.flush();
+            await session.runtime.microtasks.flush();
         }
     );
 }
@@ -322,7 +317,7 @@ async function flushScheduledWork(session: IntrospectionReconcilerSession): Prom
     await flushMicrotasks(session);
 
     do {
-        await session.moduleState.runtime.macrotasks.waitForNext();
+        await session.runtime.macrotasks.waitForNext();
         await flushMicrotasks(session);
     } while (hasScheduledRootTask(session));
 }
@@ -330,7 +325,7 @@ async function flushScheduledWork(session: IntrospectionReconcilerSession): Prom
 async function waitForIdleSession(session: IntrospectionReconcilerSession): Promise<void> {
     await session.options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
         await flushScheduledWork(session);
-        session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function flushWithRuntime() {
+        reconcilerRuntime.run(session.runtime, function flushWithRuntime() {
             renderer.flushPassiveEffects();
             settleWaiters(session.state);
         });
@@ -417,8 +412,8 @@ function renderRootElement(
     session: IntrospectionReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
-    session.moduleState.reconcilerRuntime.run(session.moduleState.runtime, function renderWithRuntime() {
-        session.moduleState.runtime.actEnvironment.act(function renderElement() {
+    reconcilerRuntime.run(session.runtime, function renderWithRuntime() {
+        session.runtime.actEnvironment.act(function renderElement() {
             updateRootElement(session, element);
             renderer.flushSyncWork();
             renderer.flushPassiveEffects();
@@ -467,10 +462,10 @@ async function waitForRenderCountSession(session: IntrospectionReconcilerSession
 }
 
 function createIntrospectionReconcilerRoot(
-    moduleState: IntrospectionReconcilerModuleState,
+    runtime: IntrospectionRuntimeDependencies,
     options: IntrospectionReconcilerRootOptions
 ): IntrospectionReconcilerRoot {
-    const session = createIntrospectionReconcilerSession(moduleState, options);
+    const session = createIntrospectionReconcilerSession(runtime, options);
 
     flushElement(session, options.element);
 
@@ -502,16 +497,11 @@ function createIntrospectionReconcilerRoot(
 export function createIntrospectionReconcilerModule(
     dependencies: IntrospectionReconcilerModuleDependencies
 ): IntrospectionReconcilerModule {
-    const moduleState = {
-        reconcilerRuntime,
-        runtime: dependencies.runtime
-    };
-
     reconcilerRuntime.makeDefault(dependencies.runtime);
 
     return {
         createRoot(options) {
-            return createIntrospectionReconcilerRoot(moduleState, options);
+            return createIntrospectionReconcilerRoot(dependencies.runtime, options);
         }
     };
 }
