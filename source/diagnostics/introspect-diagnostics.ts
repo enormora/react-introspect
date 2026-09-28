@@ -67,7 +67,7 @@ function isReactDiagnosticMessage(message: readonly unknown[]): boolean {
 }
 
 function toConsoleMessage(value: unknown): readonly unknown[] {
-    return Array.isArray(value) ? value : Object.freeze([ value ]);
+    return Array.isArray(value) ? value : [ value ];
 }
 
 function recordIntrospectionConsoleDiagnostic(message: unknown): void {
@@ -151,7 +151,7 @@ export function createIntrospectionDiagnostics(
         }
     };
 
-    return Object.freeze({
+    return {
         get caughtErrors() {
             return caughtErrors;
         },
@@ -194,5 +194,5 @@ export function createIntrospectionDiagnostics(
                 return result;
             });
         }
-    });
+    };
 }

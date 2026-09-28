@@ -3,14 +3,14 @@ import type { RuntimeIntrospectionNode } from '../types/introspect-runtime-types
 import { matchesTargetCriteria } from '../../matching/introspect-target-criteria.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
 
-const selectorFields = Object.freeze([
+const selectorFields = [
     'has',
     'key',
     'props',
     'textContent',
     'type',
     'where'
-]);
+];
 
 function isSelectorObject(value: unknown): value is IntrospectionSelector {
     return isObject(value) && !Object.hasOwn(value, '$$typeof') &&

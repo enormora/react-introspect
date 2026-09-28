@@ -6,19 +6,19 @@ export type NodeDiagnosticsChannel = {
     readonly subscribe: (name: string, record: ConsoleDiagnosticRecorder) => void;
 };
 
-const consoleDiagnosticChannels = Object.freeze([
+const consoleDiagnosticChannels = [
     'console.error',
     'console.warn'
-]);
+];
 
 export function createNodeConsoleDiagnostics(
     diagnosticsChannel: NodeDiagnosticsChannel
 ): IntrospectionConsoleDiagnostics {
-    return Object.freeze({
+    return {
         subscribe(record) {
             for (const channelName of consoleDiagnosticChannels) {
                 diagnosticsChannel.subscribe(channelName, record);
             }
         }
-    });
+    };
 }

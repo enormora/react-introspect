@@ -176,7 +176,7 @@ function createIntrospectionViewWithDependencies(
 export function createIntrospectionViewModule(
     dependencies: IntrospectionViewModuleDependencies
 ): IntrospectionViewModule {
-    return Object.freeze({
+    return {
         createView(element, options) {
             return createIntrospectionViewWithDependencies(element, options, dependencies);
         },
@@ -185,5 +185,5 @@ export function createIntrospectionViewModule(
                 return createIntrospectionViewWithDependencies(element, { ...defaults, ...options }, dependencies);
             };
         }
-    });
+    };
 }

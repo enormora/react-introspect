@@ -260,7 +260,7 @@ function createIntrospectionReconcilerSession(
 ): IntrospectionReconcilerSession {
     let renderCount = 0;
     let waiters: readonly Waiter[] = [];
-    const state = Object.freeze({
+    const state = {
         readRenderCount() {
             return renderCount;
         },
@@ -273,19 +273,19 @@ function createIntrospectionReconcilerSession(
         writeWaiters(nextWaiters: readonly Waiter[]) {
             waiters = nextWaiters;
         }
-    });
+    };
     const container = createSessionContainer(options, state);
     const root = moduleState.reconcilerRuntime.run(moduleState.runtime, function createContainerWithRuntime() {
         return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
 
-    return Object.freeze({
+    return {
         container,
         moduleState,
         options,
         root,
         state
-    });
+    };
 }
 
 function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
@@ -474,7 +474,7 @@ function createIntrospectionReconcilerRoot(
 
     flushElement(session, options.element);
 
-    return Object.freeze({
+    return {
         act(action: () => unknown) {
             return actSession(session, action);
         },
@@ -496,22 +496,22 @@ function createIntrospectionReconcilerRoot(
         async waitUntil(predicate: () => boolean) {
             return waitForSession(session, predicate);
         }
-    });
+    };
 }
 
 export function createIntrospectionReconcilerModule(
     dependencies: IntrospectionReconcilerModuleDependencies
 ): IntrospectionReconcilerModule {
-    const moduleState = Object.freeze({
+    const moduleState = {
         reconcilerRuntime,
         runtime: dependencies.runtime
-    });
+    };
 
     reconcilerRuntime.makeDefault(dependencies.runtime);
 
-    return Object.freeze({
+    return {
         createRoot(options) {
             return createIntrospectionReconcilerRoot(moduleState, options);
         }
-    });
+    };
 }

@@ -232,12 +232,12 @@ const IntrospectionClassFrameBase = class
         this.committedRender = undefined;
         this.renderPass = undefined;
         this.shouldForceRender = false;
-        this.state = Object.freeze({
+        this.state = {
             boundaryErrorCause: undefined,
             hasUnfoldedBoundaryError: false,
             isAwaitingCatchRecovery: false,
             userState: instance.state
-        });
+        };
         this.userInstance = instance;
     }
 
@@ -340,15 +340,15 @@ const IntrospectionClassFrameBase = class
         assignClassField(this.userInstance, 'props', props);
         assignClassField(this.userInstance, 'state', state);
 
-        return Object.freeze({
-            next: Object.freeze({
+        return {
+            next: {
                 node: shouldCommit ? this.renderUserOutput() : previous.node,
                 props,
                 state
-            }),
+            },
             previous,
             shouldCommit
-        });
+        };
     }
 
     protected renderUserOutput(): IntrospectionTransformedNode {

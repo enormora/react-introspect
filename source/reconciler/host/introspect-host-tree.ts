@@ -63,12 +63,12 @@ export type IntrospectionHostContext = {
     readonly refs: IntrospectionRefs | undefined;
 };
 
-const internalHostTypes = Object.freeze([
+const internalHostTypes = new Set([
     introspectionComponentHostType,
     introspectionEmptyHostType,
     introspectionOpaqueHostType
 ]);
-const introspectionComponentMetadataKeys = Object.freeze([
+const introspectionComponentMetadataKeys = [
     'activityMode',
     'caughtError',
     'givenChildren',
@@ -76,20 +76,20 @@ const introspectionComponentMetadataKeys = Object.freeze([
     'props',
     'renderedReason',
     'type'
-]);
+];
 const parentByChild = new WeakMap<IntrospectionHostChild, IntrospectionHostParent>();
 
 function createChildStore(): IntrospectionChildStore {
     let currentChildren: readonly IntrospectionHostChild[] = [];
 
-    return Object.freeze({
+    return {
         readChildren() {
             return currentChildren;
         },
         writeChildren(children: readonly IntrospectionHostChild[]) {
             currentChildren = children;
         }
-    });
+    };
 }
 
 function isPublicHostPropKey(key: PropertyKey): boolean {
@@ -142,22 +142,22 @@ function readComponentMetadata(instance: IntrospectionHostInstance): Introspecti
     const value = instance.readProps()[introspectionComponentMetadata];
 
     if (!isIntrospectionComponentMetadata(value)) {
-        return Object.freeze({
+        return {
             activityMode: undefined,
             caughtError: undefined,
             givenChildren: undefined,
             key: null,
-            props: Object.freeze({}),
+            props: {},
             renderedReason: 'unsupported',
             type: introspectionComponentHostType
-        });
+        };
     }
 
     return value;
 }
 
 function isIntrospectionInternalHostType(type: string): boolean {
-    return internalHostTypes.includes(type);
+    return internalHostTypes.has(type);
 }
 
 function toRefTarget(type: string, props: IntrospectionHostProps): IntrospectionRefHostTarget {
@@ -183,7 +183,7 @@ function resolvePublicInstance(
 
 function collectRefTargets(child: IntrospectionHostChild): readonly IntrospectionRefHostTarget[] {
     if (isTextInstance(child)) {
-        return Object.freeze([]);
+        return [];
     }
 
     const childTargets = child.readChildren().flatMap(collectRefTargets);
@@ -192,10 +192,10 @@ function collectRefTargets(child: IntrospectionHostChild): readonly Introspectio
         return childTargets;
     }
 
-    return Object.freeze([
+    return [
         toRefTarget(child.type, child.readProps()),
         ...childTargets
-    ]);
+    ];
 }
 
 export function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
@@ -287,7 +287,7 @@ export function createHostContainer(
 ): IntrospectionHostContainer {
     let mounted = true;
 
-    return Object.freeze({
+    return {
         ...createChildStore(),
         publish,
         readIdNormalization() {
@@ -303,7 +303,7 @@ export function createHostContainer(
         writeMounted(nextMounted: boolean) {
             mounted = nextMounted;
         }
-    });
+    };
 }
 
 export function createHostInstance(
@@ -316,7 +316,7 @@ export function createHostInstance(
     let currentPublicInstance = resolvePublicInstance(context.refs, type, props);
     let currentVisibility: 'hidden' | 'visible' = 'visible';
 
-    return Object.freeze({
+    return {
         ...createChildStore(),
         readProps() {
             return currentProps;
@@ -337,14 +337,14 @@ export function createHostInstance(
         writeProps(nextProps: IntrospectionHostProps) {
             currentProps = nextProps;
         }
-    });
+    };
 }
 
 export function createTextInstance(text: string): IntrospectionTextInstance {
     let currentText = text;
     let currentVisibility: 'hidden' | 'visible' = 'visible';
 
-    return Object.freeze({
+    return {
         readText() {
             return currentText;
         },
@@ -357,7 +357,7 @@ export function createTextInstance(text: string): IntrospectionTextInstance {
         writeText(nextText: string) {
             currentText = nextText;
         }
-    });
+    };
 }
 
 export function getChildHostContext(context: IntrospectionHostContext): IntrospectionHostContext {
@@ -365,7 +365,7 @@ export function getChildHostContext(context: IntrospectionHostContext): Introspe
 }
 
 export function getRootHostContext(container: IntrospectionHostContainer): IntrospectionHostContext {
-    return Object.freeze({ refs: container.readRefs() });
+    return { refs: container.readRefs() };
 }
 
 export function insertBefore(

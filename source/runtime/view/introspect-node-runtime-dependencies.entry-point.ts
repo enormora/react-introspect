@@ -11,16 +11,16 @@ import type {
 
 const reactActEnvironmentKey = 'IS_REACT_ACT_ENVIRONMENT';
 
-const realBrowserEnvironment: IntrospectionBrowserEnvironment = Object.freeze({
+const realBrowserEnvironment: IntrospectionBrowserEnvironment = {
     readDocument() {
         return Reflect.get(globalThis, 'document') as unknown;
     },
     readWindow() {
         return Reflect.get(globalThis, 'window') as unknown;
     }
-});
+};
 
-const realActEnvironment: IntrospectionActEnvironment = Object.freeze({
+const realActEnvironment: IntrospectionActEnvironment = {
     act(action) {
         const results = new Set<unknown>();
         const hadActEnvironment = Object.hasOwn(globalThis, reactActEnvironmentKey);
@@ -42,31 +42,31 @@ const realActEnvironment: IntrospectionActEnvironment = Object.freeze({
 
         return results.values().next().value;
     }
-});
+};
 
-const realMacrotasks: IntrospectionMacrotasks = Object.freeze({
+const realMacrotasks: IntrospectionMacrotasks = {
     async waitForNext() {
         await timersPromises.setImmediate();
     }
-});
+};
 
-const realMicrotasks: IntrospectionMicrotasks = Object.freeze({
+const realMicrotasks: IntrospectionMicrotasks = {
     async flush() {
         await Promise.resolve();
     },
     schedule(action) {
         queueMicrotask(action);
     }
-});
+};
 
 const createNodeClock: () => IntrospectionRuntimeDependencies['clock'] = createClock;
 
 export function createNodeRuntimeDependencies(): IntrospectionRuntimeDependencies {
-    return Object.freeze({
+    return {
         actEnvironment: realActEnvironment,
         browserEnvironment: realBrowserEnvironment,
         clock: createNodeClock(),
         macrotasks: realMacrotasks,
         microtasks: realMicrotasks
-    });
+    };
 }
