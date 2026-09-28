@@ -114,7 +114,7 @@ function createExternalStore(initialValue: string): ExternalStore {
     let value = initialValue;
     const listeners = new Set<() => void>();
 
-    return Object.freeze({
+    return {
         read() {
             return value;
         },
@@ -132,7 +132,7 @@ function createExternalStore(initialValue: string): ExternalStore {
                 listener();
             }
         }
-    });
+    };
 }
 
 function TransitionStoreReader(props: StoreReaderProps): React.ReactNode {

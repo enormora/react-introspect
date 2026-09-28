@@ -38,23 +38,23 @@ function ThrowingComponent(): React.ReactNode {
 }
 
 function createConsoleDiagnosticPublisher(): ConsoleDiagnosticPublisher {
-    let records: readonly ((message: unknown) => void)[] = Object.freeze([]);
+    let records: readonly ((message: unknown) => void)[] = [];
 
-    return Object.freeze({
+    return {
         publish(message) {
             for (const record of records) {
                 record(message);
             }
         },
-        source: Object.freeze({
+        source: {
             subscribe(record: (message: unknown) => void) {
-                records = Object.freeze([
+                records = [
                     ...records,
                     record
-                ]);
+                ];
             }
-        })
-    });
+        }
+    };
 }
 
 function createDiagnostics(
@@ -169,15 +169,15 @@ export const testNode = suite('diagnostics', [
         return scope.assert.collect();
     }),
     test('subscribes the Node console diagnostic channels', function (scope) {
-        let subscriptions: readonly NodeConsoleSubscription[] = Object.freeze([]);
-        const consoleDiagnostics = createNodeConsoleDiagnostics(Object.freeze({
+        let subscriptions: readonly NodeConsoleSubscription[] = [];
+        const consoleDiagnostics = createNodeConsoleDiagnostics({
             subscribe(name: string, record: (message: unknown) => void) {
-                subscriptions = Object.freeze([
+                subscriptions = [
                     ...subscriptions,
                     [ name, record ]
-                ]);
+                ];
             }
-        }));
+        });
         const messages = recordSink<readonly [kind: 'message', message: unknown]>(function subscribe(record) {
             consoleDiagnostics.subscribe(function recordMessage(message) {
                 record('message', message);

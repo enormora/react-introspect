@@ -107,7 +107,7 @@ function kindCounts(nodes: readonly SnapshotNode[]): Readonly<Record<SnapshotNod
         counts[node.kind] += 1;
     }
 
-    return Object.freeze(counts);
+    return counts;
 }
 
 function uniqueNodeIds(nodes: readonly SnapshotNode[]): number {

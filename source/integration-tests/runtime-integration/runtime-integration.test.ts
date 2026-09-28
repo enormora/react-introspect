@@ -101,7 +101,7 @@ function createSuspenseResource(): SuspenseResource {
         resolvePromise = resolve;
     });
 
-    return Object.freeze({
+    return {
         error: new SuspenseThenableError(promise),
         readReady() {
             return ready;
@@ -110,7 +110,7 @@ function createSuspenseResource(): SuspenseResource {
             ready = true;
             resolvePromise();
         }
-    });
+    };
 }
 
 async function actAsync(action: () => void): Promise<void> {
@@ -177,10 +177,10 @@ function startWaitingForIdle(view: IntrospectionView): IdleProgress {
 function waitForRetry(view: IntrospectionView): PendingRetry {
     const renderCount = view.renderCount + 1;
 
-    return Object.freeze({
+    return {
         renderCount,
         wait: view.waitForRenderCount(renderCount)
-    });
+    };
 }
 
 type ParallelLoaderView = {
@@ -211,7 +211,7 @@ function introspectWithDelayedLoader(label: string, delayInMilliseconds: number)
         { depth: 'full', strictMode: false }
     );
 
-    return Object.freeze({ loading, view });
+    return { loading, view };
 }
 
 export const testNode = suite('runtime integration', [
