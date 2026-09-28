@@ -1,10 +1,16 @@
 import React from 'react';
+import type { IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import type {
-    ElementChildrenState,
     SnapshotNode,
     SnapshotNodeKind,
     SnapshotProps
 } from '../model/introspect-snapshot-contract.ts';
+
+export type ElementChildrenState = {
+    readonly renderedChildren: readonly SnapshotNode[];
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+    readonly textContent: string;
+};
 
 const reactWrapperNames = new Map<unknown, string>([
     [ Symbol.for('react.activity'), 'Activity' ],

@@ -15,29 +15,87 @@ import {
 } from '../shape/introspect-snapshot-shape.ts';
 import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kinds.ts';
 import {
-    type ChildSnapshotsRequest,
-    type ChildSnapshotsResult,
-    type ElementNodeRequest,
     type IntrospectionSnapshot,
-    type NodeIdAllocation,
-    type PropsSnapshotRequest,
-    type PropsSnapshotResult,
     registerSnapshotNode,
-    type SnapshotBuild,
-    type SnapshotChildPlacement,
     type SnapshotNode,
-    type SnapshotNodeRequest,
-    type SnapshotNodeResult,
     type SnapshotProps,
     type SnapshotSourceElement,
     type SnapshotSourceNode,
-    type SnapshotVisibility,
-    type SourceChildSnapshotsRequest,
-    type SourceElementChildrenRequest,
-    type SourceElementNodeRequest,
-    type SourceElementRenderedChildrenRequest,
-    type SourceSnapshotNodeRequest
+    type SnapshotVisibility
 } from './introspect-snapshot-contract.ts';
+
+type SnapshotBuild = {
+    readonly nextId: number;
+    readonly nodes: readonly SnapshotNode[];
+    readonly normalizeIdString: (value: string) => string;
+    readonly valueAncestors: WeakSet<WeakKey>;
+};
+
+type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: number; };
+
+type SnapshotChildPlacement = {
+    readonly build: SnapshotBuild;
+    readonly inheritedVisibility: SnapshotVisibility;
+    readonly parentId: number | undefined;
+    readonly parentPath: string;
+};
+
+type SnapshotNodeRequest = SnapshotChildPlacement & {
+    readonly index: number | string;
+    readonly node: unknown;
+};
+
+type ElementNodeRequest = SnapshotNodeRequest & {
+    readonly element: React.ReactElement<SnapshotProps>;
+};
+
+type SourceElementNodeRequest = SnapshotNodeRequest & {
+    readonly element: SnapshotSourceElement;
+};
+
+type ChildSnapshotsRequest = SnapshotChildPlacement & {
+    readonly children: unknown;
+};
+
+type SourceChildSnapshotsRequest = SnapshotChildPlacement & {
+    readonly children: readonly SnapshotSourceNode[];
+};
+
+type SourceSnapshotNodeRequest = SnapshotNodeRequest & {
+    readonly node: SnapshotSourceNode;
+};
+
+type SourceElementChildrenRequest = SnapshotChildPlacement & {
+    readonly element: SnapshotSourceElement;
+    readonly parentId: number;
+};
+
+type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest & {
+    readonly givenChildrenResult: ChildSnapshotsResult;
+};
+
+type PropsSnapshotRequest = {
+    readonly build: SnapshotBuild;
+    readonly inheritedVisibility: SnapshotVisibility;
+    readonly ownerId: number;
+    readonly ownerPath: string;
+    readonly props: SnapshotProps;
+};
+
+type PropsSnapshotResult = {
+    readonly build: SnapshotBuild;
+    readonly props: SnapshotProps;
+};
+
+type SnapshotNodeResult = {
+    readonly build: SnapshotBuild;
+    readonly node: SnapshotNode;
+};
+
+type ChildSnapshotsResult = {
+    readonly build: SnapshotBuild;
+    readonly nodes: readonly SnapshotNode[];
+};
 
 function visibilityFromSource(
     inheritedVisibility: SnapshotVisibility,
