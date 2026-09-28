@@ -1,4 +1,4 @@
-import React from 'react';
+import { classifyElementType, type ReactElementKind } from '../../values/introspect-react-element-kind.ts';
 import type { IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import type {
     SnapshotNode,
@@ -12,17 +12,26 @@ export type ElementChildrenState = {
     readonly textContent: string;
 };
 
-const reactWrapperNames = new Map<unknown, string>([
-    [ Symbol.for('react.activity'), 'Activity' ],
-    [ Symbol.for('react.view_transition'), 'ViewTransition' ]
-]);
-
 type NamedFunction = {
     readonly name: string;
 };
 
+const builtInTypeNames: Readonly<Record<Exclude<ReactElementKind['kind'], 'function' | 'host'>, string>> = {
+    activity: 'Activity',
+    context: 'Component',
+    forwardRef: 'Component',
+    fragment: 'Fragment',
+    lazy: 'Component',
+    memo: 'Component',
+    other: 'Component',
+    suspense: 'Component',
+    viewTransition: 'ViewTransition'
+};
+
 function rendersOwnChildren(type: unknown): boolean {
-    return typeof type === 'string' || type === React.Fragment;
+    const { kind } = classifyElementType(type);
+
+    return kind === 'host' || kind === 'fragment';
 }
 
 export function getTextContent(nodes: readonly SnapshotNode[]): string {
@@ -54,11 +63,9 @@ export function getElementChildrenState(type: unknown, children: readonly Snapsh
 }
 
 export function getElementKind(type: unknown): SnapshotNodeKind {
-    if (typeof type === 'string') {
-        return 'host';
-    }
+    const { kind } = classifyElementType(type);
 
-    return type === React.Fragment ? 'fragment' : 'component';
+    return kind === 'host' || kind === 'fragment' ? kind : 'component';
 }
 
 export function getIndexedPath(parentPath: string, index: number | string, name: string): string {
@@ -72,15 +79,13 @@ function getFunctionTypeName(type: NamedFunction): string {
 }
 
 export function getTypeName(type: unknown): string {
-    if (typeof type === 'string') {
-        return type;
+    const elementKind = classifyElementType(type);
+
+    if (elementKind.kind === 'host') {
+        return elementKind.name;
     }
 
-    const wrapperName = reactWrapperNames.get(type);
-
-    if (wrapperName !== undefined || type === React.Fragment) {
-        return wrapperName ?? 'Fragment';
-    }
-
-    return typeof type === 'function' ? getFunctionTypeName(type) : 'Component';
+    return elementKind.kind === 'function'
+        ? getFunctionTypeName(elementKind.component)
+        : builtInTypeNames[elementKind.kind];
 }
