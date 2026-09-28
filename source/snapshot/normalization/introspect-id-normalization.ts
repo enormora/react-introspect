@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-    createUnsupportedReactValueError,
-    isReactPortalValue
-} from '../../render/frame/introspect-unsupported-react.ts';
+import { assertNotPortal } from '../../render/frame/introspect-unsupported-react.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 export type IntrospectionIdNormalization = {
@@ -126,9 +123,7 @@ const snapshotValueNormalizer = {
             return snapshotValueNormalizer.normalizeArray(value, state, location);
         }
 
-        if (isReactPortalValue(value)) {
-            throw createUnsupportedReactValueError();
-        }
+        assertNotPortal(value);
 
         if (React.isValidElement<Readonly<Record<PropertyKey, unknown>>>(value)) {
             return state.describeElement(value, location, function normalizeElementProps() {

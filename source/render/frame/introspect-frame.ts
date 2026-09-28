@@ -19,7 +19,7 @@ import {
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
-import { createUnsupportedReactValueError, isReactPortalValue } from './introspect-unsupported-react.ts';
+import { assertNotPortal } from './introspect-unsupported-react.ts';
 
 type IntrospectionFrameProps = {
     readonly createFrameElement: IntrospectionFrameElementFactory;
@@ -339,9 +339,7 @@ function transformNode(
     depth: IntrospectionFrameDepth,
     frameFactory: IntrospectionFrameElementFactory
 ): IntrospectionTransformedNode {
-    if (isReactPortalValue(node)) {
-        throw createUnsupportedReactValueError();
-    }
+    assertNotPortal(node);
 
     const primitiveNode = transformPrimitiveNode(node);
 
@@ -398,9 +396,7 @@ export function createIntrospectionRenderElement(
     element: React.ReactElement,
     depth: IntrospectionFrameDepth
 ): React.ReactElement {
-    if (isReactPortalValue(element)) {
-        throw createUnsupportedReactValueError();
-    }
+    assertNotPortal(element);
 
     return transformElement(createIntrospectionElement(element), depth, transformNode, createFrameElement);
 }
