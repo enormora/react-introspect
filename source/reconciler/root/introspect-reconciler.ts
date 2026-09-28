@@ -199,9 +199,12 @@ function createReconcilerContainer(
 
 type IntrospectionReconcilerState = {
     readonly readRenderCount: () => number;
-    readonly readWaiters: () => readonly Waiter[];
     readonly writeRenderCount: (count: number) => void;
-    readonly writeWaiters: (waiters: readonly Waiter[]) => void;
+};
+
+type WaiterQueue = {
+    readonly settle: () => void;
+    readonly wait: (predicate: () => boolean) => Promise<void>;
 };
 
 type IntrospectionReconcilerSession = {
@@ -210,33 +213,48 @@ type IntrospectionReconcilerSession = {
     readonly root: Readonly<Record<string, unknown>>;
     readonly runtime: IntrospectionRuntimeDependencies;
     readonly state: IntrospectionReconcilerState;
+    readonly waiters: WaiterQueue;
 };
 
-function settleWaiters(sessionState: IntrospectionReconcilerState): void {
-    const settledWaiters = sessionState.readWaiters().filter(function isSettled(waiter) {
-        return waiter.predicate();
-    });
+function createWaiterQueue(): WaiterQueue {
+    const waiters = new Set<Waiter>();
 
-    for (const waiter of settledWaiters) {
-        sessionState.writeWaiters(
-            sessionState.readWaiters().toSpliced(
-                sessionState.readWaiters().indexOf(waiter),
-                1
-            )
-        );
-        waiter.resolve();
-    }
+    return {
+        settle() {
+            const settledWaiters = Array.from(waiters).filter(function isSettled(waiter) {
+                return waiter.predicate();
+            });
+
+            for (const waiter of settledWaiters) {
+                waiters.delete(waiter);
+                waiter.resolve();
+            }
+        },
+        async wait(predicate) {
+            const { promise, resolve } = Promise.withResolvers<undefined>();
+
+            waiters.add({
+                predicate,
+                resolve() {
+                    resolve(undefined);
+                }
+            });
+
+            return promise;
+        }
+    };
 }
 
 function createSessionContainer(
     options: IntrospectionReconcilerRootOptions,
-    state: IntrospectionReconcilerState
+    state: IntrospectionReconcilerState,
+    waiters: WaiterQueue
 ): IntrospectionHostContainer {
     return createHostContainer(
         function publishSnapshot(snapshot) {
             state.writeRenderCount(snapshot.renderCount);
             options.publish(snapshot);
-            settleWaiters(state);
+            waiters.settle();
         },
         function readNextRenderCount() {
             return state.readRenderCount() + 1;
@@ -254,22 +272,16 @@ function createIntrospectionReconcilerSession(
     options: IntrospectionReconcilerRootOptions
 ): IntrospectionReconcilerSession {
     let renderCount = 0;
-    let waiters: readonly Waiter[] = [];
     const state = {
         readRenderCount() {
             return renderCount;
         },
-        readWaiters() {
-            return waiters;
-        },
         writeRenderCount(count: number) {
             renderCount = count;
-        },
-        writeWaiters(nextWaiters: readonly Waiter[]) {
-            waiters = nextWaiters;
         }
     };
-    const container = createSessionContainer(options, state);
+    const waiters = createWaiterQueue();
+    const container = createSessionContainer(options, state, waiters);
     const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
         return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
@@ -279,7 +291,8 @@ function createIntrospectionReconcilerSession(
         options,
         root,
         runtime,
-        state
+        state,
+        waiters
     };
 }
 
@@ -331,7 +344,7 @@ async function waitForIdleSession(session: IntrospectionReconcilerSession): Prom
         await flushScheduledWork(session);
         reconcilerRuntime.run(session.runtime, function flushWithRuntime() {
             renderer.flushPassiveEffects();
-            settleWaiters(session.state);
+            session.waiters.settle();
         });
     });
 }
@@ -341,19 +354,7 @@ async function waitForSession(session: IntrospectionReconcilerSession, predicate
         return;
     }
 
-    const waiting = new Promise<void>(function createWait(resolve) {
-        const waiter: Waiter = {
-            predicate,
-            resolve() {
-                resolve();
-            }
-        };
-
-        session.state.writeWaiters([
-            ...session.state.readWaiters(),
-            waiter
-        ]);
-    });
+    const waiting = session.waiters.wait(predicate);
 
     await waitForIdleSession(session);
 
