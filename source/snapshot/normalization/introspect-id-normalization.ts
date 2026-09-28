@@ -33,12 +33,8 @@ function isPlainObject(value: Readonly<Record<PropertyKey, unknown>>): boolean {
     return prototype === Object.prototype || prototype === null;
 }
 
-function escapeRegularExpression(value: string): string {
-    return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
-}
-
 function createReactIdPattern(prefix: string): RegExp {
-    return new RegExp(`_${escapeRegularExpression(prefix)}[rR]_[0-9a-z]+(?:_[0-9a-z]+)*_`, 'gu');
+    return new RegExp(`_${RegExp.escape(prefix)}[rR]_[0-9a-z]+(?:_[0-9a-z]+)*_`, 'gu');
 }
 
 function replaceGeneratedId(state: IdReplacementState, generatedId: string): string {
