@@ -132,7 +132,7 @@ Options:
 | `idPrefix`    | generated   | Prefix passed to React for `useId`.                                      |
 | `idGenerator` | none        | Rewrites React-generated ids in React Introspect snapshots after commit. |
 | `refs`        | none        | Injects fake host ref nodes.                                             |
-| `waitTimeout` | `1000`      | Default timeout for wait APIs.                                           |
+| `waitTimeout` | `1000`      | Milliseconds a wait API waits before it rejects with a timeout error.    |
 | `strictMode`  | `true`      | Wraps the React Introspect root in `React.StrictMode`.                   |
 | `transparent` | `[]`        | Components that execute without consuming `depth`.                       |
 | `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.                 |
