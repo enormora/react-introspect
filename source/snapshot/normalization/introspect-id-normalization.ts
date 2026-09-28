@@ -1,5 +1,5 @@
 import React from 'react';
-import { assertNotPortal } from '../../render/frame/introspect-unsupported-react.ts';
+import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 export type IntrospectionIdNormalization = {

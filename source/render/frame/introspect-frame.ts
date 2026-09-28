@@ -8,6 +8,7 @@ import {
     createOpaqueHost,
     elementKeyProps
 } from '../protocol/introspect-host-protocol.ts';
+import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
 import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
 import {
     type IntrospectionElement,
@@ -21,7 +22,6 @@ import {
     type IntrospectionFrameDepth,
     nextDepth
 } from './introspect-frame-depth.ts';
-import { assertNotPortal } from './introspect-unsupported-react.ts';
 
 type IntrospectionFrameProps = {
     readonly depth: IntrospectionFrameDepth;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
+import { isObjectOrFunction } from './introspect-value-kinds.ts';
 
 const reactPortalType = Symbol.for('react.portal');
 
