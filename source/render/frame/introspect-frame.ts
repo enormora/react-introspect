@@ -1,5 +1,5 @@
 import React from 'react';
-import { isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
+import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
 import {
     createComponentHost,
@@ -166,10 +166,6 @@ function executeIntrospectionFrameElement(element: IntrospectionElement): React.
     }
 }
 
-function isEmptyRenderable(node: unknown): boolean {
-    return node === null || node === undefined || typeof node === 'boolean';
-}
-
 function cloneElementWithChildren(
     element: IntrospectionElement,
     children: IntrospectionTransformedNode
@@ -249,7 +245,7 @@ function transformComponentElement(
 }
 
 function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | undefined {
-    if (isEmptyRenderable(node)) {
+    if (isEmptyReactNode(node)) {
         return createEmptyHost(node);
     }
 

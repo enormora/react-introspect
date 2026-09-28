@@ -14,7 +14,7 @@ import {
     getTextContent,
     getTypeName
 } from '../shape/introspect-snapshot-shape.ts';
-import { isIterable } from '../../values/introspect-value-kinds.ts';
+import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kinds.ts';
 import {
     type ChildSnapshotsRequest,
     type ChildSnapshotsResult,
@@ -50,10 +50,6 @@ function visibilityFromSource(
     }
 
     return 'visible';
-}
-
-function isEmptyNode(node: unknown): boolean {
-    return node === null || node === undefined || typeof node === 'boolean';
 }
 
 function isSourceElementNode(node: SnapshotSourceNode): node is SnapshotSourceElement {
@@ -340,7 +336,7 @@ const snapshotOperations = {
         });
     },
     createSnapshotNode(request: SnapshotNodeRequest): SnapshotNodeResult {
-        if (isEmptyNode(request.node)) {
+        if (isEmptyReactNode(request.node)) {
             return createEmptySnapshotNode(request);
         }
 
