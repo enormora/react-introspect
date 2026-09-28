@@ -4,9 +4,11 @@ import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
-    introspectionComponentMetadata,
-    introspectionValueMetadata
+    createOpaqueHost,
+    readInternalHost
 } from './introspect-host-protocol.ts';
+
+type HostElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>, string>;
 
 export const testNode = suite('introspection host protocol', [
     test('creates public component metadata from React elements', function (scope) {
@@ -27,15 +29,22 @@ export const testNode = suite('introspection host protocol', [
 
         return scope.assert.collect();
     }),
-    test('wraps metadata and opaque values in internal hosts', function (scope) {
+    test('reads back the metadata and values it wraps in internal hosts', function (scope) {
         const metadata = createComponentMetadata(React.createElement('span'), undefined);
-        const componentHost = createComponentHost(metadata, 'child') as React.ReactElement<
-            Readonly<Record<PropertyKey, unknown>>
-        >;
-        const emptyHost = createEmptyHost(null) as React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
+        const componentHost = createComponentHost(metadata, 'child') as HostElement;
+        const emptyHost = createEmptyHost(null) as HostElement;
+        const opaqueHost = createOpaqueHost(Symbol.iterator) as HostElement;
 
-        scope.assert.equal(componentHost.props[introspectionComponentMetadata], metadata);
-        scope.assert.equal(emptyHost.props[introspectionValueMetadata], null);
+        scope.assert.deepEqual(readInternalHost(componentHost.type, componentHost.props), {
+            kind: 'component',
+            metadata
+        });
+        scope.assert.deepEqual(readInternalHost(emptyHost.type, emptyHost.props), { kind: 'empty', value: null });
+        scope.assert.deepEqual(readInternalHost(opaqueHost.type, opaqueHost.props), {
+            kind: 'opaque',
+            value: Symbol.iterator
+        });
+        scope.assert.deepEqual(readInternalHost('button', {}), { kind: 'host' });
 
         return scope.assert.collect();
     })

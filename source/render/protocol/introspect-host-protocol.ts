@@ -2,14 +2,15 @@ import React from 'react';
 import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import type { IntrospectionElement, IntrospectionTransformedNode } from '../frame/introspect-frame-contract.ts';
 import { assertSupportedReactValue } from '../frame/introspect-unsupported-react.ts';
+import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
-export const introspectionComponentHostType = 'react-introspect-internal-component';
-export const introspectionEmptyHostType = 'react-introspect-internal-empty';
-export const introspectionOpaqueHostType = 'react-introspect-internal-opaque';
+const introspectionComponentHostType = 'react-introspect-internal-component';
+const introspectionEmptyHostType = 'react-introspect-internal-empty';
+const introspectionOpaqueHostType = 'react-introspect-internal-opaque';
 
-export const introspectionComponentMetadata = '__reactIntrospectionComponentMetadata';
-export const introspectionElementKeyMetadata = '__reactIntrospectionElementKeyMetadata';
-export const introspectionValueMetadata = '__reactIntrospectionValueMetadata';
+const introspectionComponentMetadata = '__reactIntrospectionComponentMetadata';
+const introspectionElementKeyMetadata = '__reactIntrospectionElementKeyMetadata';
+const introspectionValueMetadata = '__reactIntrospectionValueMetadata';
 
 export type IntrospectionComponentMetadata = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
@@ -19,6 +20,36 @@ export type IntrospectionComponentMetadata = {
     readonly props: Readonly<Record<PropertyKey, unknown>>;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly type: unknown;
+};
+
+type ComponentHost = { readonly kind: 'component'; readonly metadata: IntrospectionComponentMetadata; };
+
+type ValueHost = { readonly kind: 'empty' | 'opaque'; readonly value: unknown; };
+
+export type InternalHost = ComponentHost | ValueHost | { readonly kind: 'host'; };
+
+const internalHostTypes = new Set([
+    introspectionComponentHostType,
+    introspectionEmptyHostType,
+    introspectionOpaqueHostType
+]);
+const introspectionComponentMetadataKeys = [
+    'activityMode',
+    'caughtError',
+    'givenChildren',
+    'key',
+    'props',
+    'renderedReason',
+    'type'
+];
+const unsupportedComponentMetadata: IntrospectionComponentMetadata = {
+    activityMode: undefined,
+    caughtError: undefined,
+    givenChildren: undefined,
+    key: null,
+    props: {},
+    renderedReason: 'unsupported',
+    type: introspectionComponentHostType
 };
 
 function isPublicPropKey(key: PropertyKey): boolean {
@@ -88,4 +119,66 @@ export function createOpaqueHost(value: unknown): React.ReactElement {
 
 export function elementKeyProps(element: IntrospectionElement): Readonly<Record<PropertyKey, unknown>> {
     return { [introspectionElementKeyMetadata]: element.key };
+}
+
+function isPublicHostPropKey(key: PropertyKey): boolean {
+    return key !== 'children' &&
+        key !== 'key' &&
+        key !== 'ref' &&
+        key !== introspectionComponentMetadata &&
+        key !== introspectionElementKeyMetadata &&
+        key !== introspectionValueMetadata;
+}
+
+function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
+    return isObjectOrFunction(value) &&
+        introspectionComponentMetadataKeys.every(function hasMetadataKey(key) {
+            return Object.hasOwn(value, key);
+        });
+}
+
+function readComponentMetadata(props: Readonly<Record<PropertyKey, unknown>>): IntrospectionComponentMetadata {
+    const value = props[introspectionComponentMetadata];
+
+    return isIntrospectionComponentMetadata(value) ? value : unsupportedComponentMetadata;
+}
+
+export function isInternalHostType(type: string): boolean {
+    return internalHostTypes.has(type);
+}
+
+export function readInternalHost(type: string, props: Readonly<Record<PropertyKey, unknown>>): InternalHost {
+    if (type === introspectionEmptyHostType) {
+        return { kind: 'empty', value: props[introspectionValueMetadata] };
+    }
+
+    if (type === introspectionOpaqueHostType) {
+        return { kind: 'opaque', value: props[introspectionValueMetadata] };
+    }
+
+    if (type === introspectionComponentHostType) {
+        return { kind: 'component', metadata: readComponentMetadata(props) };
+    }
+
+    return { kind: 'host' };
+}
+
+export function readPublicHostProps(
+    props: Readonly<Record<PropertyKey, unknown>>
+): Readonly<Record<PropertyKey, unknown>> {
+    const result: Record<PropertyKey, unknown> = {};
+
+    for (const key of Reflect.ownKeys(props)) {
+        if (isPublicHostPropKey(key)) {
+            result[key] = props[key];
+        }
+    }
+
+    return Object.freeze(result);
+}
+
+export function readHostKey(props: Readonly<Record<PropertyKey, unknown>>): string | null {
+    const key = props[introspectionElementKeyMetadata];
+
+    return typeof key === 'string' ? key : null;
 }

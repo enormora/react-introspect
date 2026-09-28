@@ -3,7 +3,6 @@ import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
-import { introspectionComponentHostType } from '../protocol/introspect-host-protocol.ts';
 import { isIntrospectionRenderError, throwIntrospectionRenderError } from './introspect-render-error.ts';
 import { createFrameDepth } from './introspect-frame-depth.ts';
 import { createIntrospectionRenderElement } from './introspect-frame.ts';
@@ -565,7 +564,7 @@ export const testNode = suite('execution shallow function components', [
     test(
         'marks user host nodes that collide with Introspection internals unsupported',
         function (scope) {
-            const view = introspect(React.createElement(introspectionComponentHostType), {
+            const view = introspect(React.createElement('react-introspect-internal-component'), {
                 depth: 'full',
                 strictMode: false
             });
