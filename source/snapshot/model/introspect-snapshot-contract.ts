@@ -1,5 +1,4 @@
 import type React from 'react';
-import type { IntrospectionIdNormalization } from '../normalization/introspect-id-normalization.ts';
 import type {
     IntrospectionError,
     IntrospectionNodeKind,
@@ -92,7 +91,6 @@ export type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: num
 
 export type SnapshotChildPlacement = {
     readonly build: SnapshotBuild;
-    readonly idNormalization: IntrospectionIdNormalization;
     readonly inheritedVisibility: SnapshotVisibility;
     readonly parentId: number | undefined;
     readonly parentPath: string;
@@ -134,7 +132,6 @@ export type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest 
 
 export type PropsSnapshotRequest = {
     readonly build: SnapshotBuild;
-    readonly idNormalization: IntrospectionIdNormalization;
     readonly inheritedVisibility: SnapshotVisibility;
     readonly ownerId: number;
     readonly ownerPath: string;

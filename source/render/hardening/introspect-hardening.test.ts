@@ -34,6 +34,8 @@ type ObservedActRuntime = {
     readonly runtime: IntrospectionRuntimeDependencies;
 };
 
+type BrowserGlobalDescriptors = ReadonlyMap<string, PropertyDescriptor | undefined>;
+
 type FailingActRuntime = {
     readonly readObservation: () => Pick<ActObservation, 'active' | 'restored'>;
     readonly runtime: IntrospectionRuntimeDependencies;
@@ -198,6 +200,35 @@ function createFailingActRuntime(): FailingActRuntime {
     };
 }
 
+function readBrowserGlobalDescriptors(): BrowserGlobalDescriptors {
+    return new Map(
+        [ 'document', 'window' ].map(function readOriginalDescriptor(name) {
+            return [ name, Object.getOwnPropertyDescriptor(globalThis, name) ] as const;
+        })
+    );
+}
+
+function installThrowingBrowserGlobals(descriptors: BrowserGlobalDescriptors): void {
+    for (const name of descriptors.keys()) {
+        Object.defineProperty(globalThis, name, {
+            configurable: true,
+            get() {
+                throw new Error(`Unexpected ${name} dependency.`);
+            }
+        });
+    }
+}
+
+function restoreBrowserGlobals(descriptors: BrowserGlobalDescriptors): void {
+    for (const [ name, descriptor ] of descriptors) {
+        if (descriptor === undefined) {
+            Reflect.deleteProperty(globalThis, name);
+        } else {
+            Object.defineProperty(globalThis, name, descriptor);
+        }
+    }
+}
+
 export const testNode = suite('unsupported React concepts and hardening', [
     test('fails clearly for portal roots', function (scope) {
         scope.assert.throws(
@@ -316,25 +347,17 @@ export const testNode = suite('unsupported React concepts and hardening', [
     test(
         'renders without DOM or browser globals',
         function (scope) {
-            const runtime: IntrospectionRuntimeDependencies = {
-                ...createUnitRuntimeDependencies(),
-                browserEnvironment: {
-                    readDocument() {
-                        throw new Error('Unexpected document dependency.');
-                    },
-                    readWindow() {
-                        throw new Error('Unexpected window dependency.');
-                    }
-                }
-            };
-            const view = introspect(
-                React.createElement('main', null, 'server-safe'),
-                {},
-                noConsoleDiagnostics,
-                runtime
-            );
+            const originalDescriptors = readBrowserGlobalDescriptors();
 
-            scope.assert.equal(view.textContent, 'server-safe');
+            try {
+                installThrowingBrowserGlobals(originalDescriptors);
+
+                const view = introspect(React.createElement('main', null, 'server-safe'), {}, noConsoleDiagnostics);
+
+                scope.assert.equal(view.textContent, 'server-safe');
+            } finally {
+                restoreBrowserGlobals(originalDescriptors);
+            }
 
             return scope.assert.collect();
         }

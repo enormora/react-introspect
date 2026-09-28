@@ -3,22 +3,12 @@ import { createClock } from '@enormora/clock';
 import React from 'react';
 import type {
     IntrospectionActEnvironment,
-    IntrospectionBrowserEnvironment,
     IntrospectionMacrotasks,
     IntrospectionMicrotasks,
     IntrospectionRuntimeDependencies
 } from './introspect-runtime-dependencies-types.ts';
 
 const reactActEnvironmentKey = 'IS_REACT_ACT_ENVIRONMENT';
-
-const realBrowserEnvironment: IntrospectionBrowserEnvironment = {
-    readDocument() {
-        return Reflect.get(globalThis, 'document') as unknown;
-    },
-    readWindow() {
-        return Reflect.get(globalThis, 'window') as unknown;
-    }
-};
 
 const realActEnvironment: IntrospectionActEnvironment = {
     act(action) {
@@ -64,7 +54,6 @@ const createNodeClock: () => IntrospectionRuntimeDependencies['clock'] = createC
 export function createNodeRuntimeDependencies(): IntrospectionRuntimeDependencies {
     return {
         actEnvironment: realActEnvironment,
-        browserEnvironment: realBrowserEnvironment,
         clock: createNodeClock(),
         macrotasks: realMacrotasks,
         microtasks: realMicrotasks
