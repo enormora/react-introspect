@@ -239,14 +239,19 @@ function transformWrapperElement(
     activityMode: 'hidden' | 'visible' | undefined
 ): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata(element, undefined, undefined, activityMode),
+        createComponentMetadata({ activityMode, caughtError: undefined, element, renderedReason: undefined }),
         React.cloneElement(element, {}, transformNode(element.props.children, depth))
     );
 }
 
 function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata(props.element, undefined),
+        createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element: props.element,
+            renderedReason: undefined
+        }),
         transformNode(executeIntrospectionFrameElement(props.element), nextDepth(props.depth, props.element.type))
     );
 }
@@ -276,7 +281,10 @@ function transformComponentElement(element: IntrospectionElement, depth: Introsp
         return createFrameElement(element, componentDepth);
     }
 
-    return createComponentHost(createComponentMetadata(element, 'depth'), createEmptyHost(undefined));
+    return createComponentHost(
+        createComponentMetadata({ activityMode: undefined, caughtError: undefined, element, renderedReason: 'depth' }),
+        createEmptyHost(undefined)
+    );
 }
 
 function transformElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {

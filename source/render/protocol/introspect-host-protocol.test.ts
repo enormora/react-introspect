@@ -18,7 +18,12 @@ export const testNode = suite('introspection host protocol', [
             ref: 'legacy',
             title: 'Save'
         });
-        const metadata = createComponentMetadata(element, 'depth', undefined, 'hidden');
+        const metadata = createComponentMetadata({
+            activityMode: 'hidden',
+            caughtError: undefined,
+            element,
+            renderedReason: 'depth'
+        });
 
         scope.assert.equal(metadata.activityMode, 'hidden');
         scope.assert.equal(metadata.givenChildren, 'Save');
@@ -30,7 +35,12 @@ export const testNode = suite('introspection host protocol', [
         return scope.assert.collect();
     }),
     test('reads back the metadata and values it wraps in internal hosts', function (scope) {
-        const metadata = createComponentMetadata(React.createElement('span'), undefined);
+        const metadata = createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element: React.createElement('span'),
+            renderedReason: undefined
+        });
         const componentHost = createComponentHost(metadata, 'child') as HostElement;
         const emptyHost = createEmptyHost(null) as HostElement;
         const opaqueHost = createOpaqueHost(Symbol.iterator) as HostElement;

@@ -71,12 +71,15 @@ function publicProps(props: Readonly<Record<PropertyKey, unknown>>): Readonly<Re
     return result;
 }
 
-export function createComponentMetadata(
-    element: IntrospectionElement,
-    renderedReason: IntrospectionNotRenderedReason | undefined,
-    caughtError?: IntrospectionError,
-    activityMode?: 'hidden' | 'visible'
-): IntrospectionComponentMetadata {
+export type ComponentMetadataRequest = {
+    readonly activityMode: 'hidden' | 'visible' | undefined;
+    readonly caughtError: IntrospectionError | undefined;
+    readonly element: IntrospectionElement;
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+};
+
+export function createComponentMetadata(request: ComponentMetadataRequest): IntrospectionComponentMetadata {
+    const { activityMode, caughtError, element, renderedReason } = request;
     const { props } = element;
 
     assertSupportedReactValue(props.children);

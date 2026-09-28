@@ -258,11 +258,12 @@ const IntrospectionClassFrameBase = class
         this.renderPass = renderPass;
 
         return createComponentHost(
-            createComponentMetadata(
-                this.props.element,
-                undefined,
-                boundaryErrorCause === undefined ? undefined : createDiagnosticRecord(boundaryErrorCause)
-            ),
+            createComponentMetadata({
+                activityMode: undefined,
+                caughtError: boundaryErrorCause === undefined ? undefined : createDiagnosticRecord(boundaryErrorCause),
+                element: this.props.element,
+                renderedReason: undefined
+            }),
             renderPass.next.node
         );
     }
