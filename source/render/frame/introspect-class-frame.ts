@@ -8,9 +8,9 @@ import {
     type IntrospectionElement,
     type IntrospectionRenderChildren,
     type IntrospectionTransformedNode,
-    readElementRef,
-    throwIntrospectionRenderError
+    readElementRef
 } from './introspect-frame-contract.ts';
+import { throwIntrospectionRenderError } from './introspect-render-error.ts';
 import { type IntrospectionFrameDepth, nextDepth } from './introspect-frame-depth.ts';
 
 export type IntrospectionClassFrameProps = {

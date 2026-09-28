@@ -10,9 +10,9 @@ import {
     introspectionOpaqueHostType,
     type IntrospectionTransformedNode,
     introspectionValueMetadata,
-    readElementRef,
-    throwIntrospectionRenderError
+    readElementRef
 } from './introspect-frame-contract.ts';
+import { throwIntrospectionRenderError } from './introspect-render-error.ts';
 import {
     canExecuteComponent,
     enterComponentDepth,

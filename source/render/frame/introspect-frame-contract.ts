@@ -1,6 +1,5 @@
 import React from 'react';
 import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
-import { isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import type { IntrospectionFrameDepth } from './introspect-frame-depth.ts';
 import { assertSupportedReactValue } from './introspect-unsupported-react.ts';
 
@@ -33,8 +32,6 @@ export type IntrospectionComponentMetadata = {
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly type: unknown;
 };
-
-const introspectionRenderErrors = new WeakSet();
 
 function isPublicPropKey(key: PropertyKey): boolean {
     return key !== 'children' &&
@@ -97,16 +94,4 @@ export function createEmptyHost(value: unknown): React.ReactElement {
     return React.createElement(introspectionEmptyHostType, {
         [introspectionValueMetadata]: value
     });
-}
-
-export function throwIntrospectionRenderError(error: unknown): never {
-    if (isObjectOrFunction(error) && !isThenable(error)) {
-        introspectionRenderErrors.add(error);
-    }
-
-    throw error;
-}
-
-export function isIntrospectionRenderError(error: unknown): boolean {
-    return isObjectOrFunction(error) && introspectionRenderErrors.has(error);
 }

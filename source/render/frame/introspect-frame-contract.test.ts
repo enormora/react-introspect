@@ -5,20 +5,8 @@ import {
     createComponentMetadata,
     createEmptyHost,
     introspectionComponentMetadata,
-    introspectionValueMetadata,
-    isIntrospectionRenderError,
-    throwIntrospectionRenderError
+    introspectionValueMetadata
 } from './introspect-frame-contract.ts';
-
-function catchThrown(value: unknown): unknown {
-    try {
-        throwIntrospectionRenderError(value);
-    } catch (error) {
-        return error;
-    }
-
-    throw new Error('Expected action to throw.');
-}
 
 export const testNode = suite('introspection frame contract', [
     test('creates public component metadata from React elements', function (scope) {
@@ -48,21 +36,6 @@ export const testNode = suite('introspection frame contract', [
 
         scope.assert.equal(componentHost.props[introspectionComponentMetadata], metadata);
         scope.assert.equal(emptyHost.props[introspectionValueMetadata], null);
-
-        return scope.assert.collect();
-    }),
-    test('tracks render errors without marking thenables', function (scope) {
-        const error = new Error('failed');
-        const thenable = {
-            then() {
-                return undefined;
-            }
-        };
-
-        scope.assert.equal(catchThrown(error), error);
-        scope.assert.equal(catchThrown(thenable), thenable);
-        scope.assert.equal(isIntrospectionRenderError(error), true);
-        scope.assert.equal(isIntrospectionRenderError(thenable), false);
 
         return scope.assert.collect();
     })

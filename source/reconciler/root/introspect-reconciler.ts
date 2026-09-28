@@ -1,7 +1,7 @@
 import type React from 'react';
 import createReconciler, { type ReconcilerInstance, type ReconcilerRoot } from 'react-reconciler';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
-import { isIntrospectionRenderError } from '../../render/frame/introspect-frame-contract.ts';
+import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
 import {
     appendChild,
     clearContainer,

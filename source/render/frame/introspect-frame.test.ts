@@ -3,11 +3,8 @@ import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
-import {
-    isIntrospectionRenderError,
-    introspectionComponentHostType,
-    throwIntrospectionRenderError
-} from './introspect-frame-contract.ts';
+import { introspectionComponentHostType } from './introspect-frame-contract.ts';
+import { isIntrospectionRenderError, throwIntrospectionRenderError } from './introspect-render-error.ts';
 import { createFrameDepth } from './introspect-frame-depth.ts';
 import { createIntrospectionRenderElement } from './introspect-frame.ts';
 
