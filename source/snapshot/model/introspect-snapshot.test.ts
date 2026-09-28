@@ -5,8 +5,17 @@ import type {
     IntrospectionOptions,
     IntrospectionView
 } from '../../public/introspect-public-types.ts';
+import { createIntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
+import { createIntrospectionReconcilerModule } from '../../reconciler/root/introspect-reconciler.ts';
+import { createIntrospectionRenderElement } from '../../render/frame/introspect-frame.ts';
+import { createFrameDepth } from '../../render/frame/introspect-frame-depth.ts';
+import { createUnitRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.test.ts';
 import { createUnitIntrospectionView } from '../../runtime/view/introspect-unit-view.test.ts';
-import type { IntrospectionSnapshot, SnapshotNode } from './introspect-snapshot-contract.ts';
+import {
+    createEmptyIntrospectionSnapshot,
+    type IntrospectionSnapshot,
+    type SnapshotNode
+} from './introspect-snapshot-contract.ts';
 
 type WidgetProps = React.PropsWithChildren<{
     readonly label: string;
@@ -151,11 +160,30 @@ function createMixedTree(): React.ReactElement {
 }
 
 function createMixedSnapshot(): IntrospectionSnapshot {
-    const view = introspect(createMixedTree(), { depth: 0 }) as unknown as {
-        readonly currentSnapshot: IntrospectionSnapshot;
-    };
+    let publishedSnapshot = createEmptyIntrospectionSnapshot(0);
+    const diagnostics = createIntrospectionDiagnostics({ errorMode: 'capture', warningMode: 'throw' }, {
+        subscribe() {
+            return undefined;
+        }
+    });
 
-    return view.currentSnapshot;
+    createIntrospectionReconcilerModule({ runtime: createUnitRuntimeDependencies() }).createRoot({
+        diagnostics,
+        element: createIntrospectionRenderElement(
+            createMixedTree(),
+            createFrameDepth({ budget: 0, depthFrom: undefined, transparent: [] })
+        ),
+        idGenerator: undefined,
+        idPrefix: 'snapshot-',
+        publish(snapshot) {
+            publishedSnapshot = snapshot;
+        },
+        refs: undefined,
+        strictMode: true,
+        waitTimeout: 1000
+    });
+
+    return publishedSnapshot;
 }
 
 export const testNode = suite('snapshot tree model', [
