@@ -103,9 +103,6 @@ function createIntrospectionViewWithDependencies(
     }
 
     const view: RuntimeIntrospectionView = Object.freeze({
-        get currentSnapshot() {
-            return currentSnapshot;
-        },
         get caughtErrors() {
             return diagnostics.caughtErrors;
         },

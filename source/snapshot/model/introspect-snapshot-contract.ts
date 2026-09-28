@@ -1,4 +1,3 @@
-import type React from 'react';
 import type {
     IntrospectionError,
     IntrospectionNodeKind,
@@ -78,85 +77,6 @@ export type SnapshotNode = {
     readonly textContent: string;
     readonly type: unknown;
     readonly visibility: SnapshotVisibility;
-};
-
-export type SnapshotBuild = {
-    readonly nextId: number;
-    readonly nodes: readonly SnapshotNode[];
-    readonly normalizeIdString: (value: string) => string;
-    readonly valueAncestors: WeakSet<WeakKey>;
-};
-
-export type NodeIdAllocation = { readonly build: SnapshotBuild; readonly id: number; };
-
-export type SnapshotChildPlacement = {
-    readonly build: SnapshotBuild;
-    readonly inheritedVisibility: SnapshotVisibility;
-    readonly parentId: number | undefined;
-    readonly parentPath: string;
-};
-
-export type SnapshotNodeRequest = SnapshotChildPlacement & {
-    readonly index: number | string;
-    readonly node: unknown;
-};
-
-export type ElementNodeRequest = SnapshotNodeRequest & {
-    readonly element: React.ReactElement<SnapshotProps>;
-};
-
-export type SourceElementNodeRequest = SnapshotNodeRequest & {
-    readonly element: SnapshotSourceElement;
-};
-
-export type ChildSnapshotsRequest = SnapshotChildPlacement & {
-    readonly children: unknown;
-};
-
-export type SourceChildSnapshotsRequest = SnapshotChildPlacement & {
-    readonly children: readonly SnapshotSourceNode[];
-};
-
-export type SourceSnapshotNodeRequest = SnapshotNodeRequest & {
-    readonly node: SnapshotSourceNode;
-};
-
-export type SourceElementChildrenRequest = SnapshotChildPlacement & {
-    readonly element: SnapshotSourceElement;
-    readonly parentId: number;
-};
-
-export type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest & {
-    readonly givenChildrenResult: ChildSnapshotsResult;
-};
-
-export type PropsSnapshotRequest = {
-    readonly build: SnapshotBuild;
-    readonly inheritedVisibility: SnapshotVisibility;
-    readonly ownerId: number;
-    readonly ownerPath: string;
-    readonly props: SnapshotProps;
-};
-
-export type PropsSnapshotResult = {
-    readonly build: SnapshotBuild;
-    readonly props: SnapshotProps;
-};
-
-export type SnapshotNodeResult = {
-    readonly build: SnapshotBuild;
-    readonly node: SnapshotNode;
-};
-
-export type ChildSnapshotsResult = {
-    readonly build: SnapshotBuild;
-    readonly nodes: readonly SnapshotNode[];
-};
-
-export type ElementChildrenState = {
-    readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
-    readonly textContent: string;
 };
 
 export function createEmptyIntrospectionSnapshot(renderCount: number): IntrospectionSnapshot {
