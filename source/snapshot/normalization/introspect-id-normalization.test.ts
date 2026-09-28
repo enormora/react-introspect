@@ -20,6 +20,20 @@ export const testNode = suite('introspection id normalization', [
 
         return scope.assert.collect();
     }),
+    test('matches an id prefix containing regular expression syntax literally', function (scope) {
+        const normalizeId = createIdNormalizer({
+            generator() {
+                return 'stable-id';
+            },
+            prefix: 'x.1+(2)'
+        });
+
+        scope.assert.equal(normalizeId('_x.1+(2)r_a_'), 'stable-id');
+        scope.assert.equal(normalizeId('_xy112r_a_'), '_xy112r_a_');
+        scope.assert.equal(normalizeId('_xy1+(2)r_a_'), '_xy1+(2)r_a_');
+
+        return scope.assert.collect();
+    }),
     test('normalizes props, React elements, and circular values', function (scope) {
         const value: Record<string, unknown> = { id: '_test-r_a_' };
 
