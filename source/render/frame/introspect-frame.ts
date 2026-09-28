@@ -28,8 +28,6 @@ type IntrospectionFrameProps = {
     readonly element: IntrospectionElement;
 };
 
-const executableElementKinds = new Set<ReactElementKind['kind']>([ 'forwardRef', 'function', 'lazy', 'memo' ]);
-
 function isIntrospectionElement(element: React.ReactElement): element is IntrospectionElement {
     return isObjectOrFunction(element.props);
 }
@@ -80,10 +78,6 @@ function executeIntrospectionFrameElement(element: IntrospectionElement): React.
     } catch (error) {
         return throwIntrospectionRenderError(error);
     }
-}
-
-function isExecutableComponentType(type: unknown): boolean {
-    return executableElementKinds.has(classifyElementType(type).kind);
 }
 
 function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | undefined {
@@ -191,17 +185,19 @@ function createFrameElement(element: IntrospectionElement, depth: IntrospectionF
     });
 }
 
-function transformComponentElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    const componentDepth = enterComponentDepth(depth, element.type);
-
-    if (canExecuteComponent(componentDepth, element.type) && isExecutableComponentType(element.type)) {
-        return createFrameElement(element, componentDepth);
-    }
-
+function transformUnrenderedElement(element: IntrospectionElement): React.ReactElement {
     return createComponentHost(
         createComponentMetadata({ activityMode: undefined, caughtError: undefined, element, renderedReason: 'depth' }),
         createEmptyHost(undefined)
     );
+}
+
+function transformComponentElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    const componentDepth = enterComponentDepth(depth, element.type);
+
+    return canExecuteComponent(componentDepth, element.type)
+        ? createFrameElement(element, componentDepth)
+        : transformUnrenderedElement(element);
 }
 
 function transformActivityElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
@@ -229,7 +225,7 @@ const elementTransforms: Readonly<
     host: transformRenderableElement,
     lazy: transformComponentElement,
     memo: transformComponentElement,
-    other: transformComponentElement,
+    other: transformUnrenderedElement,
     suspense: transformSuspenseElement,
     viewTransition: transformViewTransitionElement
 };
