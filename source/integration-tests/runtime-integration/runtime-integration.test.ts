@@ -183,6 +183,37 @@ function waitForRetry(view: IntrospectionView): PendingRetry {
     });
 }
 
+type ParallelLoaderView = {
+    readonly loading: Promise<void>;
+    readonly view: IntrospectionView;
+};
+
+const parallelViewCount = 10;
+
+function introspectWithDelayedLoader(label: string, delayInMilliseconds: number): ParallelLoaderView {
+    const listeners = new Set<(value: string) => void>();
+
+    async function publishLoadedValue(): Promise<void> {
+        await timers.promises.setTimeout(delayInMilliseconds);
+
+        for (const listener of listeners) {
+            listener(label);
+        }
+    }
+
+    const loading = publishLoadedValue();
+    const view = introspect(
+        React.createElement(TransitionValueReader, {
+            subscribe(listener) {
+                listeners.add(listener);
+            }
+        }),
+        { depth: 'full', strictMode: false }
+    );
+
+    return Object.freeze({ loading, view });
+}
+
 export const testNode = suite('runtime integration', [
     test(
         'captures React console warnings from the real diagnostic channel',
@@ -227,6 +258,31 @@ export const testNode = suite('runtime integration', [
             scope.assert.deepEqual(
                 { renderCount: view.renderCount, textContent: view.textContent },
                 { renderCount: 2, textContent: 'after' }
+            );
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'renders loader updates from outside any view in parallel views',
+        async function (scope) {
+            const labels = Array.from({ length: parallelViewCount }, function createLabel(_value, index) {
+                return `view ${index}`;
+            });
+            const loaderViews = labels.map(function introspectLabel(label, index) {
+                return introspectWithDelayedLoader(label, parallelViewCount - index);
+            });
+
+            await Promise.all(loaderViews.map(async function waitForLoadedView(loaderView) {
+                await loaderView.loading;
+                await loaderView.view.waitForIdle();
+            }));
+
+            scope.assert.deepEqual(
+                loaderViews.map(function readText(loaderView) {
+                    return loaderView.view.textContent;
+                }),
+                labels
             );
 
             return scope.assert.collect();
