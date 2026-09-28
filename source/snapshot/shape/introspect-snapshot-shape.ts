@@ -28,10 +28,10 @@ const builtInTypeNames: Readonly<Record<Exclude<ReactElementKind['kind'], 'funct
     viewTransition: 'ViewTransition'
 };
 
-function rendersOwnChildren(type: unknown): boolean {
+export function getElementKind(type: unknown): SnapshotNodeKind {
     const { kind } = classifyElementType(type);
 
-    return kind === 'host' || kind === 'fragment';
+    return kind === 'host' || kind === 'fragment' ? kind : 'component';
 }
 
 export function getTextContent(nodes: readonly SnapshotNode[]): string {
@@ -57,15 +57,9 @@ export function freezePropsWithoutChildren(props: SnapshotProps): SnapshotProps 
 export function getElementChildrenState(type: unknown, children: readonly SnapshotNode[]): ElementChildrenState {
     return {
         renderedChildren: children,
-        renderedReason: rendersOwnChildren(type) ? undefined : 'depth',
+        renderedReason: getElementKind(type) === 'component' ? 'depth' : undefined,
         textContent: getTextContent(children)
     };
-}
-
-export function getElementKind(type: unknown): SnapshotNodeKind {
-    const { kind } = classifyElementType(type);
-
-    return kind === 'host' || kind === 'fragment' ? kind : 'component';
 }
 
 export function getIndexedPath(parentPath: string, index: number | string, name: string): string {
