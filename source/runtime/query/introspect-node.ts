@@ -224,13 +224,7 @@ export function createIntrospectionNode(
     }
 
     function findAll(selector: unknown): RuntimeIntrospectionList {
-        const normalizedSelector = toSelector(selector);
-
-        return createIntrospectionList(
-            descendants().filter(function isMatch(descendant) {
-                return nodeMatchesSelector(descendant, normalizedSelector);
-            })
-        );
+        return createIntrospectionList(descendants()).filterBy(selector);
     }
 
     return Object.freeze({
@@ -339,14 +333,5 @@ export function findIntrospectionNodes(
     snapshot: IntrospectionSnapshot,
     selector: unknown
 ): RuntimeIntrospectionList {
-    const normalizedSelector = toSelector(selector);
-    const nodes = snapshotTreeNodes(snapshot)
-        .map(function createNode(node) {
-            return createIntrospectionNode(reader, snapshot, node);
-        })
-        .filter(function isMatch(node) {
-            return nodeMatchesSelector(node, normalizedSelector);
-        });
-
-    return createIntrospectionList(nodes);
+    return createIntrospectionNodeList(reader, snapshot, snapshotTreeNodes(snapshot)).filterBy(selector);
 }
