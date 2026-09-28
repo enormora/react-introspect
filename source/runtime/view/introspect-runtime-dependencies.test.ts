@@ -36,14 +36,14 @@ const installScopedReactActEnvironment = (function createScopedReactActEnvironme
 })();
 
 function createQueuedMicrotasks(): IntrospectionMicrotasks {
-    let pendingActions: readonly (() => void)[] = Object.freeze([]);
+    let pendingActions: readonly (() => void)[] = [];
 
-    return Object.freeze({
+    return {
         async flush() {
             while (pendingActions.length > 0) {
                 const actions = pendingActions;
 
-                pendingActions = Object.freeze([]);
+                pendingActions = [];
 
                 for (const action of actions) {
                     action();
@@ -51,19 +51,19 @@ function createQueuedMicrotasks(): IntrospectionMicrotasks {
             }
         },
         schedule(action) {
-            pendingActions = Object.freeze([
+            pendingActions = [
                 ...pendingActions,
                 action
-            ]);
+            ];
         }
-    });
+    };
 }
 
-const schedulerMacrotasks: IntrospectionMacrotasks = Object.freeze({
+const schedulerMacrotasks: IntrospectionMacrotasks = {
     async waitForNext() {
         await timersPromises.setImmediate();
     }
-});
+};
 
 function createUnitClock(): Clock {
     return createDeterministicClock({
@@ -71,7 +71,7 @@ function createUnitClock(): Clock {
     });
 }
 
-const unitActEnvironment: IntrospectionActEnvironment = Object.freeze({
+const unitActEnvironment: IntrospectionActEnvironment = {
     act(action) {
         installScopedReactActEnvironment();
 
@@ -85,25 +85,25 @@ const unitActEnvironment: IntrospectionActEnvironment = Object.freeze({
             return results.values().next().value;
         });
     }
-});
+};
 
-const emptyBrowserEnvironment: IntrospectionBrowserEnvironment = Object.freeze({
+const emptyBrowserEnvironment: IntrospectionBrowserEnvironment = {
     readDocument() {
         return undefined;
     },
     readWindow() {
         return undefined;
     }
-});
+};
 
 export function createUnitRuntimeDependencies(): IntrospectionRuntimeDependencies {
-    return Object.freeze({
+    return {
         actEnvironment: unitActEnvironment,
         browserEnvironment: emptyBrowserEnvironment,
         clock: createUnitClock(),
         macrotasks: schedulerMacrotasks,
         microtasks: createQueuedMicrotasks()
-    });
+    };
 }
 
 export const testNode = suite('introspection runtime dependencies', [

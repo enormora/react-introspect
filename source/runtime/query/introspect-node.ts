@@ -330,7 +330,7 @@ function snapshotTreeNodes(snapshot: IntrospectionSnapshot): readonly SnapshotNo
         ];
     }
 
-    return snapshot.root === undefined ? Object.freeze([]) : collect(snapshot.root);
+    return snapshot.root === undefined ? [] : collect(snapshot.root);
 }
 
 export function createIntrospectionNodeList(

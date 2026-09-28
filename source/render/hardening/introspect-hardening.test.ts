@@ -40,11 +40,11 @@ type FailingActRuntime = {
 };
 
 const reactPortalType = Symbol.for('react.portal');
-const noConsoleDiagnostics: IntrospectionConsoleDiagnostics = Object.freeze({
+const noConsoleDiagnostics: IntrospectionConsoleDiagnostics = {
     subscribe() {
         return undefined;
     }
-});
+};
 
 function requireValue<Value>(value: Value | undefined): Value {
     if (value === undefined) {
@@ -59,19 +59,19 @@ function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown
 }
 
 function createPortalValue(children: React.ReactNode): React.ReactElement {
-    return Object.freeze({
+    return {
         $$typeof: reactPortalType,
         children,
-        containerInfo: Object.freeze({}),
+        containerInfo: {},
         implementation: null,
         key: null
-    }) as unknown as React.ReactElement;
+    } as unknown as React.ReactElement;
 }
 
 function createPortalArray(): readonly React.ReactNode[] {
-    return Object.freeze([
+    return [
         createPortalValue(React.createElement('span', null, 'portal'))
-    ]);
+    ];
 }
 
 function PortalOutput(): React.ReactNode {
@@ -136,7 +136,7 @@ function createObservedActRuntime(): ObservedActRuntime {
 
     const runtime: IntrospectionRuntimeDependencies = {
         ...unitRuntime,
-        actEnvironment: Object.freeze({
+        actEnvironment: {
             act(action: () => unknown) {
                 actCalls += 1;
                 active = true;
@@ -148,10 +148,10 @@ function createObservedActRuntime(): ObservedActRuntime {
                     restored = true;
                 }
             }
-        })
+        }
     };
 
-    return Object.freeze({
+    return {
         component: ActProbe,
         readObservation() {
             return {
@@ -162,7 +162,7 @@ function createObservedActRuntime(): ObservedActRuntime {
             };
         },
         runtime
-    });
+    };
 }
 
 function createFailingActRuntime(): FailingActRuntime {
@@ -171,7 +171,7 @@ function createFailingActRuntime(): FailingActRuntime {
     let restored = false;
     const runtime: IntrospectionRuntimeDependencies = {
         ...unitRuntime,
-        actEnvironment: Object.freeze({
+        actEnvironment: {
             act(action: () => unknown) {
                 active = true;
 
@@ -184,10 +184,10 @@ function createFailingActRuntime(): FailingActRuntime {
                     restored = true;
                 }
             }
-        })
+        }
     };
 
-    return Object.freeze({
+    return {
         readObservation() {
             return {
                 active,
@@ -195,7 +195,7 @@ function createFailingActRuntime(): FailingActRuntime {
             };
         },
         runtime
-    });
+    };
 }
 
 export const testNode = suite('unsupported React concepts and hardening', [
@@ -318,14 +318,14 @@ export const testNode = suite('unsupported React concepts and hardening', [
         function (scope) {
             const runtime: IntrospectionRuntimeDependencies = {
                 ...createUnitRuntimeDependencies(),
-                browserEnvironment: Object.freeze({
+                browserEnvironment: {
                     readDocument() {
                         throw new Error('Unexpected document dependency.');
                     },
                     readWindow() {
                         throw new Error('Unexpected window dependency.');
                     }
-                })
+                }
             };
             const view = introspect(
                 React.createElement('main', null, 'server-safe'),

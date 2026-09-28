@@ -143,7 +143,7 @@ function createFulfilledLazyType(type: React.FC<ButtonProps>): React.FC<ButtonPr
         [lazyInitializerKey]() {
             return type;
         },
-        [lazyPayloadKey]: Object.freeze({})
+        [lazyPayloadKey]: {}
     } as unknown as React.FC<ButtonProps>;
 }
 
@@ -155,11 +155,11 @@ const ForwardLabel = React.forwardRef<unknown, ButtonProps>(function ForwardLabe
     }, props.label);
 });
 const MemoForwardLabel = React.memo(ForwardLabel);
-const OpaqueMemo = Object.freeze({
+const OpaqueMemo = {
     $$typeof: Symbol.for('react.memo'),
     compare: null,
-    type: Object.freeze({ opaque: true })
-});
+    type: { opaque: true }
+};
 
 function BigIntValue(): React.ReactNode {
     return 9_007_199_254_740_993n;
@@ -219,7 +219,7 @@ function createRenderLog(): RenderLog {
             names.push(name);
         },
         rendered() {
-            return Object.freeze(Array.from(names));
+            return Array.from(names);
         }
     };
 }
@@ -263,14 +263,6 @@ function createNestedPage(log: RenderLog): React.FC<NestedPageProps> {
     };
 
     return NestedPage;
-}
-
-function catchThrown(value: unknown): void {
-    try {
-        throwIntrospectionRenderError(value);
-    } catch {
-        Object.freeze({});
-    }
 }
 
 function readRenderedChildTypes(node: IntrospectionNode): readonly unknown[] | 'notRendered' {
@@ -635,7 +627,7 @@ export const testNode = suite('execution shallow function components', [
                     }
                     : undefined;
             },
-            [lazyPayloadKey]: Object.freeze({})
+            [lazyPayloadKey]: {}
         } as unknown as React.FC<ButtonProps>;
         const view = introspect(React.createElement(VolatileLazy, { label: 'volatile' }), {
             depth: 'full',
@@ -649,11 +641,11 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('unwraps synchronously fulfilled thenable output', function (scope) {
-        const thenable = Object.freeze({
+        const thenable = {
             then(resolve: (node: React.ReactNode) => void) {
                 resolve(React.createElement('span', null, 'thenable'));
             }
-        });
+        };
 
         function ThenableLabel(): React.ReactNode {
             return thenable as never;
@@ -681,7 +673,12 @@ export const testNode = suite('execution shallow function components', [
                 }
             };
 
-            catchThrown(thenable);
+            scope.assert.throws(
+                function () {
+                    throwIntrospectionRenderError(thenable);
+                },
+                { exact: thenable }
+            );
 
             scope.assert.equal(isIntrospectionRenderError(value), false);
             scope.assert.equal(isIntrospectionRenderError(thenable), false);

@@ -106,7 +106,7 @@ function flattenReactNodes(children: unknown): readonly unknown[] {
         return Array.from(children).flatMap(flattenReactNodes);
     }
 
-    return Object.freeze([ children ]);
+    return [ children ];
 }
 
 type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
@@ -403,7 +403,7 @@ export function createIntrospectionSnapshotFromSource(
                     givenChildren: [],
                     givenChildrenKind: 'source',
                     key: null,
-                    props: Object.freeze({}),
+                    props: {},
                     renderedReason: undefined,
                     type: React.Fragment,
                     visibility: 'visible'

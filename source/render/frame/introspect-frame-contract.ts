@@ -76,7 +76,7 @@ function publicProps(props: Readonly<Record<PropertyKey, unknown>>): Readonly<Re
         }
     }
 
-    return Object.freeze(result);
+    return result;
 }
 
 export function readElementProps(element: IntrospectionElement): Readonly<Record<PropertyKey, unknown>> {
@@ -88,18 +88,18 @@ export function readElementRef(element: IntrospectionElement): unknown {
 }
 
 export function createFrameDepth(options: IntrospectionDepthOptions): IntrospectionFrameDepth {
-    return Object.freeze({
+    return {
         budget: options.budget,
         counting: options.depthFrom === undefined,
-        policy: Object.freeze({
+        policy: {
             depthFrom: options.depthFrom,
             transparent: new Set(options.transparent)
-        })
-    });
+        }
+    };
 }
 
 export function enterComponentDepth(depth: IntrospectionFrameDepth, type: unknown): IntrospectionFrameDepth {
-    return !depth.counting && type === depth.policy.depthFrom ? Object.freeze({ ...depth, counting: true }) : depth;
+    return !depth.counting && type === depth.policy.depthFrom ? { ...depth, counting: true } : depth;
 }
 
 function consumesDepth(depth: IntrospectionFrameDepth, type: unknown): boolean {
@@ -115,7 +115,7 @@ export function nextDepth(depth: IntrospectionFrameDepth, type: unknown): Intros
         return depth;
     }
 
-    return Object.freeze({ ...depth, budget: Math.max(0, depth.budget - 1) });
+    return { ...depth, budget: Math.max(0, depth.budget - 1) };
 }
 
 export function createComponentMetadata(
@@ -128,7 +128,7 @@ export function createComponentMetadata(
 
     assertSupportedReactValue(props.children);
 
-    return Object.freeze({
+    return {
         activityMode,
         caughtError,
         givenChildren: props.children,
@@ -136,7 +136,7 @@ export function createComponentMetadata(
         props: publicProps(props),
         renderedReason,
         type: element.type
-    });
+    };
 }
 
 export function createComponentHost(

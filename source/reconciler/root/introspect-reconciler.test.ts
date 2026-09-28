@@ -114,7 +114,7 @@ function createExternalStore(initialValue: string): ExternalStore {
     let value = initialValue;
     const listeners = new Set<() => void>();
 
-    return Object.freeze({
+    return {
         read() {
             return value;
         },
@@ -132,7 +132,7 @@ function createExternalStore(initialValue: string): ExternalStore {
                 listener();
             }
         }
-    });
+    };
 }
 
 function TransitionStoreReader(props: StoreReaderProps): React.ReactNode {
@@ -428,11 +428,7 @@ export const testNode = suite('custom reconciler host layer', [
                 strictMode: false
             });
 
-            try {
-                view.update(React.createElement(Suspends));
-            } catch {
-                Object.freeze({});
-            }
+            view.update(React.createElement(Suspends));
 
             scope.assert.equal(view.renderCount, 1);
             scope.assert.equal(view.textContent, 'Hello stable');

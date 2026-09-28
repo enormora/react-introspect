@@ -10,11 +10,11 @@ import type { IntrospectionRuntimeDependencies } from './introspect-runtime-depe
 import { createUnitRuntimeDependencies } from './introspect-runtime-dependencies.test.ts';
 import { createIntrospectionViewModule, type IntrospectionViewModule } from './introspect-view.ts';
 
-const isolatedConsoleDiagnostics: IntrospectionConsoleDiagnostics = Object.freeze({
+const isolatedConsoleDiagnostics: IntrospectionConsoleDiagnostics = {
     subscribe() {
         return undefined;
     }
-});
+};
 
 export function createUnitIntrospectionViewModule(): IntrospectionViewModule {
     return createIntrospectionViewModule({

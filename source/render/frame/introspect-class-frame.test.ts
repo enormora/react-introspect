@@ -54,14 +54,14 @@ function requireValue<Value>(value: Value | undefined): Value {
 function createRecorder(): Recorder {
     const entries: string[] = [];
 
-    return Object.freeze({
+    return {
         get entries() {
-            return Object.freeze(entries.slice());
+            return entries.slice();
         },
         push(entry: string) {
             entries.push(entry);
         }
-    });
+    };
 }
 
 const LifecyclePanel = class extends React.Component<LifecycleProps, LifecycleState> {
@@ -191,12 +191,12 @@ function createForcedPanel(): PanelFactory<EmptyProps> {
         }
     };
 
-    return Object.freeze({
+    return {
         Panel,
         readRenders() {
             return renders;
         }
-    });
+    };
 }
 
 function createGatedPanel(): PanelFactory<GatedPanelProps> {
@@ -214,12 +214,12 @@ function createGatedPanel(): PanelFactory<GatedPanelProps> {
         }
     };
 
-    return Object.freeze({
+    return {
         Panel,
         readRenders() {
             return renders;
         }
-    });
+    };
 }
 
 function createPurePanel(): PanelFactory<PurePanelProps> {
@@ -233,12 +233,12 @@ function createPurePanel(): PanelFactory<PurePanelProps> {
         }
     };
 
-    return Object.freeze({
+    return {
         Panel,
         readRenders() {
             return renders;
         }
-    });
+    };
 }
 
 function Bomb(): React.ReactNode {
@@ -356,7 +356,7 @@ function createRenderGateViews(): RenderGateViews {
     const gated = createGatedPanel();
     const pure = createPurePanel();
 
-    return Object.freeze({
+    return {
         gated,
         gatedView: introspect(React.createElement(gated.Panel, { value: 'one' }), {
             depth: 'full',
@@ -367,19 +367,19 @@ function createRenderGateViews(): RenderGateViews {
             depth: 'full',
             strictMode: false
         })
-    });
+    };
 }
 
 function createClassRefState(): ClassRefState {
     let callbackValue: unknown = null;
-    const callback = Object.freeze({
+    const callback = {
         read() {
             return callbackValue;
         },
         write(value: unknown) {
             callbackValue = value;
         }
-    });
+    };
     const objectRef = React.createRef<RefPanelInstance>();
     const objectProps: React.ClassAttributes<RefPanelInstance> & RefPanelProps = {
         label: 'object',
@@ -392,7 +392,7 @@ function createClassRefState(): ClassRefState {
         }
     };
 
-    return Object.freeze({
+    return {
         callback,
         callbackView: introspect(React.createElement(RefPanel, callbackProps), {
             depth: 'full',
@@ -403,7 +403,7 @@ function createClassRefState(): ClassRefState {
             depth: 'full',
             strictMode: false
         })
-    });
+    };
 }
 
 export const testNode = suite('class components and error boundaries', [

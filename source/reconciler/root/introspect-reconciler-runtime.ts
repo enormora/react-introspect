@@ -37,7 +37,7 @@ export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerR
         return runtimeStorage.run(runtime, action);
     }
 
-    return Object.freeze({
+    return {
         cancelTimeout(timeoutIdentifier) {
             currentRuntime().clock.clearTimeout(timeoutIdentifier);
         },
@@ -58,5 +58,5 @@ export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerR
         makeDefault(runtime) {
             defaultRuntime = runtime;
         }
-    });
+    };
 }
