@@ -250,19 +250,13 @@ function transformSuspenseElement(element: IntrospectionElement, depth: Introspe
     }, children);
 }
 
-function transformActivityElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    return createComponentHost(
-        createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
-        cloneWrapperElement(element, transformNode(element.props.children, depth))
-    );
-}
-
-function transformViewTransitionElement(
+function transformWrapperElement(
     element: IntrospectionElement,
-    depth: IntrospectionFrameDepth
+    depth: IntrospectionFrameDepth,
+    activityMode: 'hidden' | 'visible' | undefined
 ): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata(element, undefined),
+        createComponentMetadata(element, undefined, undefined, activityMode),
         cloneWrapperElement(element, transformNode(element.props.children, depth))
     );
 }
@@ -310,11 +304,11 @@ function transformElement(element: IntrospectionElement, depth: IntrospectionFra
     }
 
     if (isActivityType(type)) {
-        return transformActivityElement(element, depth);
+        return transformWrapperElement(element, depth, readActivityMode(element));
     }
 
     if (isViewTransitionType(type)) {
-        return transformViewTransitionElement(element, depth);
+        return transformWrapperElement(element, depth, undefined);
     }
 
     if (isRenderableElementType(type)) {
