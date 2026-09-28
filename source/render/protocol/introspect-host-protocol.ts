@@ -1,8 +1,9 @@
 import React from 'react';
 import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
-import type { IntrospectionElement, IntrospectionTransformedNode } from '../frame/introspect-frame-contract.ts';
 import { assertSupportedReactValue } from '../frame/introspect-unsupported-react.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
+
+type EncodedElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
 
 const introspectionComponentHostType = 'react-introspect-internal-component';
 const introspectionEmptyHostType = 'react-introspect-internal-empty';
@@ -69,7 +70,7 @@ function filterProps(
 export type ComponentMetadataRequest = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly caughtError: IntrospectionError | undefined;
-    readonly element: IntrospectionElement;
+    readonly element: EncodedElement;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
 };
 
@@ -96,7 +97,7 @@ export function createComponentMetadata(request: ComponentMetadataRequest): Intr
 
 export function createComponentHost(
     metadata: IntrospectionComponentMetadata,
-    children: IntrospectionTransformedNode
+    children: React.ReactNode
 ): React.ReactElement {
     return React.createElement(
         introspectionComponentHostType,
@@ -119,7 +120,7 @@ export function createOpaqueHost(value: unknown): React.ReactElement {
     });
 }
 
-export function elementKeyProps(element: IntrospectionElement): Readonly<Record<PropertyKey, unknown>> {
+export function elementKeyProps(element: EncodedElement): Readonly<Record<PropertyKey, unknown>> {
     return { [introspectionElementKeyMetadata]: element.key };
 }
 
