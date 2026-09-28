@@ -150,26 +150,6 @@ function executeIntrospectionFrameElement(element: IntrospectionElement): React.
     }
 }
 
-function cloneElementWithChildren(
-    element: IntrospectionElement,
-    children: IntrospectionTransformedNode
-): React.ReactElement {
-    if (element.type === React.Fragment) {
-        return React.createElement(React.Fragment, null, children);
-    }
-
-    return React.cloneElement(element, {
-        [introspectionElementKeyMetadata]: element.key
-    }, children);
-}
-
-function cloneWrapperElement(
-    element: IntrospectionElement,
-    children: IntrospectionTransformedNode
-): React.ReactElement {
-    return React.cloneElement(element, {}, children);
-}
-
 function isExecutableComponentType(type: unknown): boolean {
     return isClassComponent(type) ||
         isFunctionComponent(type) ||
@@ -238,7 +218,15 @@ function transformNode(node: unknown, depth: IntrospectionFrameDepth): Introspec
 }
 
 function transformRenderableElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    return cloneElementWithChildren(element, transformNode(element.props.children, depth));
+    const children = transformNode(element.props.children, depth);
+
+    if (element.type === React.Fragment) {
+        return React.createElement(React.Fragment, null, children);
+    }
+
+    return React.cloneElement(element, {
+        [introspectionElementKeyMetadata]: element.key
+    }, children);
 }
 
 function transformSuspenseElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
@@ -257,7 +245,7 @@ function transformWrapperElement(
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined, undefined, activityMode),
-        cloneWrapperElement(element, transformNode(element.props.children, depth))
+        React.cloneElement(element, {}, transformNode(element.props.children, depth))
     );
 }
 
