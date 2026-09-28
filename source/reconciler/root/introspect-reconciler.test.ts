@@ -1,5 +1,7 @@
+import { createDeterministicClock, type DeterministicClock } from '@enormora/clock/deterministic-clock';
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
+import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import type {
     IntrospectionOptions,
     IntrospectionView
@@ -63,6 +65,34 @@ function requireValue<Value>(value: Value | undefined): Value {
     }
 
     return value;
+}
+
+const waitTimeout = 25;
+
+const noConsoleDiagnostics: IntrospectionConsoleDiagnostics = {
+    subscribe() {
+        return undefined;
+    }
+};
+
+type ClockedView = {
+    readonly clock: DeterministicClock;
+    readonly view: IntrospectionView<HostSchema>;
+};
+
+function introspectWithClock(
+    element: React.ReactElement,
+    runtime: IntrospectionRuntimeDependencies = createUnitRuntimeDependencies()
+): ClockedView {
+    const clock = createDeterministicClock({ initialUnixEpochMicroseconds: 0n });
+    const view = createUnitIntrospectionView(
+        element,
+        { depth: 'full', strictMode: false, waitTimeout },
+        noConsoleDiagnostics,
+        { ...runtime, clock }
+    ) as IntrospectionView<HostSchema>;
+
+    return { clock, view };
 }
 
 async function readRejection(pending: Promise<unknown>): Promise<unknown> {
@@ -272,6 +302,79 @@ export const testNode = suite('custom reconciler host layer', [
         await nextRender;
 
         scope.assert.equal(await failingWait, failure);
+        scope.assert.equal(view.textContent, 'Hello next');
+
+        return scope.assert.collect();
+    }),
+    test('rejects a predicate wait after waitTimeout and stops evaluating its predicate', async function (scope) {
+        const { clock, view } = introspectWithClock(React.createElement(Page, { title: 'first' }));
+        let evaluations = 0;
+        const timedOutWait = readRejection(view.waitUntil(function neverSatisfied() {
+            evaluations += 1;
+
+            return false;
+        }));
+
+        clock.advanceByMilliseconds(waitTimeout);
+
+        const error = await timedOutWait;
+        const evaluationsAtTimeout = evaluations;
+
+        view.update(React.createElement(Page, { title: 'next' }));
+
+        scope.assert.equal(error instanceof Error ? error.message : error, 'waitUntil timed out after 25 ms.');
+        scope.assert.equal(evaluations, evaluationsAtTimeout);
+
+        return scope.assert.collect();
+    }),
+    test('names the render count wait that timed out', async function (scope) {
+        const { clock, view } = introspectWithClock(React.createElement(Page, { title: 'first' }));
+        const nextRender = readRejection(view.waitForNextRender());
+        const renderCount = readRejection(view.waitForRenderCount(5));
+
+        clock.advanceByMilliseconds(waitTimeout);
+
+        const errors = await Promise.all([ nextRender, renderCount ]);
+
+        scope.assert.deepEqual(
+            errors.map(function readMessage(error) {
+                return error instanceof Error ? error.message : error;
+            }),
+            [ 'waitForNextRender timed out after 25 ms.', 'waitForRenderCount timed out after 25 ms.' ]
+        );
+
+        return scope.assert.collect();
+    }),
+    test('rejects waitForIdle after waitTimeout when idle work never finishes', async function (scope) {
+        const macrotask = Promise.withResolvers<undefined>();
+        const { clock, view } = introspectWithClock(React.createElement(Page, { title: 'first' }), {
+            ...createUnitRuntimeDependencies(),
+            macrotasks: {
+                async waitForNext() {
+                    await macrotask.promise;
+                }
+            }
+        });
+        const idle = readRejection(view.waitForIdle());
+
+        clock.advanceByMilliseconds(waitTimeout);
+
+        const error = await idle;
+
+        macrotask.resolve(undefined);
+
+        scope.assert.equal(error instanceof Error ? error.message : error, 'waitForIdle timed out after 25 ms.');
+
+        return scope.assert.collect();
+    }),
+    test('resolves a wait satisfied before waitTimeout elapses', async function (scope) {
+        const { clock, view } = introspectWithClock(React.createElement(Page, { title: 'first' }));
+        const nextRender = view.waitForNextRender();
+
+        clock.advanceByMilliseconds(waitTimeout - 1);
+        view.update(React.createElement(Page, { title: 'next' }));
+        await nextRender;
+
         scope.assert.equal(view.textContent, 'Hello next');
 
         return scope.assert.collect();
