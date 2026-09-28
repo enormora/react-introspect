@@ -265,14 +265,6 @@ function createNestedPage(log: RenderLog): React.FC<NestedPageProps> {
     return NestedPage;
 }
 
-function catchThrown(value: unknown): void {
-    try {
-        throwIntrospectionRenderError(value);
-    } catch {
-        Object.freeze({});
-    }
-}
-
 function readRenderedChildTypes(node: IntrospectionNode): readonly unknown[] | 'notRendered' {
     const { renderedChildren } = node;
 
@@ -681,7 +673,12 @@ export const testNode = suite('execution shallow function components', [
                 }
             };
 
-            catchThrown(thenable);
+            scope.assert.throws(
+                function () {
+                    throwIntrospectionRenderError(thenable);
+                },
+                { exact: thenable }
+            );
 
             scope.assert.equal(isIntrospectionRenderError(value), false);
             scope.assert.equal(isIntrospectionRenderError(thenable), false);
