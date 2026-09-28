@@ -7,19 +7,17 @@ import {
     createEmptyHost,
     nextDepth,
     type IntrospectionElement,
-    type IntrospectionFrameElementFactory,
     type IntrospectionFrameDepth,
+    type IntrospectionRenderChildren,
     type IntrospectionTransformedNode,
-    type IntrospectionTransformNode,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
 
 export type IntrospectionClassFrameProps = {
-    readonly createFrameElement: IntrospectionFrameElementFactory;
     readonly depth: IntrospectionFrameDepth;
     readonly element: IntrospectionElement;
-    readonly transformNode: IntrospectionTransformNode;
+    readonly renderChildren: IntrospectionRenderChildren;
     readonly type: IntrospectionClassComponent;
 };
 
@@ -355,10 +353,9 @@ const IntrospectionClassFrameBase = class
             return createEmptyHost(undefined);
         }
 
-        return this.props.transformNode(
+        return this.props.renderChildren(
             executeIntrospectionClassRender(this.userInstance),
-            nextDepth(this.props.depth, this.props.type),
-            this.props.createFrameElement
+            nextDepth(this.props.depth, this.props.type)
         );
     }
 

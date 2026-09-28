@@ -37,15 +37,9 @@ type TransformedChildren = readonly IntrospectionTransformedNode[];
 
 export type IntrospectionTransformedNode = TransformedChildren | TransformedElement | number | string;
 
-export type IntrospectionFrameElementFactory = (
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth
-) => React.ReactElement;
-
-export type IntrospectionTransformNode = (
+export type IntrospectionRenderChildren = (
     node: unknown,
-    depth: IntrospectionFrameDepth,
-    createFrameElement: IntrospectionFrameElementFactory
+    depth: IntrospectionFrameDepth
 ) => IntrospectionTransformedNode;
 
 export type IntrospectionComponentMetadata = {

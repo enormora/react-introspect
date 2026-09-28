@@ -9,12 +9,10 @@ import {
     enterComponentDepth,
     nextDepth,
     type IntrospectionElement,
-    type IntrospectionFrameElementFactory,
     introspectionElementKeyMetadata,
     type IntrospectionFrameDepth,
     introspectionOpaqueHostType,
     type IntrospectionTransformedNode,
-    type IntrospectionTransformNode,
     introspectionValueMetadata,
     readElementRef,
     throwIntrospectionRenderError
@@ -22,10 +20,8 @@ import {
 import { assertNotPortal } from './introspect-unsupported-react.ts';
 
 type IntrospectionFrameProps = {
-    readonly createFrameElement: IntrospectionFrameElementFactory;
     readonly depth: IntrospectionFrameDepth;
     readonly element: IntrospectionElement;
-    readonly transformNode: IntrospectionTransformNode;
 };
 
 type IntrospectionFrameType = {
@@ -41,14 +37,6 @@ type IntrospectionForwardRefType = IntrospectionFrameType & {
 };
 
 type IntrospectionFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
-
-type IntrospectionSuspenseTransformRequest = {
-    readonly createFrameElement: IntrospectionFrameElementFactory;
-    readonly depth: IntrospectionFrameDepth;
-    readonly element: IntrospectionElement;
-    readonly transformedChildren: IntrospectionTransformedNode;
-    readonly transformNode: IntrospectionTransformNode;
-};
 
 type IntrospectionLazyInitializer = (payload: unknown) => unknown;
 
@@ -175,35 +163,11 @@ function cloneElementWithChildren(
     }, children);
 }
 
-function cloneSuspenseElement(request: IntrospectionSuspenseTransformRequest): React.ReactElement {
-    const { props } = request.element;
-
-    return React.cloneElement(request.element, {
-        [introspectionElementKeyMetadata]: request.element.key,
-        fallback: request.transformNode(props.fallback, request.depth, request.createFrameElement)
-    }, request.transformedChildren);
-}
-
 function cloneWrapperElement(
     element: IntrospectionElement,
     children: IntrospectionTransformedNode
 ): React.ReactElement {
     return React.cloneElement(element, {}, children);
-}
-
-function transformCollection(
-    nodes: readonly unknown[],
-    depth: IntrospectionFrameDepth,
-    transformChildNode: IntrospectionTransformNode,
-    frameFactory: IntrospectionFrameElementFactory
-): readonly IntrospectionTransformedNode[] {
-    return nodes.map(function transformChild(node, index) {
-        const transformedNode = transformChildNode(node, depth, frameFactory);
-
-        return React.isValidElement(transformedNode)
-            ? React.cloneElement(transformedNode, { key: transformedNode.key ?? `introspect-${index}` })
-            : transformedNode;
-    });
 }
 
 function isExecutableComponentType(type: unknown): boolean {
@@ -226,20 +190,6 @@ function isRenderableElementType(type: unknown): boolean {
     return typeof type === 'string' || type === React.Fragment || isContextType(type);
 }
 
-function transformComponentElement(
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth,
-    frameFactory: IntrospectionFrameElementFactory
-): React.ReactElement {
-    const componentDepth = enterComponentDepth(depth, element.type);
-
-    if (canExecuteComponent(componentDepth, element.type) && isExecutableComponentType(element.type)) {
-        return frameFactory(element, componentDepth);
-    }
-
-    return createComponentHost(createComponentMetadata(element, 'depth'), createEmptyHost(undefined));
-}
-
 function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | undefined {
     if (isEmptyReactNode(node)) {
         return createEmptyHost(node);
@@ -252,89 +202,21 @@ function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | u
     return typeof node === 'string' || typeof node === 'number' ? node : undefined;
 }
 
-function transformRenderableElement(
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth,
-    transformChildNode: IntrospectionTransformNode,
-    frameFactory: IntrospectionFrameElementFactory
-): React.ReactElement {
-    return cloneElementWithChildren(
-        element,
-        transformChildNode(element.props.children, depth, frameFactory)
-    );
-}
+function transformCollection(
+    nodes: readonly unknown[],
+    depth: IntrospectionFrameDepth
+): readonly IntrospectionTransformedNode[] {
+    return nodes.map(function transformChild(node, index) {
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define -- node and collection transforms recurse into each other
+        const transformedNode = transformNode(node, depth);
 
-function transformSuspenseElement(
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth,
-    transformChildNode: IntrospectionTransformNode,
-    frameFactory: IntrospectionFrameElementFactory
-): React.ReactElement {
-    return cloneSuspenseElement({
-        createFrameElement: frameFactory,
-        depth,
-        element,
-        transformedChildren: transformChildNode(element.props.children, depth, frameFactory),
-        transformNode: transformChildNode
+        return React.isValidElement(transformedNode)
+            ? React.cloneElement(transformedNode, { key: transformedNode.key ?? `introspect-${index}` })
+            : transformedNode;
     });
 }
 
-function transformActivityElement(
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth,
-    transformChildNode: IntrospectionTransformNode,
-    frameFactory: IntrospectionFrameElementFactory
-): React.ReactElement {
-    return createComponentHost(
-        createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
-        cloneWrapperElement(element, transformChildNode(element.props.children, depth, frameFactory))
-    );
-}
-
-function transformViewTransitionElement(
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth,
-    transformChildNode: IntrospectionTransformNode,
-    frameFactory: IntrospectionFrameElementFactory
-): React.ReactElement {
-    return createComponentHost(
-        createComponentMetadata(element, undefined),
-        cloneWrapperElement(element, transformChildNode(element.props.children, depth, frameFactory))
-    );
-}
-
-function transformElement(
-    element: IntrospectionElement,
-    depth: IntrospectionFrameDepth,
-    transformChildNode: IntrospectionTransformNode,
-    frameFactory: IntrospectionFrameElementFactory
-): React.ReactElement {
-    const { type } = element;
-
-    if (type === React.Suspense) {
-        return transformSuspenseElement(element, depth, transformChildNode, frameFactory);
-    }
-
-    if (isActivityType(type)) {
-        return transformActivityElement(element, depth, transformChildNode, frameFactory);
-    }
-
-    if (isViewTransitionType(type)) {
-        return transformViewTransitionElement(element, depth, transformChildNode, frameFactory);
-    }
-
-    if (isRenderableElementType(type)) {
-        return transformRenderableElement(element, depth, transformChildNode, frameFactory);
-    }
-
-    return transformComponentElement(element, depth, frameFactory);
-}
-
-function transformNode(
-    node: unknown,
-    depth: IntrospectionFrameDepth,
-    frameFactory: IntrospectionFrameElementFactory
-): IntrospectionTransformedNode {
+function transformNode(node: unknown, depth: IntrospectionFrameDepth): IntrospectionTransformedNode {
     assertNotPortal(node);
 
     const primitiveNode = transformPrimitiveNode(node);
@@ -344,48 +226,102 @@ function transformNode(
     }
 
     if (React.isValidElement(node)) {
-        return transformElement(createIntrospectionElement(node), depth, transformNode, frameFactory);
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define -- node and element transforms recurse into each other
+        return transformElement(createIntrospectionElement(node), depth);
     }
 
     if (Array.isArray(node)) {
-        return transformCollection(node, depth, transformNode, frameFactory);
+        return transformCollection(node, depth);
     }
 
-    return isIterable(node)
-        ? transformCollection(Array.from(node), depth, transformNode, frameFactory)
-        : createOpaqueHost(node);
+    return isIterable(node) ? transformCollection(Array.from(node), depth) : createOpaqueHost(node);
+}
+
+function transformRenderableElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    return cloneElementWithChildren(element, transformNode(element.props.children, depth));
+}
+
+function transformSuspenseElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    const children = transformNode(element.props.children, depth);
+
+    return React.cloneElement(element, {
+        [introspectionElementKeyMetadata]: element.key,
+        fallback: transformNode(element.props.fallback, depth)
+    }, children);
+}
+
+function transformActivityElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
+        cloneWrapperElement(element, transformNode(element.props.children, depth))
+    );
+}
+
+function transformViewTransitionElement(
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata(element, undefined),
+        cloneWrapperElement(element, transformNode(element.props.children, depth))
+    );
 }
 
 function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(props.element, undefined),
-        props.transformNode(
-            executeIntrospectionFrameElement(props.element),
-            nextDepth(props.depth, props.element.type),
-            props.createFrameElement
-        )
+        transformNode(executeIntrospectionFrameElement(props.element), nextDepth(props.depth, props.element.type))
     );
 }
 
 function createFrameElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
     if (isClassComponent(element.type)) {
         return React.createElement(readClassFrameType(element.type), {
-            createFrameElement,
             depth,
             element,
             key: element.key ?? undefined,
-            transformNode,
+            renderChildren: transformNode,
             type: element.type
         });
     }
 
     return React.createElement(IntrospectionFrame, {
-        createFrameElement,
         depth,
         element,
-        key: element.key ?? undefined,
-        transformNode
+        key: element.key ?? undefined
     });
+}
+
+function transformComponentElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    const componentDepth = enterComponentDepth(depth, element.type);
+
+    if (canExecuteComponent(componentDepth, element.type) && isExecutableComponentType(element.type)) {
+        return createFrameElement(element, componentDepth);
+    }
+
+    return createComponentHost(createComponentMetadata(element, 'depth'), createEmptyHost(undefined));
+}
+
+function transformElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    const { type } = element;
+
+    if (type === React.Suspense) {
+        return transformSuspenseElement(element, depth);
+    }
+
+    if (isActivityType(type)) {
+        return transformActivityElement(element, depth);
+    }
+
+    if (isViewTransitionType(type)) {
+        return transformViewTransitionElement(element, depth);
+    }
+
+    if (isRenderableElementType(type)) {
+        return transformRenderableElement(element, depth);
+    }
+
+    return transformComponentElement(element, depth);
 }
 
 export function createIntrospectionRenderElement(
@@ -394,5 +330,5 @@ export function createIntrospectionRenderElement(
 ): React.ReactElement {
     assertNotPortal(element);
 
-    return transformElement(createIntrospectionElement(element), depth, transformNode, createFrameElement);
+    return transformElement(createIntrospectionElement(element), depth);
 }
