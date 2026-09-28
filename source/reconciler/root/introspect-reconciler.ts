@@ -212,7 +212,8 @@ type IntrospectionReconcilerSession = {
 
 type SessionRenderTarget = {
     readonly container: IntrospectionHostContainer;
-    readonly options: IntrospectionReconcilerRootOptions;
+    readonly diagnostics: IntrospectionDiagnostics;
+    readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readRenderCount: () => number;
 };
 
@@ -284,7 +285,7 @@ function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefor
 
     target.container.writeMounted(false);
     target.container.writeChildren([]);
-    target.options.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
+    target.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
 }
 
 function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
@@ -293,14 +294,14 @@ function captureRenderError(target: SessionRenderTarget, error: unknown, renderC
     }
 
     publishEmptyErrorSnapshot(target, renderCountBefore);
-    target.options.diagnostics.recordUncaughtError(error);
+    target.diagnostics.recordUncaughtError(error);
 }
 
 function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBefore: number): void {
     if (
         renderCountBefore > 0 ||
         target.readRenderCount() > renderCountBefore ||
-        target.options.diagnostics.uncaughtErrors.length > 0
+        target.diagnostics.uncaughtErrors.length > 0
     ) {
         return;
     }
@@ -309,7 +310,7 @@ function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBef
         'Wrap lazy, async, or promise-using roots in React.Suspense.';
 
     publishEmptyErrorSnapshot(target, renderCountBefore);
-    target.options.diagnostics.recordUncaughtError(new Error(message));
+    target.diagnostics.recordUncaughtError(new Error(message));
 }
 
 function updateRootElement(root: ReconcilerRoot, element: Readonly<React.ReactElement> | null): void {
@@ -328,14 +329,10 @@ function renderRootElement(
     });
 }
 
-function renderWithDiagnostics(
-    target: SessionRenderTarget,
-    element: Readonly<React.ReactElement> | null,
-    commitElement: () => void
-): void {
+function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, commitElement: () => void): void {
     const renderCountBefore = target.readRenderCount();
 
-    target.container.writeMounted(element !== null);
+    target.container.writeMounted(mounted);
 
     try {
         commitElement();
@@ -375,7 +372,8 @@ function createIntrospectionReconcilerSession(
     });
     const target: SessionRenderTarget = {
         container,
-        options,
+        diagnostics: options.diagnostics,
+        publish: options.publish,
         readRenderCount() {
             return renderCount;
         }
@@ -389,7 +387,7 @@ function createIntrospectionReconcilerSession(
         readRenderCount: target.readRenderCount,
         render(element) {
             options.diagnostics.run(function renderElementWithDiagnostics() {
-                renderWithDiagnostics(target, element, function commitElement() {
+                renderWithDiagnostics(target, element !== null, function commitElement() {
                     renderRootElement(runtime, root, element);
                 });
             });
