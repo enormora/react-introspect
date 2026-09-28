@@ -321,14 +321,7 @@ export function createIntrospectionNode(
 }
 
 function snapshotTreeNodes(snapshot: IntrospectionSnapshot): readonly SnapshotNode[] {
-    function collect(node: SnapshotNode): readonly SnapshotNode[] {
-        return [
-            node,
-            ...node.renderedChildren.flatMap(collect)
-        ];
-    }
-
-    return snapshot.root === undefined ? [] : collect(snapshot.root);
+    return snapshot.root === undefined ? [] : [ snapshot.root, ...collectDescendants(snapshot.root) ];
 }
 
 export function createIntrospectionNodeList(
