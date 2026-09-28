@@ -65,6 +65,16 @@ function requireValue<Value>(value: Value | undefined): Value {
     return value;
 }
 
+async function readRejection(pending: Promise<unknown>): Promise<unknown> {
+    try {
+        await pending;
+    } catch (error) {
+        return error;
+    }
+
+    return undefined;
+}
+
 function Page(props: PageProps): React.ReactNode {
     return React.createElement(
         'main',
@@ -238,6 +248,31 @@ export const testNode = suite('custom reconciler host layer', [
         await waitForDelayedRender(view);
 
         scope.assert.equal(view.textContent, 'Hello delayed');
+
+        return scope.assert.collect();
+    }),
+    test('rejects only the wait whose predicate throws while a render commits', async function (scope) {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'first' }), {
+            depth: 'full',
+            strictMode: false
+        });
+        const failure = new Error('Predicate failed.');
+        let hasThrown = false;
+        const failingWait = readRejection(view.waitUntil(function throwsOnceAfterFirstRender() {
+            if (hasThrown || view.textContent === 'Hello first') {
+                return false;
+            }
+
+            hasThrown = true;
+            throw failure;
+        }));
+        const nextRender = view.waitForNextRender();
+
+        view.update(React.createElement(Page, { title: 'next' }));
+        await nextRender;
+
+        scope.assert.equal(await failingWait, failure);
+        scope.assert.equal(view.textContent, 'Hello next');
 
         return scope.assert.collect();
     }),

@@ -35,9 +35,13 @@ import {
     type IntrospectionReconcilerRuntime
 } from './introspect-reconciler-runtime.ts';
 
+type WaiterOutcome = { readonly error: unknown; readonly kind: 'failed'; } | { readonly kind: 'satisfied'; };
+
+type PredicateOutcome = WaiterOutcome | { readonly kind: 'pending'; };
+
 type Waiter = {
     readonly predicate: () => boolean;
-    readonly resolve: () => void;
+    readonly resolve: (outcome: WaiterOutcome) => void;
 };
 
 type IntrospectionReconcilerRootOptions = {
@@ -199,7 +203,7 @@ function createReconcilerContainer(
 
 type WaiterQueue = {
     readonly settle: () => void;
-    readonly wait: (predicate: () => boolean) => Promise<void>;
+    readonly wait: (predicate: () => boolean) => Promise<WaiterOutcome>;
 };
 
 type IntrospectionReconcilerSession = {
@@ -217,29 +221,36 @@ type SessionRenderTarget = {
     readonly readRenderCount: () => number;
 };
 
+function outcomeOfSatisfaction(satisfied: boolean): PredicateOutcome {
+    return satisfied ? { kind: 'satisfied' } : { kind: 'pending' };
+}
+
+function evaluatePredicate(predicate: () => boolean): PredicateOutcome {
+    try {
+        return outcomeOfSatisfaction(predicate());
+    } catch (error) {
+        return { error, kind: 'failed' };
+    }
+}
+
 function createWaiterQueue(): WaiterQueue {
     const waiters = new Set<Waiter>();
 
     return {
         settle() {
-            const settledWaiters = Array.from(waiters).filter(function isSettled(waiter) {
-                return waiter.predicate();
-            });
+            for (const waiter of Array.from(waiters)) {
+                const outcome = evaluatePredicate(waiter.predicate);
 
-            for (const waiter of settledWaiters) {
-                waiters.delete(waiter);
-                waiter.resolve();
+                if (outcome.kind !== 'pending') {
+                    waiters.delete(waiter);
+                    waiter.resolve(outcome);
+                }
             }
         },
         async wait(predicate) {
-            const { promise, resolve } = Promise.withResolvers<undefined>();
+            const { promise, resolve } = Promise.withResolvers<WaiterOutcome>();
 
-            waiters.add({
-                predicate,
-                resolve() {
-                    resolve(undefined);
-                }
-            });
+            waiters.add({ predicate, resolve });
 
             return promise;
         }
@@ -406,8 +417,14 @@ function createIntrospectionReconcilerSession(
 
             await session.waitForIdle();
 
-            if (!options.diagnostics.run(predicate)) {
-                await waiting;
+            if (options.diagnostics.run(predicate)) {
+                return;
+            }
+
+            const outcome = await waiting;
+
+            if (outcome.kind === 'failed') {
+                throw outcome.error;
             }
         }
     };
