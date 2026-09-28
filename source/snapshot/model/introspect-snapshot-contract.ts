@@ -25,7 +25,7 @@ export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | Sna
 type SnapshotSourceElementBase = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly children: readonly SnapshotSourceNode[];
-    readonly error: IntrospectionError | undefined;
+    readonly caughtError: IntrospectionError | undefined;
     readonly key: string | null;
     readonly props: SnapshotProps;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
@@ -65,7 +65,7 @@ type SnapshotSourceText = {
 
 export type SnapshotNode = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
-    readonly error: IntrospectionError | undefined;
+    readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: readonly SnapshotNode[];
     readonly id: number;
     readonly key: string | null;

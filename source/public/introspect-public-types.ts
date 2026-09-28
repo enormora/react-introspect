@@ -8,7 +8,6 @@ export type IntrospectionWarning = {
 export type IntrospectionError = {
     readonly message: string;
     readonly cause: unknown;
-    readonly handled: boolean;
 };
 
 export type IntrospectionNodeState = {
@@ -253,7 +252,7 @@ export type IntrospectionNode<
     NodeType = unknown,
     HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
 > = {
-    readonly error: IntrospectionError | undefined;
+    readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: GivenChildren<HostSchema>;
     readonly isStale: boolean;
     readonly key: string | null;
@@ -312,12 +311,13 @@ export type IntrospectionListLocator<
 > = IntrospectionNodeSequence<Props, Type, HostSchema>;
 
 export type IntrospectionView<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema> = {
-    readonly errors: readonly IntrospectionError[];
+    readonly caughtErrors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
     readonly renderCount: number;
     readonly renderedChildren: IntrospectionList<unknown, unknown, HostSchema>;
     readonly root: IntrospectionNode<unknown, unknown, HostSchema> | undefined;
     readonly textContent: string;
+    readonly uncaughtErrors: readonly IntrospectionError[];
     readonly warnings: readonly IntrospectionWarning[];
     readonly find: IntrospectionQuery<HostSchema, 'node'>;
     readonly findAll: IntrospectionQuery<HostSchema, 'list'>;

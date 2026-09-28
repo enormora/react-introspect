@@ -9,7 +9,7 @@ function createNode(): RuntimeIntrospectionNode {
         callProp() {
             return undefined;
         },
-        error: undefined,
+        caughtError: undefined,
         find(selector: unknown) {
             if (selector === 'strong') {
                 return createNode();

@@ -73,7 +73,7 @@ expect({
     .type
     .toBeAssignableTo<IntrospectionOptions>();
 expect({ message: 'warning', cause: undefined }).type.toBeAssignableTo<IntrospectionWarning>();
-expect({ cause: undefined, handled: false, message: 'error' }).type.toBeAssignableTo<IntrospectionError>();
+expect({ cause: undefined, message: 'error' }).type.toBeAssignableTo<IntrospectionError>();
 expect({ activityMode: undefined, reason: undefined, rendered: true, visible: true })
     .type
     .toBeAssignableTo<IntrospectionNodeState>();

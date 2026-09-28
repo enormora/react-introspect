@@ -1,5 +1,5 @@
 import React from 'react';
-import type { IntrospectionError } from '../../public/introspect-public-types.ts';
+import { createDiagnosticRecord } from '../../diagnostics/introspect-diagnostics.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
@@ -70,7 +70,9 @@ type IntrospectionClassInstance = React.Component<Readonly<Record<PropertyKey, u
 
 type IntrospectionClassFrameState = {
     readonly boundaryErrorCause: unknown;
-    readonly revision: number;
+    readonly hasUnfoldedBoundaryError: boolean;
+    readonly isAwaitingCatchRecovery: boolean;
+    readonly userState: unknown;
 };
 
 type IntrospectionStateUpdate = (props: Readonly<Record<PropertyKey, unknown>>, state: unknown) => unknown;
@@ -80,15 +82,17 @@ type IntrospectionStateUpdateFactory = (
     props: Readonly<Record<PropertyKey, unknown>>
 ) => unknown;
 
-type IntrospectionClassLifecycle = {
-    readonly previousProps: Readonly<Record<PropertyKey, unknown>>;
-    readonly previousState: unknown;
-    readonly shouldCommit: boolean;
+type IntrospectionClassRender = {
+    readonly node: IntrospectionTransformedNode;
+    readonly props: Readonly<Record<PropertyKey, unknown>>;
+    readonly state: unknown;
 };
 
-const emptyErrorInfo = Object.freeze({ componentStack: '' });
-const noCatchOnlyBoundaryRecovery = Symbol('noCatchOnlyBoundaryRecovery');
-const catchOnlyBoundaryRecoveries = new WeakMap<IntrospectionClassComponent, Map<string, unknown>>();
+type IntrospectionClassRenderPass = {
+    readonly next: IntrospectionClassRender;
+    readonly previous: IntrospectionClassRender | undefined;
+    readonly shouldCommit: boolean;
+};
 
 export function isClassComponent(value: unknown): value is IntrospectionClassComponent {
     const prototype: unknown = typeof value === 'function' ? Reflect.get(value, 'prototype') : undefined;
@@ -99,14 +103,6 @@ export function isClassComponent(value: unknown): value is IntrospectionClassCom
 function isErrorBoundary(type: IntrospectionClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
         typeof type.prototype.componentDidCatch === 'function';
-}
-
-function createIntrospectionError(cause: unknown, handled: boolean): IntrospectionError {
-    return Object.freeze({
-        cause,
-        handled,
-        message: cause instanceof Error ? cause.message : String(cause)
-    });
 }
 
 function shallowEquals(
@@ -161,16 +157,6 @@ function toStateUpdate(partialState: unknown): IntrospectionStateUpdate {
     };
 }
 
-function applyStateUpdates(
-    props: Readonly<Record<PropertyKey, unknown>>,
-    state: unknown,
-    updates: readonly IntrospectionStateUpdate[]
-): unknown {
-    return updates.reduce(function applyUpdate(nextState, update) {
-        return mergeState(nextState, update(props, nextState));
-    }, state);
-}
-
 function readDerivedState(
     type: IntrospectionClassComponent,
     props: Readonly<Record<PropertyKey, unknown>>,
@@ -179,6 +165,29 @@ function readDerivedState(
     return typeof type.getDerivedStateFromProps === 'function'
         ? mergeState(state, type.getDerivedStateFromProps(props, state))
         : state;
+}
+
+function foldBoundaryError(
+    type: IntrospectionClassComponent,
+    state: IntrospectionClassFrameState
+): IntrospectionClassFrameState {
+    if (!state.hasUnfoldedBoundaryError) {
+        return state;
+    }
+
+    if (typeof type.getDerivedStateFromError === 'function') {
+        return {
+            ...state,
+            hasUnfoldedBoundaryError: false,
+            userState: mergeState(state.userState, type.getDerivedStateFromError(state.boundaryErrorCause))
+        };
+    }
+
+    return {
+        ...state,
+        hasUnfoldedBoundaryError: false,
+        isAwaitingCatchRecovery: true
+    };
 }
 
 function assignClassField(instance: IntrospectionClassInstance, property: PropertyKey, value: unknown): void {
@@ -205,82 +214,65 @@ function executeIntrospectionClassRender(instance: IntrospectionClassInstance): 
     }
 }
 
-function notifyCatchBoundary(
-    type: IntrospectionClassComponent,
-    instance: IntrospectionClassInstance,
-    error: unknown
-): void {
-    type.prototype.componentDidCatch?.call(instance, error, emptyErrorInfo);
-}
-
-function readCatchOnlyBoundaryRecoveries(type: IntrospectionClassComponent): Map<string, unknown> {
-    let recoveries = catchOnlyBoundaryRecoveries.get(type);
-
-    if (recoveries === undefined) {
-        recoveries = new Map();
-        catchOnlyBoundaryRecoveries.set(type, recoveries);
-    }
-
-    return recoveries;
-}
-
-function readCatchOnlyBoundaryRecovery(type: IntrospectionClassComponent, key: string): unknown {
-    const recoveries = readCatchOnlyBoundaryRecoveries(type);
-
-    return recoveries.has(key) ? recoveries.get(key) : noCatchOnlyBoundaryRecovery;
-}
-
-function writeCatchOnlyBoundaryRecovery(type: IntrospectionClassComponent, key: string, state: unknown): void {
-    readCatchOnlyBoundaryRecoveries(type).set(key, state);
-}
-
-function deleteCatchOnlyBoundaryRecovery(type: IntrospectionClassComponent, error: unknown): void {
-    readCatchOnlyBoundaryRecoveries(type).delete(String(error));
-}
-
 const IntrospectionClassFrameBase = class
     extends React.Component<IntrospectionClassFrameProps, IntrospectionClassFrameState> {
-    protected appliedBoundaryErrorCause: unknown;
-    protected boundaryError: IntrospectionError | undefined;
-    protected isApplyingBoundaryError = false;
-    protected lifecycle: IntrospectionClassLifecycle | undefined;
-    protected pendingStateUpdates: readonly IntrospectionStateUpdate[];
-    protected renderedNode: IntrospectionTransformedNode;
+    protected committedRender: IntrospectionClassRender | undefined;
+    protected renderPass: IntrospectionClassRenderPass | undefined;
     protected shouldForceRender: boolean;
-    protected userInstance: IntrospectionClassInstance | undefined;
+    protected readonly userInstance: IntrospectionClassInstance;
 
     public constructor(props: IntrospectionClassFrameProps) {
         super(props);
 
-        this.appliedBoundaryErrorCause = undefined;
-        this.boundaryError = undefined;
-        this.lifecycle = undefined;
-        this.pendingStateUpdates = Object.freeze([]);
-        this.renderedNode = createEmptyHost(undefined);
+        const ClassComponent = props.type;
+        const instance = new ClassComponent(readElementProps(props.element), undefined);
+
+        assignClassField(instance, 'updater', this.createUpdater());
+        assignClassField(instance, 'refs', {});
+        this.committedRender = undefined;
+        this.renderPass = undefined;
         this.shouldForceRender = false;
         this.state = Object.freeze({
             boundaryErrorCause: undefined,
-            revision: 0
+            hasUnfoldedBoundaryError: false,
+            isAwaitingCatchRecovery: false,
+            userState: instance.state
         });
-        this.userInstance = undefined;
+        this.userInstance = instance;
+    }
+
+    public static getDerivedStateFromProps(
+        props: IntrospectionClassFrameProps,
+        state: IntrospectionClassFrameState
+    ): IntrospectionClassFrameState {
+        const foldedState = foldBoundaryError(props.type, state);
+
+        return {
+            ...foldedState,
+            userState: readDerivedState(props.type, readElementProps(props.element), foldedState.userState)
+        };
     }
 
     public override render(): React.ReactElement {
-        const props = readElementProps(this.props.element);
-        const instance = this.readUserInstance();
-        const renderedNode = this.readRenderedNode(instance, props, this.readNextState(instance, props));
+        const { boundaryErrorCause } = this.state;
+        const renderPass = this.createRenderPass(readElementProps(this.props.element), this.state.userState);
+
+        this.renderPass = renderPass;
 
         return createComponentHost(
-            createComponentMetadata(this.props.element, undefined, this.boundaryError),
-            renderedNode
+            createComponentMetadata(
+                this.props.element,
+                undefined,
+                boundaryErrorCause === undefined ? undefined : createDiagnosticRecord(boundaryErrorCause)
+            ),
+            renderPass.next.node
         );
     }
 
     public override componentDidMount(): void {
-        const instance = this.readUserInstance();
-
-        applyElementRef(readElementRef(this.props.element), instance);
-        instance.componentDidMount?.();
+        this.commitRenderPass();
+        applyElementRef(readElementRef(this.props.element), this.userInstance);
+        this.userInstance.componentDidMount?.();
     }
 
     public override componentDidUpdate(
@@ -288,50 +280,34 @@ const IntrospectionClassFrameBase = class
         _previousState: IntrospectionClassFrameState,
         snapshot: unknown
     ): void {
-        const { lifecycle } = this;
+        const { renderPass } = this;
 
-        applyElementRef(readElementRef(this.props.element), this.readUserInstance());
+        this.commitRenderPass();
+        applyElementRef(readElementRef(this.props.element), this.userInstance);
 
-        if (lifecycle?.shouldCommit === true) {
-            this.readUserInstance().componentDidUpdate?.(
-                lifecycle.previousProps,
-                lifecycle.previousState,
-                snapshot
-            );
+        if (renderPass?.shouldCommit === true && renderPass.previous !== undefined) {
+            this.userInstance.componentDidUpdate?.(renderPass.previous.props, renderPass.previous.state, snapshot);
         }
     }
 
     public override getSnapshotBeforeUpdate(): unknown {
-        const { lifecycle } = this;
+        const { renderPass } = this;
 
-        if (lifecycle?.shouldCommit !== true) {
+        if (renderPass?.shouldCommit !== true || renderPass.previous === undefined) {
             return null;
         }
 
-        return this
-            .readUserInstance()
-            .getSnapshotBeforeUpdate?.(lifecycle.previousProps, lifecycle.previousState) ?? null;
+        return this.userInstance.getSnapshotBeforeUpdate?.(renderPass.previous.props, renderPass.previous.state) ??
+            null;
     }
 
     public override componentWillUnmount(): void {
-        const instance = this.readUserInstance();
-
-        instance.componentWillUnmount?.();
+        this.userInstance.componentWillUnmount?.();
         applyElementRef(readElementRef(this.props.element), null);
     }
 
-    protected readBoundaryState(
-        _instance: IntrospectionClassInstance,
-        _type: IntrospectionClassComponent,
-        state: unknown
-    ): unknown {
-        Object.is(this.userInstance, undefined);
-
-        return state;
-    }
-
-    protected clearQueuedUpdates(): void {
-        this.pendingStateUpdates = Object.freeze([]);
+    protected commitRenderPass(): void {
+        this.committedRender = this.renderPass?.next;
         this.shouldForceRender = false;
     }
 
@@ -339,181 +315,90 @@ const IntrospectionClassFrameBase = class
         return {
             enqueueForceUpdate: (_instance: unknown, callback: (() => void) | undefined) => {
                 this.shouldForceRender = true;
-                this.setState(function incrementRevision(state) {
-                    return { revision: state.revision + 1 };
-                }, callback);
+                this.setState({ isAwaitingCatchRecovery: false }, callback);
             },
             enqueueSetState: (_instance: unknown, partialState: unknown, callback: (() => void) | undefined) => {
-                this.pendingStateUpdates = [
-                    ...this.pendingStateUpdates,
-                    toStateUpdate(partialState)
-                ];
+                const update = toStateUpdate(partialState);
 
-                if (this.isApplyingBoundaryError) {
-                    callback?.();
-
-                    return;
-                }
-
-                this.setState(function incrementRevision(currentState) {
-                    return { revision: currentState.revision + 1 };
+                this.setState(function applyUserStateUpdate(state, props) {
+                    return {
+                        isAwaitingCatchRecovery: false,
+                        userState: mergeState(state.userState, update(readElementProps(props.element), state.userState))
+                    };
                 }, callback);
             }
         };
     }
 
+    protected createRenderPass(
+        props: Readonly<Record<PropertyKey, unknown>>,
+        state: unknown
+    ): IntrospectionClassRenderPass {
+        const previous = this.committedRender;
+        const shouldCommit = previous === undefined || this.shouldRender(previous, props, state);
+
+        assignClassField(this.userInstance, 'props', props);
+        assignClassField(this.userInstance, 'state', state);
+
+        return Object.freeze({
+            next: Object.freeze({
+                node: shouldCommit ? this.renderUserOutput() : previous.node,
+                props,
+                state
+            }),
+            previous,
+            shouldCommit
+        });
+    }
+
+    protected renderUserOutput(): IntrospectionTransformedNode {
+        if (this.state.isAwaitingCatchRecovery) {
+            return createEmptyHost(undefined);
+        }
+
+        return this.props.transformNode(
+            executeIntrospectionClassRender(this.userInstance),
+            nextDepth(this.props.depth, this.props.type),
+            this.props.createFrameElement
+        );
+    }
+
     protected shouldRender(
-        instance: IntrospectionClassInstance,
+        previous: IntrospectionClassRender,
         props: Readonly<Record<PropertyKey, unknown>>,
         state: unknown
     ): boolean {
-        if (this.shouldForceRender || this.lifecycle === undefined) {
+        const instance = this.userInstance;
+
+        if (this.shouldForceRender) {
             return true;
         }
+
+        assignClassField(instance, 'props', previous.props);
+        assignClassField(instance, 'state', previous.state);
 
         if (typeof instance.shouldComponentUpdate === 'function') {
             return instance.shouldComponentUpdate(props, state, instance.context);
         }
 
         if (instance.isPureReactComponent === true) {
-            return !shallowEquals(instance.props, props) || !shallowStateEquals(instance.state, state);
+            return !shallowEquals(previous.props, props) || !shallowStateEquals(previous.state, state);
         }
 
         return true;
     }
-
-    protected readNextState(
-        instance: IntrospectionClassInstance,
-        props: Readonly<Record<PropertyKey, unknown>>
-    ): unknown {
-        const updatedState = applyStateUpdates(props, instance.state, this.pendingStateUpdates);
-        const boundaryState = this.readBoundaryState(instance, this.props.type, updatedState);
-
-        return readDerivedState(this.props.type, props, boundaryState);
-    }
-
-    protected readRenderedNode(
-        instance: IntrospectionClassInstance,
-        props: Readonly<Record<PropertyKey, unknown>>,
-        state: unknown
-    ): IntrospectionTransformedNode {
-        const shouldRender = this.shouldRender(instance, props, state);
-
-        this.lifecycle = Object.freeze({
-            previousProps: instance.props,
-            previousState: instance.state,
-            shouldCommit: shouldRender
-        });
-        assignClassField(instance, 'props', props);
-        assignClassField(instance, 'state', state);
-        this.clearQueuedUpdates();
-
-        if (shouldRender) {
-            this.renderedNode = this.props.transformNode(
-                executeIntrospectionClassRender(instance),
-                nextDepth(this.props.depth, this.props.type),
-                this.props.createFrameElement
-            );
-        }
-
-        return this.renderedNode;
-    }
-
-    protected readUserInstance(): IntrospectionClassInstance {
-        if (this.userInstance !== undefined) {
-            return this.userInstance;
-        }
-
-        const ClassComponent = this.props.type;
-        const instance = new ClassComponent(readElementProps(this.props.element), undefined);
-
-        assignClassField(instance, 'updater', this.createUpdater());
-        assignClassField(instance, 'refs', {});
-        assignClassField(
-            instance,
-            'state',
-            readDerivedState(ClassComponent, readElementProps(this.props.element), instance.state)
-        );
-        this.userInstance = instance;
-
-        return instance;
-    }
 };
 
 const IntrospectionClassBoundaryFrame = class extends IntrospectionClassFrameBase {
-    public static getDerivedStateFromError(error: unknown): IntrospectionClassFrameState {
+    public static getDerivedStateFromError(error: unknown): Partial<IntrospectionClassFrameState> {
         return {
             boundaryErrorCause: error,
-            revision: 0
+            hasUnfoldedBoundaryError: true
         };
     }
 
     public override componentDidCatch(error: unknown, errorInfo: unknown): void {
-        const instance = this.readUserInstance();
-
-        if (typeof this.props.type.getDerivedStateFromError === 'function') {
-            instance.componentDidCatch?.(error, errorInfo);
-        } else {
-            deleteCatchOnlyBoundaryRecovery(this.props.type, error);
-        }
-
-        this.boundaryError = createIntrospectionError(error, true);
-    }
-
-    protected applyCatchOnlyBoundaryState(
-        instance: IntrospectionClassInstance,
-        type: IntrospectionClassComponent,
-        state: unknown,
-        error: unknown
-    ): unknown {
-        const recoveryKey = String(error);
-        const recoveredState = readCatchOnlyBoundaryRecovery(type, recoveryKey);
-
-        if (recoveredState !== noCatchOnlyBoundaryRecovery) {
-            return recoveredState;
-        }
-
-        this.isApplyingBoundaryError = true;
-
-        try {
-            notifyCatchBoundary(type, instance, error);
-        } finally {
-            this.isApplyingBoundaryError = false;
-        }
-
-        return this.createCatchOnlyBoundaryState(type, recoveryKey, state);
-    }
-
-    protected createCatchOnlyBoundaryState(type: IntrospectionClassComponent, key: string, state: unknown): unknown {
-        const nextState = applyStateUpdates(readElementProps(this.props.element), state, this.pendingStateUpdates);
-
-        writeCatchOnlyBoundaryRecovery(type, key, nextState);
-
-        return nextState;
-    }
-
-    protected override readBoundaryState(
-        instance: IntrospectionClassInstance,
-        type: IntrospectionClassComponent,
-        state: unknown
-    ): unknown {
-        const { boundaryErrorCause } = this.state;
-
-        if (boundaryErrorCause === undefined || this.appliedBoundaryErrorCause === boundaryErrorCause) {
-            return state;
-        }
-
-        this.appliedBoundaryErrorCause = boundaryErrorCause;
-        this.boundaryError = createIntrospectionError(boundaryErrorCause, true);
-
-        if (typeof type.getDerivedStateFromError !== 'function') {
-            return this.applyCatchOnlyBoundaryState(instance, type, state, boundaryErrorCause);
-        }
-
-        return mergeState(
-            state,
-            type.getDerivedStateFromError(boundaryErrorCause)
-        );
+        this.userInstance.componentDidCatch?.(error, errorInfo);
     }
 };
 

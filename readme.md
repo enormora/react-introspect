@@ -660,9 +660,9 @@ type IntrospectionNodeState = {
 };
 ```
 
-### `node.error`
+### `node.caughtError`
 
-Returns the error associated with this node, or `undefined`.
+Returns the latest error this error boundary caught, or `undefined`.
 
 ```tsx
 const view = introspect(
@@ -676,10 +676,9 @@ const boundary = view.find(Boundary);
 
 assert.ok(boundary);
 
-const error = boundary.error;
+const error = boundary.caughtError;
 
 assert.ok(error);
-assert.equal(error.handled, true);
 assert.match(error.message, /boom/);
 ```
 
@@ -767,21 +766,23 @@ assert.equal(view.root, undefined);
 const nextView = introspect(<ProfileCard user={user} />);
 ```
 
-### `view.errors`
+### `view.uncaughtErrors` and `view.caughtErrors`
 
-Returns all committed error records.
+`uncaughtErrors` returns render errors no error boundary caught. They unmount the root.
+
+`caughtErrors` returns every error an error boundary caught, in order, including ones the boundary has recovered from since.
 
 Use `.at(-1)` for the latest one.
 
 ```tsx
 const view = introspect(<Crashes />);
 
-const error = view.errors.at(-1);
+const error = view.uncaughtErrors.at(-1);
 
 assert.ok(error);
-assert.equal(error.handled, false);
 assert.match(error.message, /boom/);
-assert.equal(view.errors.length, 1);
+assert.equal(view.uncaughtErrors.length, 1);
+assert.equal(view.caughtErrors.length, 0);
 ```
 
 Use `errorMode: 'throw'` when a thrown render error should escape `introspect()`.
@@ -1134,12 +1135,12 @@ const boundary = view.find(Boundary);
 assert.ok(fallback);
 assert.ok(boundary);
 
-const error = boundary.error;
+const error = boundary.caughtError;
 
 assert.ok(error);
-assert.equal(error.handled, true);
 assert.match(error.message, /boom/);
-assert.equal(view.errors.length, 1);
+assert.equal(view.caughtErrors.length, 1);
+assert.equal(view.uncaughtErrors.length, 0);
 ```
 
 Uncaught errors stay inspectable on the view.
@@ -1147,10 +1148,9 @@ Uncaught errors stay inspectable on the view.
 ```tsx
 const view = introspect(<Crashes />);
 
-const error = view.errors.at(-1);
+const error = view.uncaughtErrors.at(-1);
 
 assert.ok(error);
-assert.equal(error.handled, false);
 assert.match(error.message, /boom/);
 ```
 

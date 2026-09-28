@@ -25,6 +25,10 @@ type ButtonProps = {
     readonly label: string;
 };
 
+type SeededLabelListProps = {
+    readonly labels: readonly string[];
+};
+
 type DepthComponents = {
     readonly Button: React.FC<ButtonProps>;
     readonly counts: Counts;
@@ -101,6 +105,18 @@ function Counter(): React.ReactNode {
         },
         String(count)
     );
+}
+
+function SeededLabel(props: ButtonProps): React.ReactNode {
+    const [ label ] = React.useState(props.label);
+
+    return React.createElement('span', null, label);
+}
+
+function SeededLabelList(props: SeededLabelListProps): React.ReactNode {
+    return props.labels.map(function renderSeededLabel(label) {
+        return React.createElement(SeededLabel, { key: label, label });
+    });
 }
 
 function LabelConsumer(): React.ReactNode {
@@ -461,6 +477,29 @@ export const testNode = suite('execution shallow function components', [
 
         scope.assert.equal(button.isStale, true);
         scope.assert.equal(view.find('button')?.textContent, '1');
+
+        return scope.assert.collect();
+    }),
+    test('remounts a component whose key changes', function (scope) {
+        const view = introspect(React.createElement(SeededLabel, { key: 'first', label: 'first' }), {
+            strictMode: false
+        });
+
+        view.update(React.createElement(SeededLabel, { key: 'second', label: 'second' }));
+
+        scope.assert.equal(view.textContent, 'second');
+
+        return scope.assert.collect();
+    }),
+    test('keeps component state with its key when siblings reorder', function (scope) {
+        const view = introspect(React.createElement(SeededLabelList, { labels: [ 'first', 'second' ] }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        view.update(React.createElement(SeededLabelList, { labels: [ 'third', 'first', 'second' ] }));
+
+        scope.assert.equal(view.textContent, 'thirdfirstsecond');
 
         return scope.assert.collect();
     }),

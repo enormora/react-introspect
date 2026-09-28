@@ -275,7 +275,6 @@ function createIntrospectionReconcilerSession(
         }
     });
     const container = createSessionContainer(options, state);
-    moduleState.reconcilerRuntime.enter(moduleState.runtime);
     const root = moduleState.reconcilerRuntime.run(moduleState.runtime, function createContainerWithRuntime() {
         return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
     });
@@ -393,7 +392,7 @@ function captureMissingInitialCommit(session: IntrospectionReconcilerSession, re
     if (
         renderCountBefore > 0 ||
         session.state.readRenderCount() > renderCountBefore ||
-        session.options.diagnostics.errors.length > 0
+        session.options.diagnostics.uncaughtErrors.length > 0
     ) {
         return;
     }
@@ -507,6 +506,8 @@ export function createIntrospectionReconcilerModule(
         reconcilerRuntime,
         runtime: dependencies.runtime
     });
+
+    reconcilerRuntime.makeDefault(dependencies.runtime);
 
     return Object.freeze({
         createRoot(options) {

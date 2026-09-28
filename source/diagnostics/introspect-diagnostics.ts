@@ -18,8 +18,9 @@ type IntrospectionDiagnosticsContext = {
 };
 
 export type IntrospectionDiagnostics = {
-    readonly errors: readonly IntrospectionError[];
+    readonly caughtErrors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
+    readonly uncaughtErrors: readonly IntrospectionError[];
     readonly warnings: readonly IntrospectionWarning[];
     readonly recordCaughtError: (cause: unknown) => void;
     readonly recordRecoverableError: (cause: unknown) => void;
@@ -43,17 +44,9 @@ function throwDiagnostic(diagnostic: IntrospectionError | IntrospectionWarning):
     throw new Error(diagnostic.message);
 }
 
-function createIntrospectionWarning(cause: unknown): IntrospectionWarning {
+export function createDiagnosticRecord(cause: unknown): IntrospectionError & IntrospectionWarning {
     return Object.freeze({
         cause,
-        message: messageFromCause(cause)
-    });
-}
-
-function createIntrospectionError(cause: unknown, handled: boolean): IntrospectionError {
-    return Object.freeze({
-        cause,
-        handled,
         message: messageFromCause(cause)
     });
 }
@@ -104,7 +97,8 @@ export function createIntrospectionDiagnostics(
 ): IntrospectionDiagnostics {
     subscribeConsoleDiagnostics(consoleDiagnostics);
 
-    let errors: readonly IntrospectionError[] = Object.freeze([]);
+    let caughtErrors: readonly IntrospectionError[] = Object.freeze([]);
+    let uncaughtErrors: readonly IntrospectionError[] = Object.freeze([]);
     let warnings: readonly IntrospectionWarning[] = Object.freeze([]);
     let pendingThrownDiagnostic: IntrospectionError | IntrospectionWarning | null = null;
 
@@ -123,17 +117,17 @@ export function createIntrospectionDiagnostics(
         }
     }
 
-    function appendError(error: IntrospectionError): void {
+    function appendUncaughtError(error: IntrospectionError): void {
         if (
-            errors.some(function isSameError(existingError) {
-                return existingError.cause === error.cause && existingError.handled === error.handled;
+            uncaughtErrors.some(function isSameError(existingError) {
+                return existingError.cause === error.cause;
             })
         ) {
             return;
         }
 
-        errors = Object.freeze([
-            ...errors,
+        uncaughtErrors = Object.freeze([
+            ...uncaughtErrors,
             error
         ]);
 
@@ -153,28 +147,34 @@ export function createIntrospectionDiagnostics(
 
     const context: IntrospectionDiagnosticsContext = {
         recordConsoleWarning(message) {
-            appendWarning(createIntrospectionWarning(consoleMessageText(message)));
+            appendWarning(createDiagnosticRecord(consoleMessageText(message)));
         }
     };
 
     return Object.freeze({
-        get errors() {
-            return errors;
+        get caughtErrors() {
+            return caughtErrors;
         },
         get hasWarnings() {
             return warnings.length > 0;
         },
+        get uncaughtErrors() {
+            return uncaughtErrors;
+        },
         get warnings() {
             return warnings;
         },
-        recordCaughtError() {
-            return undefined;
+        recordCaughtError(cause) {
+            caughtErrors = Object.freeze([
+                ...caughtErrors,
+                createDiagnosticRecord(cause)
+            ]);
         },
         recordRecoverableError(cause) {
-            appendWarning(createIntrospectionWarning(cause));
+            appendWarning(createDiagnosticRecord(cause));
         },
         recordUncaughtError(cause) {
-            appendError(createIntrospectionError(cause, false));
+            appendUncaughtError(createDiagnosticRecord(cause));
         },
         run<Result>(action: () => Result) {
             return storage.run(context, function runWithDiagnostics() {

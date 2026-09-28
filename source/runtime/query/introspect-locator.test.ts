@@ -13,7 +13,7 @@ function createNode(name: string): RuntimeIntrospectionNode {
         callProp(property: PropertyKey, parameter: unknown) {
             return `${String(property)}:${String(parameter)}`;
         },
-        error: undefined,
+        caughtError: undefined,
         find() {
             return undefined;
         },
@@ -52,7 +52,7 @@ function createNode(name: string): RuntimeIntrospectionNode {
 
 function createView(nodes: readonly RuntimeIntrospectionNode[]): RuntimeIntrospectionView {
     const view: RuntimeIntrospectionView = {
-        errors: [],
+        caughtErrors: [],
         find(selector: unknown) {
             return nodes.find(function matchesNode(node) {
                 return node.type === selector;
@@ -77,6 +77,7 @@ function createView(nodes: readonly RuntimeIntrospectionNode[]): RuntimeIntrospe
         renderedChildren: createIntrospectionList([]),
         root: undefined,
         textContent: '',
+        uncaughtErrors: [],
         unmount() {
             return undefined;
         },

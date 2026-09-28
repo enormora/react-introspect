@@ -29,7 +29,7 @@ export type RuntimeNodeSequence = Iterable<RuntimeIntrospectionNode> & {
 };
 
 export type RuntimeIntrospectionNode = {
-    readonly error: IntrospectionError | undefined;
+    readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: RuntimeIntrospectionList;
     readonly isStale: boolean;
     readonly key: string | null;
@@ -72,12 +72,13 @@ export type RuntimeIntrospectionLocator = {
 };
 
 export type RuntimeIntrospectionView = IntrospectionRenderControl & {
-    readonly errors: readonly IntrospectionError[];
+    readonly caughtErrors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
     readonly renderCount: number;
     readonly renderedChildren: RuntimeIntrospectionList;
     readonly root: RuntimeIntrospectionNode | undefined;
     readonly textContent: string;
+    readonly uncaughtErrors: readonly IntrospectionError[];
     readonly warnings: readonly IntrospectionWarning[];
     readonly find: (selector: unknown) => RuntimeIntrospectionNode | undefined;
     readonly findAll: (selector: unknown) => RuntimeIntrospectionList;
