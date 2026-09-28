@@ -14,6 +14,7 @@ import {
 } from './refs/introspect-ref.ts';
 import { createNodeConsoleDiagnostics } from './diagnostics/introspect-node-console-diagnostics.ts';
 import { createIntrospectionReconcilerModule } from './reconciler/root/introspect-reconciler.ts';
+import type { RuntimeIntrospectionView } from './runtime/types/introspect-runtime-types.ts';
 import { createNodeRuntimeDependencies } from './runtime/view/introspect-node-runtime-dependencies.entry-point.ts';
 import { createIntrospectionViewModule } from './runtime/view/introspect-view.ts';
 
@@ -54,7 +55,7 @@ export function introspect<HostSchema extends IntrospectionHostSchema = Introspe
     element: React.ReactElement,
     options?: IntrospectionOptions<HostSchema>
 ): IntrospectionView<HostSchema>;
-export function introspect(element: React.ReactElement, options: IntrospectionOptions = {}): unknown {
+export function introspect(element: React.ReactElement, options: IntrospectionOptions = {}): RuntimeIntrospectionView {
     return introspectionView.createView(element, options);
 }
 
@@ -63,7 +64,7 @@ export function createIntrospect<HostSchema extends IntrospectionHostSchema = In
 ): (element: React.ReactElement, options?: IntrospectionOptions<HostSchema>) => IntrospectionView<HostSchema>;
 export function createIntrospect(
     defaults: IntrospectionOptions
-): (element: React.ReactElement, options?: IntrospectionOptions) => unknown {
+): (element: React.ReactElement, options?: IntrospectionOptions) => RuntimeIntrospectionView {
     const createView = introspectionView.preconfigure(defaults);
 
     return function introspectWithDefaults(element, options = {}) {
