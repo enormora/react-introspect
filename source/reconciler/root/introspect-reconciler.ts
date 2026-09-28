@@ -283,18 +283,22 @@ function createIntrospectionReconcilerSession(
     };
 }
 
+function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => unknown): unknown {
+    return reconcilerRuntime.run(runtime, function actWithRuntime() {
+        return runtime.actEnvironment.act(function runAction() {
+            const result = action();
+
+            renderer.flushSyncWork();
+            renderer.flushPassiveEffects();
+
+            return result;
+        });
+    });
+}
+
 function actSession(session: IntrospectionReconcilerSession, action: () => unknown): unknown {
     return session.options.diagnostics.run(function actWithDiagnostics() {
-        return reconcilerRuntime.run(session.runtime, function actWithRuntime() {
-            return session.runtime.actEnvironment.act(function runAction() {
-                const result = action();
-
-                renderer.flushSyncWork();
-                renderer.flushPassiveEffects();
-
-                return result;
-            });
-        });
+        return actAndFlush(session.runtime, action);
     });
 }
 
@@ -412,12 +416,8 @@ function renderRootElement(
     session: IntrospectionReconcilerSession,
     element: Readonly<React.ReactElement> | null
 ): void {
-    reconcilerRuntime.run(session.runtime, function renderWithRuntime() {
-        session.runtime.actEnvironment.act(function renderElement() {
-            updateRootElement(session, element);
-            renderer.flushSyncWork();
-            renderer.flushPassiveEffects();
-        });
+    actAndFlush(session.runtime, function renderElement() {
+        updateRootElement(session, element);
     });
 }
 
