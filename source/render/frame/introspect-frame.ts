@@ -106,10 +106,6 @@ function isIntrospectionElement(element: React.ReactElement): element is Introsp
     return isObjectOrFunction(element.props);
 }
 
-function readElementChildren(element: IntrospectionElement): unknown {
-    return element.props.children;
-}
-
 function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
     return element.props.mode === 'hidden' ? 'hidden' : 'visible';
 }
@@ -264,7 +260,7 @@ function transformRenderableElement(
 ): React.ReactElement {
     return cloneElementWithChildren(
         element,
-        transformChildNode(readElementChildren(element), depth, frameFactory)
+        transformChildNode(element.props.children, depth, frameFactory)
     );
 }
 
@@ -278,7 +274,7 @@ function transformSuspenseElement(
         createFrameElement: frameFactory,
         depth,
         element,
-        transformedChildren: transformChildNode(readElementChildren(element), depth, frameFactory),
+        transformedChildren: transformChildNode(element.props.children, depth, frameFactory),
         transformNode: transformChildNode
     });
 }
@@ -291,7 +287,7 @@ function transformActivityElement(
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined, undefined, readActivityMode(element)),
-        cloneWrapperElement(element, transformChildNode(readElementChildren(element), depth, frameFactory))
+        cloneWrapperElement(element, transformChildNode(element.props.children, depth, frameFactory))
     );
 }
 
@@ -303,7 +299,7 @@ function transformViewTransitionElement(
 ): React.ReactElement {
     return createComponentHost(
         createComponentMetadata(element, undefined),
-        cloneWrapperElement(element, transformChildNode(readElementChildren(element), depth, frameFactory))
+        cloneWrapperElement(element, transformChildNode(element.props.children, depth, frameFactory))
     );
 }
 
