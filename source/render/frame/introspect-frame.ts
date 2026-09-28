@@ -16,7 +16,6 @@ import {
     type IntrospectionTransformedNode,
     type IntrospectionTransformNode,
     introspectionValueMetadata,
-    readElementProps,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
@@ -108,11 +107,11 @@ function isIntrospectionElement(element: React.ReactElement): element is Introsp
 }
 
 function readElementChildren(element: IntrospectionElement): unknown {
-    return readElementProps(element).children;
+    return element.props.children;
 }
 
 function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
-    return readElementProps(element).mode === 'hidden' ? 'hidden' : 'visible';
+    return element.props.mode === 'hidden' ? 'hidden' : 'visible';
 }
 
 function createOpaqueHost(value: unknown): React.ReactElement {
@@ -160,7 +159,7 @@ function executeWrappedElement(
 function executeIntrospectionFrameElement(element: IntrospectionElement): React.ReactNode {
     try {
         return unwrapThenableNode(
-            executeWrappedElement(element.type, readElementProps(element), readElementRef(element))
+            executeWrappedElement(element.type, element.props, readElementRef(element))
         );
     } catch (error) {
         return throwIntrospectionRenderError(error);
@@ -185,7 +184,7 @@ function cloneElementWithChildren(
 }
 
 function cloneSuspenseElement(request: IntrospectionSuspenseTransformRequest): React.ReactElement {
-    const props = readElementProps(request.element);
+    const { props } = request.element;
 
     return React.cloneElement(request.element, {
         [introspectionElementKeyMetadata]: request.element.key,

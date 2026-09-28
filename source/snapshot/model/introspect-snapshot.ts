@@ -52,10 +52,6 @@ function visibilityFromSource(
     return 'visible';
 }
 
-function readElementProps(element: React.ReactElement<SnapshotProps>): SnapshotProps {
-    return element.props;
-}
-
 function isEmptyNode(node: unknown): boolean {
     return node === null || node === undefined || typeof node === 'boolean';
 }
@@ -198,7 +194,7 @@ const snapshotOperations = {
         return createSiblingSnapshots(placement, flattenReactNodes(children), snapshotOperations.createSnapshotNode);
     },
     createElementSnapshotNode(request: ElementNodeRequest): SnapshotNodeResult {
-        const props = readElementProps(request.element);
+        const { props } = request.element;
         const { type } = request.element;
         const idAllocation = allocateNodeId(request.build);
         const name = getTypeName(type);

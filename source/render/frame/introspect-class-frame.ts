@@ -11,7 +11,6 @@ import {
     type IntrospectionFrameDepth,
     type IntrospectionTransformedNode,
     type IntrospectionTransformNode,
-    readElementProps,
     readElementRef,
     throwIntrospectionRenderError
 } from './introspect-frame-contract.ts';
@@ -225,7 +224,7 @@ const IntrospectionClassFrameBase = class
         super(props);
 
         const ClassComponent = props.type;
-        const instance = new ClassComponent(readElementProps(props.element), undefined);
+        const instance = new ClassComponent(props.element.props, undefined);
 
         assignClassField(instance, 'updater', this.createUpdater());
         assignClassField(instance, 'refs', {});
@@ -249,13 +248,13 @@ const IntrospectionClassFrameBase = class
 
         return {
             ...foldedState,
-            userState: readDerivedState(props.type, readElementProps(props.element), foldedState.userState)
+            userState: readDerivedState(props.type, props.element.props, foldedState.userState)
         };
     }
 
     public override render(): React.ReactElement {
         const { boundaryErrorCause } = this.state;
-        const renderPass = this.createRenderPass(readElementProps(this.props.element), this.state.userState);
+        const renderPass = this.createRenderPass(this.props.element.props, this.state.userState);
 
         this.renderPass = renderPass;
 
@@ -323,7 +322,7 @@ const IntrospectionClassFrameBase = class
                 this.setState(function applyUserStateUpdate(state, props) {
                     return {
                         isAwaitingCatchRecovery: false,
-                        userState: mergeState(state.userState, update(readElementProps(props.element), state.userState))
+                        userState: mergeState(state.userState, update(props.element.props, state.userState))
                     };
                 }, callback);
             }
