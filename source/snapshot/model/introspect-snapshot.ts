@@ -206,7 +206,6 @@ const snapshotOperations = {
         const childrenResult = snapshotOperations.createChildSnapshots({
             build: idAllocation.build,
             children: props.children,
-            idNormalization: request.idNormalization,
             inheritedVisibility: request.inheritedVisibility,
             parentId: idAllocation.id,
             parentPath: path
@@ -214,7 +213,6 @@ const snapshotOperations = {
         const childrenState = getElementChildrenState(type, childrenResult.nodes);
         const propsResult = snapshotOperations.createPropsSnapshot({
             build: childrenResult.build,
-            idNormalization: request.idNormalization,
             inheritedVisibility: request.inheritedVisibility,
             ownerId: idAllocation.id,
             ownerPath: path,
@@ -252,7 +250,6 @@ const snapshotOperations = {
         const childrenRequest = {
             build: idAllocation.build,
             element: request.element,
-            idNormalization: request.idNormalization,
             inheritedVisibility: visibility,
             parentId: idAllocation.id,
             parentPath: path
@@ -267,7 +264,6 @@ const snapshotOperations = {
             : givenChildrenResult.nodes;
         const propsResult = snapshotOperations.createPropsSnapshot({
             build: renderedChildrenResult.build,
-            idNormalization: request.idNormalization,
             inheritedVisibility: visibility,
             ownerId: idAllocation.id,
             ownerPath: path,
@@ -300,7 +296,6 @@ const snapshotOperations = {
                 const elementResult = snapshotOperations.createElementSnapshotNode({
                     build: currentBuild,
                     element,
-                    idNormalization: request.idNormalization,
                     index: location,
                     inheritedVisibility: request.inheritedVisibility,
                     node: element,
@@ -343,7 +338,6 @@ const snapshotOperations = {
         return snapshotOperations.createSourceChildSnapshots({
             build: request.givenChildrenResult.build,
             children: request.element.children,
-            idNormalization: request.idNormalization,
             inheritedVisibility: request.inheritedVisibility,
             parentId: request.parentId,
             parentPath: request.parentPath
@@ -422,7 +416,6 @@ export function createIntrospectionSnapshotFromSource(
             valueAncestors: new WeakSet()
         },
         children,
-        idNormalization,
         inheritedVisibility: 'visible',
         parentId: undefined,
         parentPath: 'root'
