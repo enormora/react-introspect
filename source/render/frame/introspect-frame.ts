@@ -1,22 +1,25 @@
 import React from 'react';
 import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
-import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
 import {
     createComponentHost,
     createComponentMetadata,
-    canExecuteComponent,
     createEmptyHost,
-    enterComponentDepth,
-    nextDepth,
+    createOpaqueHost,
+    elementKeyProps
+} from '../protocol/introspect-host-protocol.ts';
+import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
+import {
     type IntrospectionElement,
-    introspectionElementKeyMetadata,
-    type IntrospectionFrameDepth,
-    introspectionOpaqueHostType,
     type IntrospectionTransformedNode,
-    introspectionValueMetadata,
-    readElementRef,
-    throwIntrospectionRenderError
+    readElementRef
 } from './introspect-frame-contract.ts';
+import { throwIntrospectionRenderError } from './introspect-render-error.ts';
+import {
+    canExecuteComponent,
+    enterComponentDepth,
+    type IntrospectionFrameDepth,
+    nextDepth
+} from './introspect-frame-depth.ts';
 import { assertNotPortal } from './introspect-unsupported-react.ts';
 
 type IntrospectionFrameProps = {
@@ -96,12 +99,6 @@ function isIntrospectionElement(element: React.ReactElement): element is Introsp
 
 function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
     return element.props.mode === 'hidden' ? 'hidden' : 'visible';
-}
-
-function createOpaqueHost(value: unknown): React.ReactElement {
-    return React.createElement(introspectionOpaqueHostType, {
-        [introspectionValueMetadata]: value
-    });
 }
 
 function createIntrospectionElement(element: React.ReactElement): IntrospectionElement {
@@ -224,16 +221,14 @@ function transformRenderableElement(element: IntrospectionElement, depth: Intros
         return React.createElement(React.Fragment, null, children);
     }
 
-    return React.cloneElement(element, {
-        [introspectionElementKeyMetadata]: element.key
-    }, children);
+    return React.cloneElement(element, elementKeyProps(element), children);
 }
 
 function transformSuspenseElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
     const children = transformNode(element.props.children, depth);
 
     return React.cloneElement(element, {
-        [introspectionElementKeyMetadata]: element.key,
+        ...elementKeyProps(element),
         fallback: transformNode(element.props.fallback, depth)
     }, children);
 }
@@ -244,14 +239,19 @@ function transformWrapperElement(
     activityMode: 'hidden' | 'visible' | undefined
 ): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata(element, undefined, undefined, activityMode),
+        createComponentMetadata({ activityMode, caughtError: undefined, element, renderedReason: undefined }),
         React.cloneElement(element, {}, transformNode(element.props.children, depth))
     );
 }
 
 function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata(props.element, undefined),
+        createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element: props.element,
+            renderedReason: undefined
+        }),
         transformNode(executeIntrospectionFrameElement(props.element), nextDepth(props.depth, props.element.type))
     );
 }
@@ -281,7 +281,10 @@ function transformComponentElement(element: IntrospectionElement, depth: Introsp
         return createFrameElement(element, componentDepth);
     }
 
-    return createComponentHost(createComponentMetadata(element, 'depth'), createEmptyHost(undefined));
+    return createComponentHost(
+        createComponentMetadata({ activityMode: undefined, caughtError: undefined, element, renderedReason: 'depth' }),
+        createEmptyHost(undefined)
+    );
 }
 
 function transformElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {

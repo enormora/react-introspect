@@ -4,15 +4,16 @@ import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
     createComponentMetadata,
-    createEmptyHost,
-    nextDepth,
+    createEmptyHost
+} from '../protocol/introspect-host-protocol.ts';
+import {
     type IntrospectionElement,
-    type IntrospectionFrameDepth,
     type IntrospectionRenderChildren,
     type IntrospectionTransformedNode,
-    readElementRef,
-    throwIntrospectionRenderError
+    readElementRef
 } from './introspect-frame-contract.ts';
+import { throwIntrospectionRenderError } from './introspect-render-error.ts';
+import { type IntrospectionFrameDepth, nextDepth } from './introspect-frame-depth.ts';
 
 export type IntrospectionClassFrameProps = {
     readonly depth: IntrospectionFrameDepth;
@@ -257,11 +258,12 @@ const IntrospectionClassFrameBase = class
         this.renderPass = renderPass;
 
         return createComponentHost(
-            createComponentMetadata(
-                this.props.element,
-                undefined,
-                boundaryErrorCause === undefined ? undefined : createDiagnosticRecord(boundaryErrorCause)
-            ),
+            createComponentMetadata({
+                activityMode: undefined,
+                caughtError: boundaryErrorCause === undefined ? undefined : createDiagnosticRecord(boundaryErrorCause),
+                element: this.props.element,
+                renderedReason: undefined
+            }),
             renderPass.next.node
         );
     }

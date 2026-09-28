@@ -1,12 +1,9 @@
 import {
-    introspectionComponentHostType,
-    type IntrospectionComponentMetadata,
-    introspectionComponentMetadata,
-    introspectionElementKeyMetadata,
-    introspectionEmptyHostType,
-    introspectionOpaqueHostType,
-    introspectionValueMetadata
-} from '../../render/frame/introspect-frame-contract.ts';
+    isInternalHostType,
+    readHostKey,
+    readInternalHost,
+    readPublicHostProps
+} from '../../render/protocol/introspect-host-protocol.ts';
 import type { IntrospectionIdNormalization } from '../../snapshot/normalization/introspect-id-normalization.ts';
 import type { IntrospectionRefs } from '../../public/introspect-public-types.ts';
 import {
@@ -20,7 +17,6 @@ import {
     type SnapshotSourceNode
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
-import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 export type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -63,20 +59,6 @@ export type IntrospectionHostContext = {
     readonly refs: IntrospectionRefs | undefined;
 };
 
-const internalHostTypes = new Set([
-    introspectionComponentHostType,
-    introspectionEmptyHostType,
-    introspectionOpaqueHostType
-]);
-const introspectionComponentMetadataKeys = [
-    'activityMode',
-    'caughtError',
-    'givenChildren',
-    'key',
-    'props',
-    'renderedReason',
-    'type'
-];
 const parentByChild = new WeakMap<IntrospectionHostChild, IntrospectionHostParent>();
 
 function createChildStore(): IntrospectionChildStore {
@@ -92,79 +74,15 @@ function createChildStore(): IntrospectionChildStore {
     };
 }
 
-function isPublicHostPropKey(key: PropertyKey): boolean {
-    return key !== 'children' &&
-        key !== 'key' &&
-        key !== 'ref' &&
-        key !== introspectionComponentMetadata &&
-        key !== introspectionElementKeyMetadata &&
-        key !== introspectionValueMetadata;
-}
-
-function publicProps(props: IntrospectionHostProps): IntrospectionHostProps {
-    const result: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        if (isPublicHostPropKey(key)) {
-            result[key] = props[key];
-        }
-    }
-
-    return Object.freeze(result);
-}
-
-function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
-    return isObjectOrFunction(value) &&
-        introspectionComponentMetadataKeys.every(function hasMetadataKey(key) {
-            return Object.hasOwn(value, key);
-        });
-}
-
 function isTextInstance(child: IntrospectionHostChild): child is IntrospectionTextInstance {
     return !Reflect.has(child, 'type');
 }
 
-function readSpecialValue(instance: IntrospectionHostInstance): unknown {
-    return instance.readProps()[introspectionValueMetadata];
-}
-
-function readHostKeyFromProps(props: IntrospectionHostProps): string | null {
-    const key = props[introspectionElementKeyMetadata];
-
-    return typeof key === 'string' ? key : null;
-}
-
-function readHostKey(instance: IntrospectionHostInstance): string | null {
-    return readHostKeyFromProps(instance.readProps());
-}
-
-function readComponentMetadata(instance: IntrospectionHostInstance): IntrospectionComponentMetadata {
-    const value = instance.readProps()[introspectionComponentMetadata];
-
-    if (!isIntrospectionComponentMetadata(value)) {
-        return {
-            activityMode: undefined,
-            caughtError: undefined,
-            givenChildren: undefined,
-            key: null,
-            props: {},
-            renderedReason: 'unsupported',
-            type: introspectionComponentHostType
-        };
-    }
-
-    return value;
-}
-
-function isIntrospectionInternalHostType(type: string): boolean {
-    return internalHostTypes.has(type);
-}
-
 function toRefTarget(type: string, props: IntrospectionHostProps): IntrospectionRefHostTarget {
     return Object.freeze({
-        key: readHostKeyFromProps(props),
+        key: readHostKey(props),
         name: type,
-        props: publicProps(props),
+        props: readPublicHostProps(props),
         type
     });
 }
@@ -174,7 +92,7 @@ function resolvePublicInstance(
     type: string,
     props: IntrospectionHostProps
 ): unknown {
-    if (isIntrospectionInternalHostType(type)) {
+    if (isInternalHostType(type)) {
         return null;
     }
 
@@ -188,7 +106,7 @@ function collectRefTargets(child: IntrospectionHostChild): readonly Introspectio
 
     const childTargets = child.readChildren().flatMap(collectRefTargets);
 
-    if (isIntrospectionInternalHostType(child.type)) {
+    if (isInternalHostType(child.type)) {
         return childTargets;
     }
 
@@ -222,16 +140,14 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
         return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
     }
 
-    if (child.type === introspectionEmptyHostType || child.type === introspectionOpaqueHostType) {
-        return {
-            kind: child.type === introspectionEmptyHostType ? 'empty' : 'opaque',
-            value: readSpecialValue(child),
-            visibility: child.readVisibility()
-        };
+    const internalHost = readInternalHost(child.type, child.readProps());
+
+    if (internalHost.kind === 'empty' || internalHost.kind === 'opaque') {
+        return { kind: internalHost.kind, value: internalHost.value, visibility: child.readVisibility() };
     }
 
-    if (child.type === introspectionComponentHostType) {
-        const metadata = readComponentMetadata(child);
+    if (internalHost.kind === 'component') {
+        const { metadata } = internalHost;
 
         return {
             activityMode: metadata.activityMode,
@@ -255,8 +171,8 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
         caughtError: undefined,
         givenChildren: children,
         givenChildrenKind: 'source',
-        key: readHostKey(child),
-        props: publicProps(child.readProps()),
+        key: readHostKey(child.readProps()),
+        props: readPublicHostProps(child.readProps()),
         renderedReason: undefined,
         type: child.type,
         visibility: child.readVisibility()
