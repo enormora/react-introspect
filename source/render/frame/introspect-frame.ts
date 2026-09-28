@@ -1,4 +1,5 @@
 import React from 'react';
+import { classifyElementType, type ReactElementKind } from '../../values/introspect-react-element-kind.ts';
 import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
@@ -27,71 +28,7 @@ type IntrospectionFrameProps = {
     readonly element: IntrospectionElement;
 };
 
-type IntrospectionFrameType = {
-    readonly $$typeof: symbol;
-};
-
-type IntrospectionMemoType = IntrospectionFrameType & {
-    readonly type: unknown;
-};
-
-type IntrospectionForwardRefType = IntrospectionFrameType & {
-    readonly render: (props: Readonly<Record<PropertyKey, unknown>>, ref: unknown) => React.ReactNode;
-};
-
-type IntrospectionFunctionComponent = (props: Readonly<Record<PropertyKey, unknown>>) => React.ReactNode;
-
-type IntrospectionLazyInitializer = (payload: unknown) => unknown;
-
-const memoType = Symbol.for('react.memo');
-const forwardRefType = Symbol.for('react.forward_ref');
-const lazyType = Symbol.for('react.lazy');
-const contextType = Symbol.for('react.context');
-const activityType: unknown = Symbol.for('react.activity');
-const viewTransitionType: unknown = Symbol.for('react.view_transition');
-const lazyInitializerKey = '_init';
-const lazyPayloadKey = '_payload';
-
-function hasReactType(value: unknown, type: symbol): value is IntrospectionFrameType {
-    return isObjectOrFunction(value) && value.$$typeof === type;
-}
-
-function isMemoType(value: unknown): value is IntrospectionMemoType {
-    return hasReactType(value, memoType) && Object.hasOwn(value, 'type');
-}
-
-function isForwardRefType(value: unknown): value is IntrospectionForwardRefType {
-    return isObjectOrFunction(value) &&
-        value.$$typeof === forwardRefType &&
-        Object.hasOwn(value, 'render') &&
-        typeof value.render === 'function';
-}
-
-function isLazyInitializer(value: unknown): value is IntrospectionLazyInitializer {
-    return typeof value === 'function';
-}
-
-function readLazyInitializer(value: Readonly<Record<PropertyKey, unknown>>): IntrospectionLazyInitializer | undefined {
-    const initializer: unknown = Reflect.get(value, lazyInitializerKey);
-
-    return isLazyInitializer(initializer) ? initializer : undefined;
-}
-
-function isLazyType(value: unknown): value is IntrospectionFrameType {
-    return isObjectOrFunction(value) &&
-        value.$$typeof === lazyType &&
-        Object.hasOwn(value, lazyInitializerKey) &&
-        Object.hasOwn(value, lazyPayloadKey) &&
-        readLazyInitializer(value) !== undefined;
-}
-
-function isContextType(value: unknown): value is React.Context<unknown> {
-    return hasReactType(value, contextType);
-}
-
-function isFunctionComponent(value: unknown): value is IntrospectionFunctionComponent {
-    return typeof value === 'function';
-}
+const executableElementKinds = new Set<ReactElementKind['kind']>([ 'forwardRef', 'function', 'lazy', 'memo' ]);
 
 function isIntrospectionElement(element: React.ReactElement): element is IntrospectionElement {
     return isObjectOrFunction(element.props);
@@ -109,10 +46,6 @@ function createIntrospectionElement(element: React.ReactElement): IntrospectionE
     return element;
 }
 
-function readLazyType(type: IntrospectionFrameType): unknown {
-    return readLazyInitializer(type)?.(Reflect.get(type, lazyPayloadKey));
-}
-
 function unwrapThenableNode(node: React.ReactNode): React.ReactNode {
     return isThenable(node) ? React.use(node) as React.ReactNode : node;
 }
@@ -122,19 +55,21 @@ function executeWrappedElement(
     props: Readonly<Record<PropertyKey, unknown>>,
     ref: unknown
 ): React.ReactNode {
-    if (isLazyType(type)) {
-        return executeWrappedElement(readLazyType(type), props, ref);
+    const elementKind = classifyElementType(type);
+
+    if (elementKind.kind === 'lazy') {
+        return executeWrappedElement(elementKind.initialize(), props, ref);
     }
 
-    if (isMemoType(type)) {
-        return executeWrappedElement(type.type, props, ref);
+    if (elementKind.kind === 'memo') {
+        return executeWrappedElement(elementKind.inner, props, ref);
     }
 
-    if (isFunctionComponent(type) && !isClassComponent(type)) {
-        return type(props);
+    if (elementKind.kind === 'function' && !isClassComponent(elementKind.component)) {
+        return elementKind.component(props);
     }
 
-    return isForwardRefType(type) ? type.render(props, ref) : createOpaqueHost(type);
+    return elementKind.kind === 'forwardRef' ? elementKind.render(props, ref) : createOpaqueHost(type);
 }
 
 function executeIntrospectionFrameElement(element: IntrospectionElement): React.ReactNode {
@@ -148,23 +83,7 @@ function executeIntrospectionFrameElement(element: IntrospectionElement): React.
 }
 
 function isExecutableComponentType(type: unknown): boolean {
-    return isClassComponent(type) ||
-        isFunctionComponent(type) ||
-        isMemoType(type) ||
-        isForwardRefType(type) ||
-        isLazyType(type);
-}
-
-function isActivityType(type: unknown): boolean {
-    return type === activityType;
-}
-
-function isViewTransitionType(type: unknown): boolean {
-    return type === viewTransitionType;
-}
-
-function isRenderableElementType(type: unknown): boolean {
-    return typeof type === 'string' || type === React.Fragment || isContextType(type);
+    return executableElementKinds.has(classifyElementType(type).kind);
 }
 
 function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | undefined {
@@ -287,26 +206,38 @@ function transformComponentElement(element: IntrospectionElement, depth: Introsp
     );
 }
 
+function transformActivityElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+    return transformWrapperElement(element, depth, readActivityMode(element));
+}
+
+function transformViewTransitionElement(
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth
+): React.ReactElement {
+    return transformWrapperElement(element, depth, undefined);
+}
+
+const elementTransforms: Readonly<
+    Record<
+        ReactElementKind['kind'],
+        (element: IntrospectionElement, depth: IntrospectionFrameDepth) => React.ReactElement
+    >
+> = {
+    activity: transformActivityElement,
+    context: transformRenderableElement,
+    forwardRef: transformComponentElement,
+    fragment: transformRenderableElement,
+    function: transformComponentElement,
+    host: transformRenderableElement,
+    lazy: transformComponentElement,
+    memo: transformComponentElement,
+    other: transformComponentElement,
+    suspense: transformSuspenseElement,
+    viewTransition: transformViewTransitionElement
+};
+
 function transformElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    const { type } = element;
-
-    if (type === React.Suspense) {
-        return transformSuspenseElement(element, depth);
-    }
-
-    if (isActivityType(type)) {
-        return transformWrapperElement(element, depth, readActivityMode(element));
-    }
-
-    if (isViewTransitionType(type)) {
-        return transformWrapperElement(element, depth, undefined);
-    }
-
-    if (isRenderableElementType(type)) {
-        return transformRenderableElement(element, depth);
-    }
-
-    return transformComponentElement(element, depth);
+    return elementTransforms[classifyElementType(element.type).kind](element, depth);
 }
 
 export function createIntrospectionRenderElement(
