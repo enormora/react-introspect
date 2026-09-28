@@ -57,5 +57,27 @@ export const testNode = suite('introspection host protocol', [
         scope.assert.deepEqual(readInternalHost('button', {}), { kind: 'host' });
 
         return scope.assert.collect();
+    }),
+    test('treats a copy of real component metadata as unsupported', function (scope) {
+        const metadata = createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element: React.createElement('span'),
+            renderedReason: undefined
+        });
+        const componentHost = createComponentHost(metadata, 'child') as HostElement;
+        const forgedProps = Object.fromEntries(
+            Object.entries(componentHost.props).map(function copyMetadata([ key, value ]) {
+                return [ key, value === metadata ? { ...metadata } : value ];
+            })
+        );
+        const decoded = readInternalHost(componentHost.type, forgedProps);
+
+        scope.assert.equal(
+            decoded.kind === 'component' ? decoded.metadata.renderedReason : decoded.kind,
+            'unsupported'
+        );
+
+        return scope.assert.collect();
     })
 ]);

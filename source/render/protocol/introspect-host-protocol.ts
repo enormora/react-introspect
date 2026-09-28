@@ -33,15 +33,7 @@ const internalHostTypes = new Set([
     introspectionEmptyHostType,
     introspectionOpaqueHostType
 ]);
-const introspectionComponentMetadataKeys = [
-    'activityMode',
-    'caughtError',
-    'givenChildren',
-    'key',
-    'props',
-    'renderedReason',
-    'type'
-];
+const createdComponentMetadata = new WeakSet();
 const unsupportedComponentMetadata: IntrospectionComponentMetadata = {
     activityMode: undefined,
     caughtError: undefined,
@@ -84,7 +76,7 @@ export function createComponentMetadata(request: ComponentMetadataRequest): Intr
 
     assertSupportedReactValue(props.children);
 
-    return {
+    const metadata: IntrospectionComponentMetadata = {
         activityMode,
         caughtError,
         givenChildren: props.children,
@@ -93,6 +85,10 @@ export function createComponentMetadata(request: ComponentMetadataRequest): Intr
         renderedReason,
         type: element.type
     };
+
+    createdComponentMetadata.add(metadata);
+
+    return metadata;
 }
 
 export function createComponentHost(
@@ -134,10 +130,7 @@ function isPublicHostPropKey(key: PropertyKey): boolean {
 }
 
 function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
-    return isObjectOrFunction(value) &&
-        introspectionComponentMetadataKeys.every(function hasMetadataKey(key) {
-            return Object.hasOwn(value, key);
-        });
+    return isObjectOrFunction(value) && createdComponentMetadata.has(value);
 }
 
 function readComponentMetadata(props: Readonly<Record<PropertyKey, unknown>>): IntrospectionComponentMetadata {
