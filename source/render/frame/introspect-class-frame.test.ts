@@ -501,6 +501,47 @@ export const testNode = suite('class components and error boundaries', [
 
         return scope.assert.collect();
     }),
+    test('notifies boundaries about errors caught during an update render', async function (scope) {
+        const recorder = createRecorder();
+        const view = introspect(
+            React.createElement(Boundary, { recorder }, React.createElement(RefPanel, { label: 'safe' })),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false,
+                warningMode: 'capture'
+            }
+        );
+
+        view.update(React.createElement(Boundary, { recorder }, React.createElement(Bomb)));
+        await view.waitForIdle();
+
+        scope.assert.deepEqual(recorder.entries, [ 'boom' ]);
+        scope.assert.equal(view.root?.error?.message, 'boom');
+        scope.assert.equal(view.find('span')?.textContent, 'fallback');
+
+        return scope.assert.collect();
+    }),
+    test('recovers catch-only boundaries from errors caught during an update render', async function (scope) {
+        const recorder = createRecorder();
+        const view = introspect(
+            React.createElement(CatchOnlyBoundary, { recorder }, React.createElement(RefPanel, { label: 'safe' })),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                warningMode: 'capture'
+            }
+        );
+
+        view.update(React.createElement(CatchOnlyBoundary, { recorder }, React.createElement(Bomb)));
+        await view.waitForIdle();
+
+        scope.assert.deepEqual(recorder.entries, [ 'boom', 'recovered' ]);
+        scope.assert.equal(view.root?.error?.message, 'boom');
+        scope.assert.equal(view.find('span')?.textContent, 'catch fallback');
+
+        return scope.assert.collect();
+    }),
     test('captures uncaught class render errors', function (scope) {
         const view = introspect(React.createElement(BrokenClass, { label: 'broken' }), {
             depth: 'full',
