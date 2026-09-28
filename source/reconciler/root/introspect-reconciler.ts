@@ -363,16 +363,12 @@ async function waitForSession(session: IntrospectionReconcilerSession, predicate
     }
 }
 
-function publishEmptySnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
+function publishEmptyErrorSnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
     const errorRenderCount = Math.max(session.state.readRenderCount(), renderCountBefore + 1);
 
-    session.options.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
-}
-
-function publishEmptyErrorSnapshot(session: IntrospectionReconcilerSession, renderCountBefore: number): void {
     session.container.writeMounted(false);
     session.container.writeChildren([]);
-    publishEmptySnapshot(session, renderCountBefore);
+    session.options.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
 }
 
 function captureRenderError(
@@ -448,14 +444,6 @@ function flushElement(session: IntrospectionReconcilerSession, element: Readonly
     });
 }
 
-async function waitForNextRenderSession(session: IntrospectionReconcilerSession): Promise<void> {
-    const expectedRenderCount = session.state.readRenderCount() + 1;
-
-    return waitForSession(session, function didRender() {
-        return session.state.readRenderCount() >= expectedRenderCount;
-    });
-}
-
 async function waitForRenderCountSession(session: IntrospectionReconcilerSession, count: number): Promise<void> {
     return waitForSession(session, function didRenderCount() {
         return session.state.readRenderCount() >= count;
@@ -484,7 +472,7 @@ function createIntrospectionReconcilerRoot(
             await waitForIdleSession(session);
         },
         async waitForNextRender() {
-            return waitForNextRenderSession(session);
+            return waitForRenderCountSession(session, session.state.readRenderCount() + 1);
         },
         async waitForRenderCount(count: number) {
             return waitForRenderCountSession(session, count);
