@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import type { IntrospectionSnapshot, SnapshotNode } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import { createIntrospectionNode, type SnapshotReader } from './introspect-node.ts';
+import { createSnapshotQuery, type SnapshotReader } from './introspect-node.ts';
 
 type Count = {
     readonly read: () => number;
@@ -102,15 +102,12 @@ function requireError(action: () => void): Error {
 export const testNode = suite('introspection node', [
     test('reads snapshot node properties and children', function (scope) {
         const snapshot = createSnapshot();
-        const node = createIntrospectionNode(
-            createReader(snapshot, {
-                read() {
-                    return 1;
-                }
-            }),
-            snapshot,
-            requireValue(snapshot.nodes[0])
-        );
+        const reader = createReader(snapshot, {
+            read() {
+                return 1;
+            }
+        });
+        const node = createSnapshotQuery(reader, snapshot).node(requireValue(snapshot.nodes[0]));
 
         scope.assert.equal(node.name, 'button');
         scope.assert.equal(node.renderedChildren.status, 'rendered');
@@ -131,8 +128,8 @@ export const testNode = suite('introspection node', [
                 return 1;
             }
         });
-        const button = createIntrospectionNode(reader, snapshot, requireValue(snapshot.nodes[0]));
-        const label = createIntrospectionNode(reader, snapshot, requireValue(snapshot.nodes[1]));
+        const button = createSnapshotQuery(reader, snapshot).node(requireValue(snapshot.nodes[0]));
+        const label = createSnapshotQuery(reader, snapshot).node(requireValue(snapshot.nodes[1]));
 
         scope.assert.equal(button.sendEvent('click', 'primary'), 'clicked:primary');
         scope.assert.equal(button.callProp('onClick', 'direct'), 'clicked:direct');
@@ -144,15 +141,12 @@ export const testNode = suite('introspection node', [
     }),
     test('reports non-callable prop calls clearly', function (scope) {
         const snapshot = createSnapshot();
-        const node = createIntrospectionNode(
-            createReader(snapshot, {
-                read() {
-                    return 1;
-                }
-            }),
-            snapshot,
-            requireValue(snapshot.nodes[0])
-        );
+        const reader = createReader(snapshot, {
+            read() {
+                return 1;
+            }
+        });
+        const node = createSnapshotQuery(reader, snapshot).node(requireValue(snapshot.nodes[0]));
 
         scope.assert.equal(
             requireError(function callTitle() {
@@ -166,15 +160,12 @@ export const testNode = suite('introspection node', [
     }),
     test('reports stale nodes after newer snapshots', function (scope) {
         const snapshot = createSnapshot();
-        const node = createIntrospectionNode(
-            createReader(snapshot, {
-                read() {
-                    return 2;
-                }
-            }),
-            snapshot,
-            requireValue(snapshot.nodes[0])
-        );
+        const reader = createReader(snapshot, {
+            read() {
+                return 2;
+            }
+        });
+        const node = createSnapshotQuery(reader, snapshot).node(requireValue(snapshot.nodes[0]));
 
         scope.assert.equal(node.isStale, true);
 

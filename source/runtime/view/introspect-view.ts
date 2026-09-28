@@ -11,18 +11,13 @@ import {
     createIntrospectionLocator
 } from '../query/introspect-locator.ts';
 import {
-    createIntrospectionNode,
-    createIntrospectionNodeList,
-    findIntrospectionNodes,
+    createSnapshotQuery,
+    type SnapshotQuery,
     type SnapshotReader
 } from '../query/introspect-node.ts';
 import type { IntrospectionOptions } from '../../public/introspect-public-types.ts';
 import type { IntrospectionReconcilerModule } from '../../reconciler/root/introspect-reconciler.ts';
-import type {
-    RuntimeIntrospectionList,
-    RuntimeIntrospectionNode,
-    RuntimeIntrospectionView
-} from '../types/introspect-runtime-types.ts';
+import type { RuntimeIntrospectionNode, RuntimeIntrospectionView } from '../types/introspect-runtime-types.ts';
 import {
     createEmptyIntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
@@ -97,14 +92,14 @@ function createIntrospectionViewWithDependencies(
         hostEvent: options.hostEvent ?? {}
     };
 
+    function currentQuery(): SnapshotQuery {
+        return createSnapshotQuery(state, currentSnapshot);
+    }
+
     function rootNode(): RuntimeIntrospectionNode | undefined {
         const { root } = currentSnapshot;
 
-        return root === undefined ? undefined : createIntrospectionNode(state, currentSnapshot, root);
-    }
-
-    function findAll(selector: unknown): RuntimeIntrospectionList {
-        return findIntrospectionNodes(state, currentSnapshot, selector);
+        return root === undefined ? undefined : currentQuery().node(root);
     }
 
     const view: RuntimeIntrospectionView = Object.freeze({
@@ -123,7 +118,7 @@ function createIntrospectionViewWithDependencies(
         get renderedChildren() {
             const { root } = currentSnapshot;
 
-            return createIntrospectionNodeList(state, currentSnapshot, root?.renderedChildren ?? []);
+            return currentQuery().list(root?.renderedChildren ?? []);
         },
         get root() {
             return rootNode();
@@ -138,9 +133,11 @@ function createIntrospectionViewWithDependencies(
             return diagnostics.warnings;
         },
         find(selector: unknown) {
-            return findAll(selector).first;
+            return currentQuery().findAll(selector).first;
         },
-        findAll,
+        findAll(selector: unknown) {
+            return currentQuery().findAll(selector);
+        },
         formatTree() {
             return rootNode()?.formatTree() ?? '';
         },

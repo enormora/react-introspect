@@ -19,6 +19,12 @@ export type SnapshotReader = {
     readonly act: (action: () => unknown) => unknown;
 };
 
+export type SnapshotQuery = {
+    readonly findAll: (selector: unknown) => RuntimeIntrospectionList;
+    readonly list: (nodes: readonly SnapshotNode[]) => RuntimeIntrospectionList;
+    readonly node: (node: SnapshotNode) => RuntimeIntrospectionNode;
+};
+
 function readProperty(value: SnapshotProps, property: PropertyKey): unknown {
     return value[property];
 }
@@ -176,13 +182,12 @@ const propElementExposure = {
 
 const exposedPropsBySnapshotNode = new WeakMap<SnapshotNode, SnapshotProps>();
 
-export function createIntrospectionNode(
+function exposeSnapshotNode(
+    query: SnapshotQuery,
     reader: SnapshotReader,
     snapshot: IntrospectionSnapshot,
     node: SnapshotNode
 ): RuntimeIntrospectionNode {
-    const context = { reader, snapshot };
-
     function readProps(): SnapshotProps {
         const cachedProps = exposedPropsBySnapshotNode.get(node);
 
@@ -190,19 +195,11 @@ export function createIntrospectionNode(
             return cachedProps;
         }
 
-        const exposedProps = propElementExposure.exposeProps(node.props, function createPropNode(propNode) {
-            return createIntrospectionNode(reader, snapshot, propNode);
-        });
+        const exposedProps = propElementExposure.exposeProps(node.props, query.node);
 
         exposedPropsBySnapshotNode.set(node, exposedProps);
 
         return exposedProps;
-    }
-
-    function createNodeList(nodes: readonly SnapshotNode[]): RuntimeIntrospectionList {
-        return createIntrospectionList(nodes.map(function createChildNode(child) {
-            return createIntrospectionNode(context.reader, context.snapshot, child);
-        }));
     }
 
     function readRenderedChildren(): RuntimeRenderedChildren {
@@ -214,25 +211,13 @@ export function createIntrospectionNode(
         }
 
         return {
-            nodes: createNodeList(node.renderedChildren),
+            nodes: query.list(node.renderedChildren),
             status: 'rendered'
         };
     }
 
-    function descendants(): readonly RuntimeIntrospectionNode[] {
-        return collectDescendants(node).map(function createDescendantNode(descendant) {
-            return createIntrospectionNode(reader, snapshot, descendant);
-        });
-    }
-
     function findAll(selector: unknown): RuntimeIntrospectionList {
-        const normalizedSelector = toSelector(selector);
-
-        return createIntrospectionList(
-            descendants().filter(function isMatch(descendant) {
-                return nodeMatchesSelector(descendant, normalizedSelector);
-            })
-        );
+        return query.list(collectDescendants(node)).filterBy(selector);
     }
 
     return Object.freeze({
@@ -240,7 +225,7 @@ export function createIntrospectionNode(
             return node.caughtError;
         },
         get givenChildren() {
-            return createNodeList(node.givenChildren);
+            return query.list(node.givenChildren);
         },
         get isStale() {
             return reader.currentSnapshot.renderCount !== snapshot.renderCount;
@@ -289,7 +274,7 @@ export function createIntrospectionNode(
             let parent = node.parentId === undefined ? undefined : findSnapshotNode(snapshot, node.parentId);
 
             while (parent !== undefined) {
-                const parentNode = createIntrospectionNode(reader, snapshot, parent);
+                const parentNode = query.node(parent);
 
                 if (nodeMatchesSelector(parentNode, normalizedSelector)) {
                     return parentNode;
@@ -323,39 +308,21 @@ export function createIntrospectionNode(
 }
 
 function snapshotTreeNodes(snapshot: IntrospectionSnapshot): readonly SnapshotNode[] {
-    function collect(node: SnapshotNode): readonly SnapshotNode[] {
-        return [
-            node,
-            ...node.renderedChildren.flatMap(collect)
-        ];
-    }
-
-    return snapshot.root === undefined ? [] : collect(snapshot.root);
+    return snapshot.root === undefined ? [] : [ snapshot.root, ...collectDescendants(snapshot.root) ];
 }
 
-export function createIntrospectionNodeList(
-    reader: SnapshotReader,
-    snapshot: IntrospectionSnapshot,
-    nodes: readonly SnapshotNode[]
-): RuntimeIntrospectionList {
-    return createIntrospectionList(nodes.map(function createNode(node) {
-        return createIntrospectionNode(reader, snapshot, node);
-    }));
-}
+export function createSnapshotQuery(reader: SnapshotReader, snapshot: IntrospectionSnapshot): SnapshotQuery {
+    const query: SnapshotQuery = {
+        findAll(selector) {
+            return query.list(snapshotTreeNodes(snapshot)).filterBy(selector);
+        },
+        list(nodes) {
+            return createIntrospectionList(nodes.map(query.node));
+        },
+        node(node) {
+            return exposeSnapshotNode(query, reader, snapshot, node);
+        }
+    };
 
-export function findIntrospectionNodes(
-    reader: SnapshotReader,
-    snapshot: IntrospectionSnapshot,
-    selector: unknown
-): RuntimeIntrospectionList {
-    const normalizedSelector = toSelector(selector);
-    const nodes = snapshotTreeNodes(snapshot)
-        .map(function createNode(node) {
-            return createIntrospectionNode(reader, snapshot, node);
-        })
-        .filter(function isMatch(node) {
-            return nodeMatchesSelector(node, normalizedSelector);
-        });
-
-    return createIntrospectionList(nodes);
+    return query;
 }
