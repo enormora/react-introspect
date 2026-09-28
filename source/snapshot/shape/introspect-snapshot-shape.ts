@@ -3,8 +3,7 @@ import type {
     ElementChildrenState,
     SnapshotNode,
     SnapshotNodeKind,
-    SnapshotProps,
-    SnapshotSourceElement
+    SnapshotProps
 } from '../model/introspect-snapshot-contract.ts';
 
 const reactWrapperNames = new Map<unknown, string>([
@@ -58,10 +57,6 @@ export function getElementKind(type: unknown): SnapshotNodeKind {
 
 export function getIndexedPath(parentPath: string, index: number | string, name: string): string {
     return parentPath === 'root' ? name : `${parentPath} > ${name}[${index}]`;
-}
-
-export function getSourceElementKind(element: SnapshotSourceElement): SnapshotNodeKind {
-    return getElementKind(element.type);
 }
 
 function getFunctionTypeName(type: NamedFunction): string {

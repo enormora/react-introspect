@@ -10,7 +10,6 @@ import {
     getElementChildrenState,
     getElementKind,
     getIndexedPath,
-    getSourceElementKind,
     getTextContent,
     getTypeName
 } from '../shape/introspect-snapshot-shape.ts';
@@ -268,7 +267,7 @@ const snapshotOperations = {
             caughtError: request.element.caughtError,
             id: idAllocation.id,
             key: request.element.key,
-            kind: getSourceElementKind(request.element),
+            kind: getElementKind(request.element.type),
             name,
             parentId: request.parentId,
             path,
