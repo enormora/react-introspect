@@ -10,6 +10,7 @@ import {
     elementKeyProps
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
+import { createIntrospectionUsageError } from '../../values/introspect-usage-error.ts';
 import type { IntrospectionClassComponent } from '../../values/introspect-class-component.ts';
 import { readClassFrameType } from './introspect-class-frame.ts';
 import {
@@ -17,7 +18,6 @@ import {
     type IntrospectionTransformedNode,
     readElementRef
 } from './introspect-frame-contract.ts';
-import { throwIntrospectionRenderError } from './introspect-render-error.ts';
 import {
     canExecuteComponent,
     enterComponentDepth,
@@ -42,7 +42,7 @@ function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
 
 function createIntrospectionElement(element: React.ReactElement): IntrospectionElement {
     if (!isIntrospectionElement(element)) {
-        throw new TypeError('Introspection expected React element props to be an object.');
+        throw createIntrospectionUsageError('Introspection expected React element props to be an object.');
     }
 
     return element;
@@ -62,14 +62,6 @@ function unwrapExecutableType(type: unknown): unknown {
     return elementKind.kind === 'memo' ? unwrapExecutableType(elementKind.inner) : type;
 }
 
-function resolveExecutableType(element: IntrospectionElement): unknown {
-    try {
-        return unwrapExecutableType(element.type);
-    } catch (error) {
-        return throwIntrospectionRenderError(error);
-    }
-}
-
 function executeType(
     type: unknown,
     props: Readonly<Record<PropertyKey, unknown>>,
@@ -85,11 +77,7 @@ function executeType(
 }
 
 function executeIntrospectionFrameElement(type: unknown, element: IntrospectionElement): React.ReactNode {
-    try {
-        return unwrapThenableNode(executeType(type, element.props, readElementRef(element)));
-    } catch (error) {
-        return throwIntrospectionRenderError(error);
-    }
+    return unwrapThenableNode(executeType(type, element.props, readElementRef(element)));
 }
 
 function transformPrimitiveNode(node: unknown): IntrospectionTransformedNode | undefined {
@@ -182,7 +170,7 @@ function createClassFrameElement(
 }
 
 function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement {
-    const executableType = resolveExecutableType(props.element);
+    const executableType = unwrapExecutableType(props.element.type);
     const executableKind = classifyElementType(executableType);
 
     if (executableKind.kind === 'class') {

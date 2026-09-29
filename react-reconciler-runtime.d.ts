@@ -14,6 +14,7 @@ declare module 'react-reconciler' {
             onRecoverableError: (error: unknown) => void,
             onDefaultTransitionIndicator: null
         ) => ReconcilerRoot;
+        readonly discreteUpdates: <Result>(action: () => Result) => Result;
         readonly flushPassiveEffects: () => boolean;
         readonly flushSyncFromReconciler: <Result>(action: () => Result) => Result;
         readonly flushSyncWork: () => boolean;
@@ -85,4 +86,6 @@ declare module 'react-reconciler' {
 declare module 'react-reconciler/constants.js' {
     export const ConcurrentRoot: number;
     export const DefaultEventPriority: number;
+    export const DiscreteEventPriority: number;
+    export const NoEventPriority: number;
 }

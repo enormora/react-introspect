@@ -39,11 +39,15 @@ test-types:
 
 test-runtime-integration:
     node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile runtime-integration
+    node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile runtime-integration-development
+
+test-runtime-integration-production:
+    NODE_ENV=production node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile runtime-integration
 
 test-package-smoke: compile
     node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile integration
 
-test: test-unit-with-coverage test-types test-runtime-integration test-package-smoke
+test: test-unit-with-coverage test-types test-runtime-integration test-runtime-integration-production test-package-smoke
 
 publish-dry-run: test-package-smoke
     packtory publish

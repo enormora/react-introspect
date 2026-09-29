@@ -598,7 +598,7 @@ assert.equal(button.textContent, 'Save changes');
 
 ### `node.sendEvent(name, ...args)`
 
-Calls a conventional event prop inside `act`.
+Calls a conventional event prop at discrete priority, like a user event, and commits the resulting update before it returns.
 
 ```tsx
 const input = view.find(SearchInput);
@@ -888,7 +888,7 @@ button.sendEvent('save');
 await view.waitForIdle();
 ```
 
-Render work that is already scheduled when you call it is committed first, including transitions scheduled outside React, for example by a store or router subscription.
+Render work that is already scheduled when you call it is committed first, including transitions scheduled outside React, for example by a store or router subscription, and commits React delays on purpose, such as revealing resolved Suspense content.
 
 ```tsx
 cartStore.add(item);
@@ -1043,7 +1043,7 @@ Components beside the path to `depthFrom`, such as a layout's header, also execu
 
 ### Updates outside `act`
 
-Store, router, and timer updates need no `act`. `waitForIdle()` commits them.
+React Introspect does not use `act`, and your tests do not need it either. Store, router, and timer updates are committed by `waitForIdle()`.
 
 ```tsx
 const view = introspect(<RouterProvider router={router} />, {
@@ -1057,9 +1057,9 @@ await view.waitForIdle();
 assert.ok(view.find(SettingsPage));
 ```
 
-React Introspect sets `IS_REACT_ACT_ENVIRONMENT` only while it runs its own `act` calls, and restores it afterwards.
+Trigger the update and wait on the view instead of wrapping it in `React.act`. `React.act` only exists in development builds of React, and an open `await act(async () => ...)` scope collects the work of every React root in the process until it ends. Run tests that hold such a scope serially, not concurrently with other tests.
 
-If your suite sets `IS_REACT_ACT_ENVIRONMENT = true` globally, React warns about every update outside `act`. The flag only controls those warnings. Scope it to the tests that need it instead of the whole suite.
+If your suite sets `IS_REACT_ACT_ENVIRONMENT = true`, React Introspect clears it while it commits its own renders and events, so those do not warn. Updates your test triggers outside React still warn about missing `act`. Scope the flag to the tests that need it instead of the whole suite.
 
 ### Render props
 
@@ -1307,8 +1307,12 @@ Use browser tests for animation and CSS transition behavior.
 
 When the React version supports `Activity`, React Introspect treats it as a React wrapper.
 
+React renders hidden `Activity` content at a lower priority after the first commit, so it appears once the view is idle.
+
 ```tsx
 const view = introspect(<SettingsPage />);
+
+await view.waitForIdle();
 
 const activity = view.find(React.Activity);
 
@@ -1632,6 +1636,7 @@ Use React Introspect for component contracts.
 - no compiler plugin
 - no JSX requirement
 - no monkey patching
+- no `act`, works with development and production builds of React
 - no raw React internals in public output
 - committed snapshots only
 - shallow by default

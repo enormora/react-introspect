@@ -1,5 +1,3 @@
-// eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
-import { DefaultEventPriority } from 'react-reconciler/constants.js';
 import type { TimeoutIdentifier } from '@enormora/clock';
 import {
     readHostKey,
@@ -66,15 +64,20 @@ type IntrospectionTextInstance = {
     readonly writeText: (text: string) => void;
 };
 
+export const noHostTimeout = -1;
+
 export type IntrospectionHostScheduling = {
     readonly cancelTimeout: (timeoutIdentifier: TimeoutIdentifier) => void;
+    readonly readCurrentUpdatePriority: () => number;
     readonly readEventTimestamp: () => number;
+    readonly resolveUpdatePriority: () => number;
     readonly scheduleMicrotask: (action: () => void) => void;
     readonly scheduleTimeout: <HandlerArguments extends readonly unknown[]>(
         handler: (...handlerArguments: HandlerArguments) => void,
         delayInMilliseconds: number,
         ...handlerArguments: HandlerArguments
     ) => TimeoutIdentifier;
+    readonly writeCurrentUpdatePriority: (priority: number) => void;
 };
 
 type IntrospectionHostContext = {
@@ -356,10 +359,6 @@ function returnNull(): null {
     return null;
 }
 
-function getDefaultEventPriority(): number {
-    return DefaultEventPriority;
-}
-
 function publishContainerSnapshot(container: IntrospectionHostContainer): void {
     container.publish(toSnapshot(container));
 }
@@ -460,7 +459,7 @@ export function createIntrospectionHostConfig(scheduling: IntrospectionHostSched
         detachDeletedInstance: noop,
         finalizeInitialChildren: alwaysFalse,
         getChildHostContext,
-        getCurrentUpdatePriority: getDefaultEventPriority,
+        getCurrentUpdatePriority: scheduling.readCurrentUpdatePriority,
         getPublicInstance(instance: IntrospectionHostChild) {
             return instance.kind === 'host' ? instance.readPublicInstance() : instance;
         },
@@ -475,7 +474,7 @@ export function createIntrospectionHostConfig(scheduling: IntrospectionHostSched
         maySuspendCommit: alwaysFalse,
         maySuspendCommitInSyncRender: alwaysFalse,
         maySuspendCommitOnUpdate: alwaysFalse,
-        noTimeout: -1,
+        noTimeout: noHostTimeout,
         prepareForCommit,
         preparePortalMount: noop,
         removeChild,
@@ -484,12 +483,12 @@ export function createIntrospectionHostConfig(scheduling: IntrospectionHostSched
         resetFormInstance: noop,
         resolveEventTimeStamp: scheduling.readEventTimestamp,
         resolveEventType: returnNull,
-        resolveUpdatePriority: getDefaultEventPriority,
+        resolveUpdatePriority: scheduling.resolveUpdatePriority,
         restoreRootViewTransitionName: noop,
         restoreViewTransitionName: noop,
         scheduleMicrotask: scheduling.scheduleMicrotask,
         scheduleTimeout: scheduling.scheduleTimeout,
-        setCurrentUpdatePriority: noop,
+        setCurrentUpdatePriority: scheduling.writeCurrentUpdatePriority,
         shouldAttemptEagerTransition: alwaysFalse,
         shouldSetTextContent: alwaysFalse,
         startSuspendingCommit: noop,

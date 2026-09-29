@@ -8,6 +8,7 @@ import type {
     IntrospectionRefTarget
 } from '../public/introspect-public-types.js';
 import { matchesTargetCriteria } from '../matching/introspect-target-criteria.ts';
+import { createIntrospectionUsageError } from '../values/introspect-usage-error.ts';
 import { isObject } from '../values/introspect-value-kinds.ts';
 
 const matcherType = 'matchRefs';
@@ -74,7 +75,7 @@ function resolveRuleRef(
     const rules = matchingRules(refs, target);
 
     if (rules.length > 1) {
-        throw new TypeError(`Ref target ${target.name} matches multiple ref rules.`);
+        throw createIntrospectionUsageError(`Ref target ${target.name} matches multiple ref rules.`);
     }
 
     const rule = rules[0];
@@ -98,11 +99,11 @@ function shorthandTypes(refs: IntrospectionRefShorthand): readonly string[] {
 
 function validateShorthandTargetCount(type: string, targetCount: number): void {
     if (targetCount === 0) {
-        throw new TypeError(`Ref shorthand ${type} matched no host refs.`);
+        throw createIntrospectionUsageError(`Ref shorthand ${type} matched no host refs.`);
     }
 
     if (targetCount > 1) {
-        throw new TypeError(`Ref shorthand ${type} matched multiple host refs.`);
+        throw createIntrospectionUsageError(`Ref shorthand ${type} matched multiple host refs.`);
     }
 }
 

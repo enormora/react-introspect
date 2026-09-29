@@ -10,10 +10,7 @@ export const config = defineConfig({
             },
             testFamily: 'microtest',
             files: {
-                exclude: [
-                    'source/integration-tests/package-smoke/package-smoke.test.ts',
-                    'source/integration-tests/runtime-integration/runtime-integration.test.ts'
-                ],
+                exclude: [ 'source/integration-tests/**/*.test.ts' ],
                 include: [ 'source/**/*.test.ts' ]
             },
             timeouts: {
@@ -38,11 +35,26 @@ export const config = defineConfig({
         'runtime-integration': {
             execution: {
                 processModel: 'supervised-process',
-                scheduling: 'serial'
+                scheduling: 'concurrent'
             },
             testFamily: 'integration',
             files: {
                 include: [ 'source/integration-tests/runtime-integration/runtime-integration.test.ts' ]
+            },
+            timeouts: {
+                collectionMilliseconds: 30_000,
+                hardMilliseconds: 30_000,
+                softMilliseconds: 20_000
+            }
+        },
+        'runtime-integration-development': {
+            execution: {
+                processModel: 'supervised-process',
+                scheduling: 'serial'
+            },
+            testFamily: 'integration',
+            files: {
+                include: [ 'source/integration-tests/runtime-integration/runtime-integration-development.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000,
