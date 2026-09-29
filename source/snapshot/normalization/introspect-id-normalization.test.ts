@@ -34,21 +34,18 @@ export const testNode = suite('introspection id normalization', [
 
         return scope.assert.collect();
     }),
-    test('normalizes props, React elements, and circular values', function (scope) {
-        const value: Record<string, unknown> = { id: '_test-r_a_' };
-
-        value.self = value;
-
+    test('normalizes strings directly on props and replaces elements inside plain containers', function (scope) {
+        const config = { theme: 'dark' };
         const normalized = normalizeSnapshotProps(
             {
                 element: React.createElement('label', { htmlFor: '_test-r_a_' }),
-                nested: [ { icon: React.createElement('svg', { id: '_test-r_a_' }) } ],
-                value
+                id: '_test-r_a_',
+                nested: [ { config, icon: React.createElement('svg', { id: '_test-r_a_' }) } ]
             },
             {
                 ancestors: new WeakSet(),
-                describeElement(element, location, normalizeElementProps) {
-                    return { location, props: normalizeElementProps(), type: element.type };
+                describeElement(element, location) {
+                    return { location, props: element.props, type: element.type };
                 },
                 normalizeIdString: createIdNormalizer({
                     generator() {
@@ -58,28 +55,123 @@ export const testNode = suite('introspection id normalization', [
                 })
             }
         );
+        const nested = normalized.nested as readonly Readonly<Record<string, unknown>>[];
 
         scope.assert.deepEqual(normalized, {
             element: {
                 location: 'element',
-                props: { htmlFor: 'stable-id' },
+                props: { htmlFor: '_test-r_a_' },
                 type: 'label'
             },
-            nested: [ { icon: { location: 'nested.0.icon', props: { id: 'stable-id' }, type: 'svg' } } ],
+            id: 'stable-id',
+            nested: [ { config, icon: { location: 'nested.0.icon', props: { id: '_test-r_a_' }, type: 'svg' } } ]
+        });
+        scope.assert.equal(Object.isFrozen(nested), true);
+        scope.assert.equal(Object.isFrozen(nested[0]), true);
+        scope.assert.equal(nested[0]?.config, config);
+
+        return scope.assert.collect();
+    }),
+    test('keeps values without elements by reference', function (scope) {
+        const cyclic: Record<string, unknown> = { id: '_test-r_a_' };
+
+        cyclic.self = cyclic;
+
+        const props = {
+            createdAt: new Date(0),
+            cyclic,
+            list: [ { id: '_test-r_a_' } ],
+            lookup: new Map([ [ 'id', '_test-r_a_' ] ]),
+            record: { id: '_test-r_a_' },
+            set: new Set([ '_test-r_a_' ])
+        };
+        const normalized = normalizeSnapshotProps(props, {
+            ancestors: new WeakSet(),
+            describeElement() {
+                throw new Error('Expected no element.');
+            },
+            normalizeIdString: createIdNormalizer({
+                generator() {
+                    return 'stable-id';
+                },
+                prefix: 'test-'
+            })
+        });
+
+        scope.assert.deepEqual({
+            createdAt: normalized.createdAt === props.createdAt,
+            cyclic: normalized.cyclic === props.cyclic,
+            list: normalized.list === props.list,
+            lookup: normalized.lookup === props.lookup,
+            record: normalized.record === props.record,
+            recordFrozen: Object.isFrozen(normalized.record),
+            set: normalized.set === props.set
+        }, {
+            createdAt: true,
+            cyclic: true,
+            list: true,
+            lookup: true,
+            record: true,
+            recordFrozen: false,
+            set: true
+        });
+
+        return scope.assert.collect();
+    }),
+    test('cuts cycles inside containers that hold elements', function (scope) {
+        const value: Record<string, unknown> = { icon: React.createElement('svg') };
+
+        value.self = value;
+        value.inner = { back: value };
+
+        const normalized = normalizeSnapshotProps({ value }, {
+            ancestors: new WeakSet(),
+            describeElement(element) {
+                return element.type;
+            },
+            normalizeIdString: String
+        });
+
+        scope.assert.deepEqual(normalized, {
             value: {
-                id: 'stable-id',
+                icon: 'svg',
+                inner: { back: '[Circular]' },
                 self: '[Circular]'
             }
         });
+
+        return scope.assert.collect();
+    }),
+    test('describes elements inside leaf values as plain data', function (scope) {
+        const list = [ 1 ];
+        const plain = { list };
+
         scope.assert.deepEqual(
-            normalizeSnapshotValue(React.createElement('b', { title: 'plain' }), String),
-            { key: null, props: { title: 'plain' }, type: 'b' }
+            normalizeSnapshotValue(
+                { element: React.createElement('b', { title: 'plain' }, React.createElement('i')), plain },
+                String
+            ),
+            {
+                element: {
+                    key: null,
+                    props: { children: { key: null, props: {}, type: 'i' }, title: 'plain' },
+                    type: 'b'
+                },
+                plain
+            }
         );
+        scope.assert.equal(normalizeSnapshotValue(plain, String), plain);
         scope.assert.equal(
-            normalizeSnapshotValue('unchanged', function (valueToNormalize) {
-                return valueToNormalize;
-            }),
-            'unchanged'
+            normalizeSnapshotValue(
+                '_test-r_a_',
+                createIdNormalizer({
+                    generator() {
+                        return 'stable-id';
+                    },
+                    prefix: 'test-'
+                })
+            ),
+            'stable-id'
         );
 
         return scope.assert.collect();

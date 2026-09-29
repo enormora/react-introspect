@@ -123,19 +123,19 @@ const view = introspect(<ProfileCard user={user} />, {
 
 Options:
 
-| Option        | Default     | What it does                                                             |
-| ------------- | ----------- | ------------------------------------------------------------------------ |
-| `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.                    |
-| `depthFrom`   | none        | Starts counting `depth` at the first instance of this component.         |
-| `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.              |
-| `hostEvent`   | `{}`        | Default fields for event stubs sent to host elements.                    |
-| `idPrefix`    | generated   | Prefix passed to React for `useId`.                                      |
-| `idGenerator` | none        | Rewrites React-generated ids in React Introspect snapshots after commit. |
-| `refs`        | none        | Injects fake host ref nodes.                                             |
-| `waitTimeout` | `1000`      | Milliseconds a wait API waits before it rejects with a timeout error.    |
-| `strictMode`  | `true`      | Wraps the React Introspect root in `React.StrictMode`.                   |
-| `transparent` | `[]`        | Components that execute without consuming `depth`.                       |
-| `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.                 |
+| Option        | Default     | What it does                                                          |
+| ------------- | ----------- | --------------------------------------------------------------------- |
+| `depth`       | `1`         | Component depth to execute. Use a number or `'full'`.                 |
+| `depthFrom`   | none        | Starts counting `depth` at the first instance of this component.      |
+| `errorMode`   | `'capture'` | Captures uncaught render errors on the view. Use `'throw'`.           |
+| `hostEvent`   | `{}`        | Default fields for event stubs sent to host elements.                 |
+| `idPrefix`    | generated   | Prefix passed to React for `useId`.                                   |
+| `idGenerator` | none        | Rewrites React-generated ids in string props and text after commit.   |
+| `refs`        | none        | Injects fake host ref nodes.                                          |
+| `waitTimeout` | `1000`      | Milliseconds a wait API waits before it rejects with a timeout error. |
+| `strictMode`  | `true`      | Wraps the React Introspect root in `React.StrictMode`.                |
+| `transparent` | `[]`        | Components that execute without consuming `depth`.                    |
+| `warningMode` | `'throw'`   | Throws on React warnings. Use `'capture'` or `'ignore'`.              |
 
 ### `createIntrospect(defaults)`
 
@@ -462,6 +462,19 @@ assert.equal(tab.props.label, 'Inbox');
 Their types follow: `React.ReactElement` becomes `IntrospectionNode`. A `React.ReactNode` prop can also hold a string, number, or `null` at runtime, so it stays a union; type slot props as `React.ReactElement` when they always hold an element.
 
 `view.find()` does not search inside props. Search from the prop node instead: `tab.props.icon.find('svg')`.
+
+Every other prop value is the reference the parent passed. Plain objects, arrays, `Map`, `Set`, and class instances keep their identity, so a test can check that a component hands an object through:
+
+```tsx
+const appContext = createAppContext();
+const view = introspect(<App appContext={appContext} />);
+const provider = view.find(AppContextProvider);
+
+assert.ok(provider);
+assert.equal(provider.props.value, appContext);
+```
+
+Only a plain object or array that holds a React element is rebuilt: it becomes a frozen copy with the elements replaced by nodes, and every value inside it that holds no element keeps its identity. A reference back to a rebuilt container becomes the string `'[Circular]'`. React Introspect does not look inside `Map`, `Set`, or class instances, so elements in there stay React elements.
 
 ### `node.pickProps(keys)` and `node.omitProps(keys)`
 
@@ -1352,7 +1365,7 @@ assert.ok(email);
 assert.match(email.props.id, /^signup-/);
 ```
 
-Use `idGenerator` when you want nice deterministic ids in React Introspect output.
+Use `idGenerator` when you want nice deterministic ids in React Introspect output. It rewrites string props and text content. Strings inside object or array props stay untouched, because those values keep their identity.
 
 ```tsx
 const ids = [ 'field-a', 'field-b' ];

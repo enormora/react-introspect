@@ -275,6 +275,49 @@ export const testNode = suite('snapshot tree model', [
 
         return scope.assert.collect();
     }),
+    test('keeps prop values without elements by reference', function (scope) {
+        const config = { theme: 'dark' };
+        const props = {
+            createdAt: new Date(0),
+            list: [ config ],
+            lookup: new Map([ [ 'theme', 'dark' ] ]),
+            record: { config },
+            set: new Set([ 'dark' ]),
+            slots: [ React.createElement(Icon, { name: 'gear' }), config ]
+        };
+        const view = introspect(React.createElement(Widget, { label: 'Refs', ...props } as never), {
+            depth: 0,
+            strictMode: false
+        });
+        const widgetProps = requireValue(view.root).props as Readonly<Record<string, unknown>>;
+        const slots = widgetProps.slots as readonly unknown[];
+
+        scope.assert.deepEqual({
+            createdAt: widgetProps.createdAt === props.createdAt,
+            firstSlot: isIntrospectionNode(slots[0]) ? slots[0].type : undefined,
+            list: widgetProps.list === props.list,
+            lookup: widgetProps.lookup === props.lookup,
+            record: widgetProps.record === props.record,
+            recordFrozen: Object.isFrozen(widgetProps.record),
+            secondSlot: slots[1] === config,
+            set: widgetProps.set === props.set,
+            slotsFrozen: Object.isFrozen(slots),
+            slotsRebuilt: slots !== props.slots
+        }, {
+            createdAt: true,
+            firstSlot: Icon,
+            list: true,
+            lookup: true,
+            record: true,
+            recordFrozen: false,
+            secondSlot: true,
+            set: true,
+            slotsFrozen: true,
+            slotsRebuilt: true
+        });
+
+        return scope.assert.collect();
+    }),
     test('cuts circular values that pass through elements in props', function (scope) {
         const settings: Record<string, unknown> = {};
 
