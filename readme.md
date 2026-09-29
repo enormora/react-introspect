@@ -664,10 +664,10 @@ Shape:
 
 ```ts
 type IntrospectionNodeState = {
-    rendered: boolean;
-    visible: boolean;
-    activityMode?: 'visible' | 'hidden';
-    reason?: 'depth' | 'unsupported' | 'activity' | 'suspended';
+    readonly rendered: boolean;
+    readonly visible: boolean;
+    readonly activityMode: 'visible' | 'hidden' | undefined;
+    readonly reason: 'depth' | 'unsupported' | 'activity' | 'suspended' | undefined;
 };
 ```
 
