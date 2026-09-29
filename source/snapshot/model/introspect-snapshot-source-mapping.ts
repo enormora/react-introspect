@@ -1,5 +1,6 @@
 import React from 'react';
-import { freezePublicElementProps, getElementKind } from '../shape/introspect-snapshot-shape.ts';
+import { getElementKind } from '../shape/introspect-snapshot-shape.ts';
+import { readPublicProps } from '../../values/introspect-public-props.ts';
 import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kinds.ts';
 import type { IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import type {
@@ -8,6 +9,8 @@ import type {
     SnapshotSourceNode,
     SnapshotSourceOutput
 } from './introspect-snapshot-contract.ts';
+
+const noInternalPropKeys = new Set<PropertyKey>();
 
 function flattenReactNodes(children: unknown): readonly unknown[] {
     if (Array.isArray(children)) {
@@ -31,7 +34,7 @@ export function toSourceElement(element: React.ReactElement<SnapshotProps>): Sna
         givenChildren: children,
         key: element.key ?? null,
         kind: 'element',
-        props: freezePublicElementProps(element.props),
+        props: readPublicProps(element.props, noInternalPropKeys),
         output: getElementKind(element.type) === 'component'
             ? { reason: 'depth', status: 'notRendered' }
             : { children: 'given', status: 'rendered' },

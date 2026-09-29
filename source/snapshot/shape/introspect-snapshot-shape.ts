@@ -1,4 +1,3 @@
-import { isReactReservedPropKey } from '../../values/introspect-public-props.ts';
 import {
     classifyElementType,
     type ReactElementKind,
@@ -7,8 +6,7 @@ import {
 } from '../../values/introspect-react-element-kind.ts';
 import type {
     SnapshotNode,
-    SnapshotNodeKind,
-    SnapshotProps
+    SnapshotNodeKind
 } from '../model/introspect-snapshot-contract.ts';
 
 type NamedFunction = {
@@ -124,18 +122,6 @@ export function getTextContent(nodes: readonly SnapshotNode[]): string {
             return node.textContent;
         })
         .join('');
-}
-
-export function freezePublicElementProps(props: SnapshotProps): SnapshotProps {
-    const publicProps: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        if (!isReactReservedPropKey(key)) {
-            publicProps[key] = props[key];
-        }
-    }
-
-    return Object.freeze(publicProps);
 }
 
 export function getIndexedPath(parentPath: string, index: number | string, name: string): string {
