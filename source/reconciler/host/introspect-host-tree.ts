@@ -43,6 +43,7 @@ export type IntrospectionHostContainer = {
 } & IntrospectionChildStore;
 
 type IntrospectionHostInstance = {
+    readonly kind: 'host';
     readonly readProps: () => IntrospectionHostProps;
     readonly readPublicInstance: () => unknown;
     readonly readVisibility: () => 'hidden' | 'visible';
@@ -52,6 +53,7 @@ type IntrospectionHostInstance = {
 } & IntrospectionChildStore;
 
 type IntrospectionTextInstance = {
+    readonly kind: 'text';
     readonly readText: () => string;
     readonly readVisibility: () => 'hidden' | 'visible';
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
@@ -82,10 +84,6 @@ function createChildStore(): IntrospectionChildStore {
     };
 }
 
-function isTextInstance(child: IntrospectionHostChild): child is IntrospectionTextInstance {
-    return !Reflect.has(child, 'type');
-}
-
 function toRefTarget(type: string, props: IntrospectionHostProps): IntrospectionRefHostTarget {
     return Object.freeze({
         key: readHostKey(props),
@@ -108,7 +106,7 @@ function resolvePublicInstance(
 }
 
 function collectRefTargets(child: IntrospectionHostChild): readonly IntrospectionRefHostTarget[] {
-    if (isTextInstance(child)) {
+    if (child.kind === 'text') {
         return [];
     }
 
@@ -144,7 +142,7 @@ function detachChild(child: IntrospectionHostChild): void {
 }
 
 function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
-    if (isTextInstance(child)) {
+    if (child.kind === 'text') {
         return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
     }
 
@@ -238,6 +236,7 @@ function createHostInstance(
 
     return {
         ...createChildStore(),
+        kind: 'host',
         readProps() {
             return currentProps;
         },
@@ -263,6 +262,7 @@ function createTextInstance(text: string): IntrospectionTextInstance {
     let currentVisibility: 'hidden' | 'visible' = 'visible';
 
     return {
+        kind: 'text',
         readText() {
             return currentText;
         },
