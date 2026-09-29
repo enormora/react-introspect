@@ -99,11 +99,11 @@ if (button !== undefined) {
         IntrospectionNode<ButtonPublicProps, typeof Button> | undefined
     >();
 
-    button.pickProps([ 'label' ]);
+    button.pickProps([ 'label', 'disabled' ]);
     button.omitProps([ 'onSave' ]);
 
     // @ts-expect-error: Type '"missing"' is not assignable to type '"label" | "disabled" | "onSave"'.
-    button.pickProps([ 'missing' ]);
+    button.pickProps([ 'label', 'missing' ]);
     // @ts-expect-error: Property 'children' does not exist on type 'IntrospectionPropValues<IntrospectionWithoutKeys<ButtonProps & { children?: ReactNode; }, ReactReservedPropKey>, Readonly<Record<...>>>'.
     String(button.props.children);
 }
@@ -140,7 +140,7 @@ const hostButton = hostView.find('button');
 if (hostButton !== undefined) {
     expect(hostButton.props.disabled).type.toBe<boolean>();
     expect(hostButton.props.type).type.toBe<'button' | 'submit'>();
-    expect(hostButton.pickProps([ 'disabled' ])).type.toBe<Pick<HostSchema['button'], 'disabled'>>();
+    expect(hostButton.pickProps([ 'disabled', 'type' ])).type.toBe<Pick<HostSchema['button'], 'disabled' | 'type'>>();
 }
 
 const hostLocator = hostView.locate('button');
