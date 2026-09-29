@@ -1,29 +1,31 @@
 import { suite, test } from '@overkill-dev/test';
-import { hasScheduledRootTask } from './introspect-react-root.ts';
+import { createUnitRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies.test.ts';
+import { flushScheduledWork } from './introspect-react-root.ts';
+
+async function readRejection(pending: Promise<unknown>): Promise<unknown> {
+    try {
+        await pending;
+    } catch (error) {
+        return error;
+    }
+
+    return undefined;
+}
 
 export const testNode = suite('React root access', [
-    test('reports whether the root has a scheduled task', function (scope) {
-        scope.assert.equal(hasScheduledRootTask({ callbackNode: null }), false);
-        scope.assert.equal(hasScheduledRootTask({ callbackNode: { callback: 'not callable' } }), false);
-        scope.assert.equal(
-            hasScheduledRootTask({
-                callbackNode: {
-                    callback() {
-                        return undefined;
-                    }
-                }
-            }),
-            true
-        );
+    test('finishes flushing once the root has no scheduled task', async function (scope) {
+        const error = await readRejection(flushScheduledWork(createUnitRuntimeDependencies(), { callbackNode: null }));
+
+        scope.assert.equal(error, undefined);
 
         return scope.assert.collect();
     }),
-    test('fails loudly when the root no longer exposes its scheduled task', function (scope) {
-        scope.assert.throws(
-            function () {
-                hasScheduledRootTask({});
-            },
-            { message: 'React Introspect expected the React root to expose callbackNode.' }
+    test('fails loudly when the root no longer exposes its scheduled task', async function (scope) {
+        const error = await readRejection(flushScheduledWork(createUnitRuntimeDependencies(), {}));
+
+        scope.assert.equal(
+            error instanceof Error ? error.message : error,
+            'React Introspect expected the React root to expose callbackNode.'
         );
 
         return scope.assert.collect();

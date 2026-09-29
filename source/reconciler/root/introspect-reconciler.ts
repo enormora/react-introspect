@@ -1,5 +1,4 @@
 import type React from 'react';
-import type { ReconcilerRoot } from 'react-reconciler';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
 import {
@@ -11,10 +10,12 @@ import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public
 import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 import {
+    actAndFlush,
     createReconcilerContainer,
-    hasScheduledRootTask,
+    flushPassiveEffects,
+    flushScheduledWork,
     reconcilerRuntime,
-    renderer
+    renderRootElement
 } from './introspect-react-root.ts';
 import {
     awaitWaiter,
@@ -62,34 +63,6 @@ type SessionRenderTarget = {
     readonly readRenderCount: () => number;
 };
 
-function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => unknown): unknown {
-    return reconcilerRuntime.run(runtime, function actWithRuntime() {
-        return runtime.actEnvironment.act(function runAction() {
-            const result = action();
-
-            renderer.flushSyncWork();
-            renderer.flushPassiveEffects();
-
-            return result;
-        });
-    });
-}
-
-async function flushMicrotasks(runtime: IntrospectionRuntimeDependencies): Promise<void> {
-    await reconcilerRuntime.run(runtime, async function flushMicrotasksWithRuntime() {
-        await runtime.microtasks.flush();
-    });
-}
-
-async function flushScheduledWork(runtime: IntrospectionRuntimeDependencies, root: ReconcilerRoot): Promise<void> {
-    await flushMicrotasks(runtime);
-
-    do {
-        await runtime.macrotasks.waitForNext();
-        await flushMicrotasks(runtime);
-    } while (hasScheduledRootTask(root));
-}
-
 function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
     const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
 
@@ -119,18 +92,6 @@ function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBef
 
     publishEmptyErrorSnapshot(target, renderCountBefore);
     target.diagnostics.recordUncaughtError(new Error(message));
-}
-
-function renderRootElement(
-    runtime: IntrospectionRuntimeDependencies,
-    root: ReconcilerRoot,
-    element: Readonly<React.ReactElement> | null
-): void {
-    actAndFlush(runtime, function renderElement() {
-        renderer.flushSyncFromReconciler(function updateContainer() {
-            renderer.updateContainer(element, root, null, null);
-        });
-    });
 }
 
 function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, commitElement: () => void): void {
@@ -171,9 +132,7 @@ function createIntrospectionReconcilerSession(
         },
         options.refs
     );
-    const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
-        return createReconcilerContainer(container, options.diagnostics, options.strictMode);
-    });
+    const root = createReconcilerContainer(runtime, container, options.diagnostics, options.strictMode);
     const target: SessionRenderTarget = {
         container,
         diagnostics: options.diagnostics,
@@ -185,10 +144,7 @@ function createIntrospectionReconcilerSession(
     async function flushUntilIdle(): Promise<void> {
         await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
             await flushScheduledWork(runtime, root);
-            reconcilerRuntime.run(runtime, function flushWithRuntime() {
-                renderer.flushPassiveEffects();
-                waiters.settle();
-            });
+            flushPassiveEffects(runtime, waiters.settle);
         });
     }
 
