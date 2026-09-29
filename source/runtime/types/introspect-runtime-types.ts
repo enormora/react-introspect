@@ -2,7 +2,7 @@ import type {
     IntrospectionError,
     IntrospectionNodeKind,
     IntrospectionNodeState,
-    IntrospectionNotRenderedReason,
+    IntrospectionChildrenNotRenderedReason,
     IntrospectionRenderControl,
     IntrospectionSendEvent,
     IntrospectionWarning
@@ -14,7 +14,7 @@ type RuntimeRenderedChildNodes = {
 };
 
 type RuntimeNotRenderedChildren = {
-    readonly reason: IntrospectionNotRenderedReason;
+    readonly reason: IntrospectionChildrenNotRenderedReason;
     readonly status: 'notRendered';
 };
 

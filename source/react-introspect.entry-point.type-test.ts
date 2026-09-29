@@ -78,6 +78,8 @@ expect({ cause: undefined, message: 'error' }).type.toBeAssignableTo<Introspecti
 expect({ activityMode: undefined, reason: undefined, rendered: true, visible: true })
     .type
     .toBeAssignableTo<IntrospectionNodeState>();
+expect<IntrospectionNodeState['reason']>().type.toBe<'activity' | 'depth' | 'suspended' | 'unsupported' | undefined>();
+expect<Extract<RenderedChildren, { readonly status: 'notRendered'; }>['reason']>().type.toBe<'unsupported'>();
 
 if (button !== undefined) {
     expect(button).type.toBeAssignableTo<IntrospectionNode<ButtonPublicProps, typeof Button>>();

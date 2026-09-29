@@ -1,4 +1,5 @@
 import React from 'react';
+import type { IntrospectionHiddenReason } from '../../public/introspect-public-types.ts';
 import {
     createIdNormalizer,
     normalizeSnapshotProps,
@@ -17,7 +18,6 @@ import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kind
 import {
     type IntrospectionSnapshot,
     registerSnapshotNode,
-    type SnapshotHiddenCause,
     type SnapshotNode,
     type SnapshotProps,
     type SnapshotSourceElement,
@@ -36,7 +36,7 @@ type SnapshotBuilder = {
 
 type SnapshotChildPlacement = {
     readonly build: SnapshotBuilder;
-    readonly inheritedHiddenBy: SnapshotHiddenCause | undefined;
+    readonly inheritedHiddenBy: IntrospectionHiddenReason | undefined;
     readonly parentId: number | undefined;
     readonly parentPath: string;
 };
@@ -69,17 +69,17 @@ type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
 
 type PropsSnapshotRequest = {
     readonly build: SnapshotBuilder;
-    readonly inheritedHiddenBy: SnapshotHiddenCause | undefined;
+    readonly inheritedHiddenBy: IntrospectionHiddenReason | undefined;
     readonly ownerId: number;
     readonly ownerPath: string;
     readonly props: SnapshotProps;
 };
 
 function hiddenByFromSource(
-    inheritedHiddenBy: SnapshotHiddenCause | undefined,
+    inheritedHiddenBy: IntrospectionHiddenReason | undefined,
     sourceVisibility: SnapshotVisibility,
     activityMode: 'hidden' | 'visible' | undefined
-): SnapshotHiddenCause | undefined {
+): IntrospectionHiddenReason | undefined {
     if (inheritedHiddenBy !== undefined) {
         return inheritedHiddenBy;
     }
@@ -91,7 +91,7 @@ function hiddenByFromSource(
     return activityMode === 'hidden' ? 'activity' : undefined;
 }
 
-function visibilityOf(hiddenBy: SnapshotHiddenCause | undefined): SnapshotVisibility {
+function visibilityOf(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotVisibility {
     return hiddenBy === undefined ? 'visible' : 'hidden';
 }
 
