@@ -38,6 +38,10 @@ type MemoKind = {
 
 export type ReactElementKind = ClassKind | ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
 
+export type ReactElementKindByName = {
+    readonly [Kind in ReactElementKind as Kind['kind']]: Kind;
+};
+
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
 const lazyType = Symbol.for('react.lazy');
