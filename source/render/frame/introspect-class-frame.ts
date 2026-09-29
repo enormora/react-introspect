@@ -374,8 +374,29 @@ const IntrospectionClassBoundaryFrame = class extends IntrospectionClassFrameBas
     }
 };
 
+const classFramesByComponent = new WeakMap<
+    IntrospectionClassComponent,
+    React.ComponentType<IntrospectionClassFrameProps>
+>();
+
+function createClassFrameType(type: IntrospectionClassComponent): React.ComponentType<IntrospectionClassFrameProps> {
+    return isErrorBoundary(type)
+        ? class IntrospectionClassBoundaryFrameForType extends IntrospectionClassBoundaryFrame {}
+        : class IntrospectionClassFrameForType extends IntrospectionClassFrameBase {};
+}
+
 export function readClassFrameType(
     type: IntrospectionClassComponent
 ): React.ComponentType<IntrospectionClassFrameProps> {
-    return isErrorBoundary(type) ? IntrospectionClassBoundaryFrame : IntrospectionClassFrameBase;
+    const cachedFrame = classFramesByComponent.get(type);
+
+    if (cachedFrame !== undefined) {
+        return cachedFrame;
+    }
+
+    const frame = createClassFrameType(type);
+
+    classFramesByComponent.set(type, frame);
+
+    return frame;
 }

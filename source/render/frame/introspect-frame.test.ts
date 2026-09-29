@@ -129,6 +129,18 @@ function ContextRoot(): React.ReactNode {
     );
 }
 
+function StatefulFirst(): React.ReactNode {
+    const [ label ] = React.useState('first state');
+
+    return React.createElement('span', null, label);
+}
+
+function StatefulSecond(): React.ReactNode {
+    const [ label ] = React.useState('second state');
+
+    return React.createElement('span', null, label);
+}
+
 function ignoreProfile(): undefined {
     return undefined;
 }
@@ -723,6 +735,38 @@ export const testNode = suite('execution shallow function components', [
 
         scope.assert.deepEqual(log.rendered(), [ 'shallow', 'custom 0', 'class memo', 'ref', 'nested 0', 'ref' ]);
         scope.assert.equal(view.find(LabelIgnoringMemoLabel)?.textContent, 'custom 0');
+
+        return scope.assert.collect();
+    }),
+    test('remounts when a different component takes the same position', function (scope) {
+        const view = introspect(React.createElement(StatefulFirst), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        view.update(React.createElement(StatefulSecond));
+
+        scope.assert.equal(view.find('span')?.textContent, 'second state');
+
+        return scope.assert.collect();
+    }),
+    test('remounts when a differently wrapped component takes the same position', function (scope) {
+        const swaps: readonly (readonly [React.ElementType, React.ElementType])[] = [
+            [ React.memo(StatefulFirst), React.memo(StatefulSecond) ],
+            [ React.forwardRef(StatefulFirst), React.forwardRef(StatefulSecond) ],
+            [ createFulfilledLazyType(StatefulFirst), createFulfilledLazyType(StatefulSecond) ]
+        ];
+
+        scope.assert.deepEqual(
+            swaps.map(function readTextAfterSwap([ first, second ]) {
+                const view = introspect(React.createElement(first), { depth: 'full', strictMode: false });
+
+                view.update(React.createElement(second));
+
+                return view.find('span')?.textContent;
+            }),
+            [ 'second state', 'second state', 'second state' ]
+        );
 
         return scope.assert.collect();
     }),

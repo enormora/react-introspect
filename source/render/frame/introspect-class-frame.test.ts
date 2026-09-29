@@ -374,6 +374,30 @@ function ThrowsOnClick(): React.ReactNode {
     }, 'arm');
 }
 
+const FirstStatefulClass = class extends React.Component<EmptyProps, CounterState> {
+    public constructor(props: EmptyProps) {
+        super(props);
+
+        this.state = { count: 1 };
+    }
+
+    public override render(): React.ReactNode {
+        return React.createElement('output', null, `first ${this.state.count}`);
+    }
+};
+
+const SecondStatefulClass = class extends React.Component<EmptyProps, CounterState> {
+    public constructor(props: EmptyProps) {
+        super(props);
+
+        this.state = { count: 2 };
+    }
+
+    public override render(): React.ReactNode {
+        return React.createElement('output', null, `second ${this.state.count}`);
+    }
+};
+
 const PrimitiveBoundary = class extends React.Component<BoundaryProps, unknown> {
     public static getDerivedStateFromError(): string {
         return 'failed';
@@ -697,6 +721,26 @@ export const testNode = suite('class components and error boundaries', [
             view.formatTree(),
             'Fragment\n  RefPanel\n    output\n      #text\n  RefPanel\n    output\n      #text'
         );
+
+        return scope.assert.collect();
+    }),
+    test('remounts when a different class takes the same position', function (scope) {
+        const view = introspect(React.createElement(FirstStatefulClass), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        view.update(React.createElement(SecondStatefulClass));
+
+        const memoView = introspect(React.createElement(React.memo(FirstStatefulClass)), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        memoView.update(React.createElement(React.memo(SecondStatefulClass)));
+
+        scope.assert.equal(view.find('output')?.textContent, 'second 2');
+        scope.assert.equal(memoView.find('output')?.textContent, 'second 2');
 
         return scope.assert.collect();
     }),

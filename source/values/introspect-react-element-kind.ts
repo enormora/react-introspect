@@ -15,6 +15,7 @@ type MarkerKind = { readonly kind: BuiltInMarkerName | 'context' | 'other'; };
 
 type ForwardRefKind = {
     readonly kind: 'forwardRef';
+    readonly type: PropsRecord;
     readonly displayName: string | undefined;
     readonly render: ForwardRefRender;
 };
@@ -25,12 +26,18 @@ type FunctionKind = { readonly kind: 'function'; readonly component: FunctionCom
 
 type HostKind = { readonly kind: 'host'; readonly name: string; };
 
-type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; readonly resolved: unknown; };
+type LazyKind = {
+    readonly kind: 'lazy';
+    readonly initialize: () => unknown;
+    readonly resolved: unknown;
+    readonly type: PropsRecord;
+};
 
 type MemoCompare = (previous: PropsRecord, next: PropsRecord) => boolean;
 
 type MemoKind = {
     readonly kind: 'memo';
+    readonly type: PropsRecord;
     readonly compare: MemoCompare;
     readonly displayName: string | undefined;
     readonly inner: unknown;
@@ -95,7 +102,8 @@ function readMemoKind(type: unknown): ReactElementKind | undefined {
             : ownCompare,
         displayName: readDisplayName(type),
         inner: type.type,
-        kind: 'memo'
+        kind: 'memo',
+        type
     };
 }
 
@@ -106,7 +114,9 @@ function readForwardRefKind(type: unknown): ReactElementKind | undefined {
 
     const { render } = type;
 
-    return isForwardRefRender(render) ? { displayName: readDisplayName(type), kind: 'forwardRef', render } : undefined;
+    return isForwardRefRender(render)
+        ? { displayName: readDisplayName(type), kind: 'forwardRef', render, type }
+        : undefined;
 }
 
 const lazyStatusKey = '_status';
@@ -149,7 +159,8 @@ function readLazyKind(type: unknown): ReactElementKind | undefined {
             return resolved;
         },
         kind: 'lazy',
-        resolved: resolvedLazyTypes.get(type) ?? readResolvedLazyType(Reflect.get(type, lazyPayloadKey))
+        resolved: resolvedLazyTypes.get(type) ?? readResolvedLazyType(Reflect.get(type, lazyPayloadKey)),
+        type
     };
 }
 
