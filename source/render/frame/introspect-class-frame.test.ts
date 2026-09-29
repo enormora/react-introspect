@@ -335,6 +335,12 @@ const PropsGatedBoundary = class extends Boundary {
     public override componentDidUpdate(): void {
         this.props.recorder.push('componentDidUpdate');
     }
+
+    public override render(): React.ReactNode {
+        this.props.recorder.push('render');
+
+        return super.render();
+    }
 };
 
 function ThrowsOnClick(): React.ReactNode {
@@ -626,6 +632,27 @@ export const testNode = suite('class components and error boundaries', [
             caught: true,
             ranComponentDidUpdate: false
         });
+
+        return scope.assert.collect();
+    }),
+    test('lets shouldComponentUpdate gate boundary renders again after the capture render', function (scope) {
+        const recorder = createRecorder();
+        const child = React.createElement(ThrowsOnClick);
+        const view = introspect(React.createElement(PropsGatedBoundary, { recorder }, child), {
+            depth: 'full',
+            errorMode: 'capture',
+            strictMode: false,
+            warningMode: 'capture'
+        });
+
+        requireValue(view.find('button')).sendEvent('click');
+
+        const rendersAfterCapture = recorder.entries.length;
+
+        view.update(React.createElement(PropsGatedBoundary, { recorder }, child));
+
+        scope.assert.deepEqual(recorder.entries.slice(rendersAfterCapture), [ 'shouldComponentUpdate' ]);
+        scope.assert.equal(view.find('span')?.textContent, 'fallback');
 
         return scope.assert.collect();
     }),
