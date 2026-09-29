@@ -3,27 +3,10 @@ import { defineConfig } from '@overkill-dev/test/config';
 export const config = defineConfig({
     runtimeStateDir: 'target/.overkill',
     profiles: {
-        coverage: {
-            execution: {
-                processModel: 'in-process',
-                scheduling: 'serial'
-            },
-            testFamily: 'microtest',
-            files: {
-                exclude: [
-                    'source/integration-tests/package-smoke/package-smoke.test.ts',
-                    'source/integration-tests/runtime-integration/runtime-integration.test.ts'
-                ],
-                include: [ 'source/**/*.test.ts' ]
-            },
-            timeouts: {
-                collectionMilliseconds: 30_000
-            }
-        },
         microtest: {
             execution: {
                 processModel: 'in-process',
-                scheduling: 'serial'
+                scheduling: 'concurrent'
             },
             testFamily: 'microtest',
             files: {
@@ -40,7 +23,7 @@ export const config = defineConfig({
         integration: {
             execution: {
                 processModel: 'supervised-process',
-                scheduling: 'serial'
+                scheduling: 'concurrent'
             },
             testFamily: 'integration',
             files: {

@@ -32,7 +32,7 @@ test-unit:
     NODE_OPTIONS='--allow-fs-read=. --allow-fs-write=target' overkill run --config tool-configurations/overkill.config.ts --profile microtest
 
 test-unit-with-coverage:
-    c8 --config tool-configurations/c8.json node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile coverage --measure-resource-usage
+    c8 --config tool-configurations/c8.json node node_modules/@overkill-dev/test/packages/test/overkill.entry-point.js run --config tool-configurations/overkill.config.ts --profile microtest --measure-resource-usage
 
 test-types:
     ./node_modules/.bin/tstyche --config tool-configurations/tstyche.json
