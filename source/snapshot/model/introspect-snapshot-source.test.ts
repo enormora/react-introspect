@@ -1,7 +1,8 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import { isObject } from '../../values/introspect-value-kinds.ts';
-import { createIntrospectionSnapshotFromSource, toSnapshotSourceNodes } from './introspect-snapshot.ts';
+import { createIntrospectionSnapshotFromSource } from './introspect-snapshot.ts';
+import { toSnapshotSourceNodes } from './introspect-snapshot-source-mapping.ts';
 import { isSnapshotNode, type SnapshotNode } from './introspect-snapshot-contract.ts';
 
 function Icon(): React.ReactNode {

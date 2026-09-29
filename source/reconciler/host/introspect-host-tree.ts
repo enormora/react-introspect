@@ -18,10 +18,8 @@ import {
     type IntrospectionSnapshot,
     type SnapshotSourceNode
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import {
-    createIntrospectionSnapshotFromSource,
-    toSnapshotSourceNodes
-} from '../../snapshot/model/introspect-snapshot.ts';
+import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
+import { toSnapshotSourceNodes } from '../../snapshot/model/introspect-snapshot-source-mapping.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
