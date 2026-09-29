@@ -73,6 +73,7 @@ type IntrospectionCaughtError = {
 
 type IntrospectionClassFrameState = {
     readonly caught: IntrospectionCaughtError | undefined;
+    readonly isCapturing: boolean;
     readonly userState: unknown;
 };
 
@@ -92,7 +93,7 @@ type IntrospectionClassRender = {
 type IntrospectionClassRenderPass = {
     readonly next: IntrospectionClassRender;
     readonly previous: IntrospectionClassRender | undefined;
-    readonly shouldCommit: boolean;
+    readonly shouldUpdate: boolean;
 };
 
 export function isClassComponent(value: unknown): value is IntrospectionClassComponent {
@@ -184,6 +185,7 @@ function foldBoundaryError(
 
     if (typeof type.getDerivedStateFromError === 'function') {
         return {
+            ...state,
             caught: { cause: caught.cause, phase: 'recovered' },
             userState: mergeState(state.userState, type.getDerivedStateFromError(caught.cause))
         };
@@ -239,6 +241,7 @@ const IntrospectionClassFrameBase = class
         this.shouldForceRender = false;
         this.state = {
             caught: undefined,
+            isCapturing: false,
             userState: instance.state
         };
         this.userInstance = instance;
@@ -252,6 +255,7 @@ const IntrospectionClassFrameBase = class
 
         return {
             ...foldedState,
+            isCapturing: state.caught?.phase === 'unfolded',
             userState: readDerivedState(props.type, props.element.props, foldedState.userState)
         };
     }
@@ -289,7 +293,7 @@ const IntrospectionClassFrameBase = class
         this.commitRenderPass();
         applyElementRef(readElementRef(this.props.element), this.userInstance);
 
-        if (renderPass?.shouldCommit === true && renderPass.previous !== undefined) {
+        if (renderPass?.shouldUpdate === true && renderPass.previous !== undefined) {
             this.userInstance.componentDidUpdate?.(renderPass.previous.props, renderPass.previous.state, snapshot);
         }
     }
@@ -297,7 +301,7 @@ const IntrospectionClassFrameBase = class
     public override getSnapshotBeforeUpdate(): unknown {
         const { renderPass } = this;
 
-        if (renderPass?.shouldCommit !== true || renderPass.previous === undefined) {
+        if (renderPass?.shouldUpdate !== true || renderPass.previous === undefined) {
             return null;
         }
 
@@ -347,19 +351,19 @@ const IntrospectionClassFrameBase = class
             assignClassField(this.userInstance, 'state', previous.state);
         }
 
-        const shouldCommit = previous === undefined || this.shouldRender(previous, props, state);
+        const shouldUpdate = previous === undefined || this.shouldRender(previous, props, state);
 
         assignClassField(this.userInstance, 'props', props);
         assignClassField(this.userInstance, 'state', state);
 
         return {
             next: {
-                node: shouldCommit ? this.renderUserOutput() : previous.node,
+                node: shouldUpdate || this.state.isCapturing ? this.renderUserOutput() : previous.node,
                 props,
                 state
             },
             previous,
-            shouldCommit
+            shouldUpdate
         };
     }
 
