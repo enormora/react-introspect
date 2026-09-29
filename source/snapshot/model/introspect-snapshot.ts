@@ -40,12 +40,15 @@ type SnapshotChildPlacement = {
     readonly parentPath: string;
 };
 
-type SnapshotNodeRequest = SnapshotChildPlacement & {
+type SnapshotSiblingPlacement = SnapshotChildPlacement & {
     readonly index: number | string;
-    readonly node: unknown;
 };
 
-type SourceElementNodeRequest = SnapshotNodeRequest & {
+type LeafNodeRequest = SnapshotSiblingPlacement & {
+    readonly value: unknown;
+};
+
+type SourceElementNodeRequest = SnapshotSiblingPlacement & {
     readonly element: SnapshotSourceElement;
 };
 
@@ -53,7 +56,7 @@ type SourceChildSnapshotsRequest = SnapshotChildPlacement & {
     readonly children: readonly SnapshotSourceNode[];
 };
 
-type SourceSnapshotNodeRequest = SnapshotNodeRequest & {
+type SourceSnapshotNodeRequest = SnapshotSiblingPlacement & {
     readonly node: SnapshotSourceNode;
 };
 
@@ -164,7 +167,7 @@ export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourc
 
 type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
 
-function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
+function pushLeafSnapshotNode(request: LeafNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
     return request.build.createNode(function describeLeafNode() {
         return {
             ...leaf,
@@ -175,7 +178,7 @@ function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf):
             parentId: request.parentId,
             path: getIndexedPath(request.parentPath, request.index, leaf.name),
             props: Object.freeze({
-                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
+                value: normalizeSnapshotValue(request.value, request.build.normalizeIdString)
             }),
             renderedChildren: Object.freeze([]),
             visibility: request.inheritedVisibility
@@ -183,7 +186,7 @@ function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf):
     });
 }
 
-function createEmptySnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
+function createEmptySnapshotNode(request: LeafNodeRequest): SnapshotNode {
     return pushLeafSnapshotNode(request, {
         kind: 'empty',
         name: '#empty',
@@ -193,7 +196,7 @@ function createEmptySnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
     });
 }
 
-function createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
+function createOpaqueSnapshotNode(request: LeafNodeRequest): SnapshotNode {
     return pushLeafSnapshotNode(request, {
         kind: 'opaque',
         name: 'Opaque',
@@ -203,12 +206,12 @@ function createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
     });
 }
 
-function createTextSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
+function createTextSnapshotNode(request: LeafNodeRequest): SnapshotNode {
     return pushLeafSnapshotNode(request, {
         kind: 'text',
         name: '#text',
         renderedReason: undefined,
-        textContent: request.build.normalizeIdString(String(request.node)),
+        textContent: request.build.normalizeIdString(String(request.value)),
         type: '#text'
     });
 }
@@ -278,7 +281,6 @@ const snapshotOperations = {
                 element: toSourceElement(element),
                 index: location,
                 inheritedVisibility: request.inheritedVisibility,
-                node: element,
                 parentId: request.ownerId,
                 parentPath: request.ownerPath
             });
@@ -313,17 +315,16 @@ const snapshotOperations = {
         }));
     },
     createSourceSnapshotNode(request: SourceSnapshotNodeRequest): SnapshotNode {
-        if (request.node.kind === 'element') {
-            return snapshotOperations.createSourceElementSnapshotNode({
-                ...request,
-                element: request.node
-            });
+        const { node, ...placement } = request;
+
+        if (node.kind === 'element') {
+            return snapshotOperations.createSourceElementSnapshotNode({ ...placement, element: node });
         }
 
-        return sourceLeafSnapshotFactories[request.node.kind]({
-            ...request,
-            inheritedVisibility: visibilityFromSource(request.inheritedVisibility, request.node.visibility, undefined),
-            node: request.node.value
+        return sourceLeafSnapshotFactories[node.kind]({
+            ...placement,
+            inheritedVisibility: visibilityFromSource(placement.inheritedVisibility, node.visibility, undefined),
+            value: node.value
         });
     }
 };
