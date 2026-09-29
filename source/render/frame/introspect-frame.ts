@@ -2,9 +2,9 @@ import React from 'react';
 import { classifyElementType, type ReactElementKindByName } from '../../values/introspect-react-element-kind.ts';
 import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import {
-    createComponentHost,
-    createComponentMetadata,
+    createActivityComponentHost,
     createEmptyHost,
+    createExecutedComponentHost,
     createOpaqueHost,
     createUnexecutedComponentHost,
     elementKeyProps
@@ -144,15 +144,11 @@ function transformSuspenseElement(element: IntrospectionElement, depth: Introspe
     }, children);
 }
 
-function transformWrapperElement(
+function cloneWithTransformedChildren(
     element: IntrospectionElement,
-    depth: IntrospectionFrameDepth,
-    activityMode: 'hidden' | 'visible' | undefined
+    depth: IntrospectionFrameDepth
 ): React.ReactElement {
-    return createComponentHost(
-        createComponentMetadata({ activityMode, caughtError: undefined, element, renderedReason: undefined }),
-        React.cloneElement(element, {}, transformNode(element.props.children, depth))
-    );
+    return React.cloneElement(element, {}, transformNode(element.props.children, depth));
 }
 
 function createClassFrameElement(
@@ -177,13 +173,8 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
         return createClassFrameElement(props.element, props.depth, executableKind.component);
     }
 
-    return createComponentHost(
-        createComponentMetadata({
-            activityMode: undefined,
-            caughtError: undefined,
-            element: props.element,
-            renderedReason: undefined
-        }),
+    return createExecutedComponentHost(
+        props.element,
         transformNode(
             executeIntrospectionFrameElement(executableType, props.element),
             nextDepth(props.depth, props.element.type)
@@ -254,14 +245,18 @@ function transformFunctionFrameElement(
 }
 
 function transformActivityElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    return transformWrapperElement(element, depth, readActivityMode(element));
+    return createActivityComponentHost(
+        element,
+        readActivityMode(element),
+        cloneWithTransformedChildren(element, depth)
+    );
 }
 
 function transformNamedWrapperElement(
     element: IntrospectionElement,
     depth: IntrospectionFrameDepth
 ): React.ReactElement {
-    return transformWrapperElement(element, depth, undefined);
+    return createExecutedComponentHost(element, cloneWithTransformedChildren(element, depth));
 }
 
 type ElementTransforms = {

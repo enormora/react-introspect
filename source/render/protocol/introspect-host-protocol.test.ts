@@ -1,54 +1,107 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import {
-    createComponentHost,
-    createComponentMetadata,
+    createActivityComponentHost,
+    createCaughtErrorComponentHost,
     createEmptyHost,
+    createExecutedComponentHost,
     createOpaqueHost,
+    createUnexecutedComponentHost,
+    type InternalHost,
     readInternalHost
 } from './introspect-host-protocol.ts';
 
 type HostElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>, string>;
 
+type ComponentMetadata = Extract<InternalHost, { readonly kind: 'component'; }>['metadata'];
+
+function readComponentMetadata(componentHost: React.ReactElement): ComponentMetadata {
+    const { props, type } = componentHost as HostElement;
+    const decoded = readInternalHost(type, props);
+
+    if (decoded.kind !== 'component') {
+        throw new Error('Expected a component host.');
+    }
+
+    return decoded.metadata;
+}
+
 export const testNode = suite('introspection host protocol', [
-    test('creates public component metadata from React elements', function (scope) {
+    test('encodes public component metadata for executed hosts', function (scope) {
         const element = React.createElement('button', {
             children: 'Save',
             key: 'save',
             ref: 'legacy',
             title: 'Save'
         });
-        const metadata = createComponentMetadata({
-            activityMode: 'hidden',
-            caughtError: undefined,
-            element,
-            renderedReason: 'depth'
-        });
+        const metadata = readComponentMetadata(createExecutedComponentHost(element, 'child'));
 
-        scope.assert.equal(metadata.activityMode, 'hidden');
-        scope.assert.equal(metadata.givenChildren, 'Save');
-        scope.assert.equal(metadata.key, 'save');
-        scope.assert.deepEqual(metadata.props, { title: 'Save' });
-        scope.assert.equal(metadata.renderedReason, 'depth');
-        scope.assert.equal(metadata.type, 'button');
+        scope.assert.deepEqual(metadata, {
+            activityMode: undefined,
+            caughtError: undefined,
+            givenChildren: 'Save',
+            key: 'save',
+            props: { title: 'Save' },
+            renderedReason: undefined,
+            type: 'button'
+        });
 
         return scope.assert.collect();
     }),
-    test('reads back the metadata and values it wraps in internal hosts', function (scope) {
-        const metadata = createComponentMetadata({
+    test('encodes the mode of Activity hosts', function (scope) {
+        const metadata = readComponentMetadata(
+            createActivityComponentHost(React.createElement('span'), 'hidden', 'child')
+        );
+
+        scope.assert.deepEqual(metadata, {
+            activityMode: 'hidden',
+            caughtError: undefined,
+            givenChildren: undefined,
+            key: null,
+            props: {},
+            renderedReason: undefined,
+            type: 'span'
+        });
+
+        return scope.assert.collect();
+    }),
+    test('encodes the error a boundary host caught', function (scope) {
+        const caughtError = { cause: new Error('Boom'), message: 'Boom' };
+        const metadata = readComponentMetadata(
+            createCaughtErrorComponentHost(React.createElement('span'), caughtError, 'child')
+        );
+
+        scope.assert.deepEqual(metadata, {
+            activityMode: undefined,
+            caughtError,
+            givenChildren: undefined,
+            key: null,
+            props: {},
+            renderedReason: undefined,
+            type: 'span'
+        });
+
+        return scope.assert.collect();
+    }),
+    test('encodes why an unexecuted host did not render', function (scope) {
+        const metadata = readComponentMetadata(createUnexecutedComponentHost(React.createElement('span'), 'depth'));
+
+        scope.assert.deepEqual(metadata, {
             activityMode: undefined,
             caughtError: undefined,
-            element: React.createElement('span'),
-            renderedReason: undefined
+            givenChildren: undefined,
+            key: null,
+            props: {},
+            renderedReason: 'depth',
+            type: 'span'
         });
-        const componentHost = createComponentHost(metadata, 'child') as HostElement;
+
+        return scope.assert.collect();
+    }),
+    test('reads back the values it wraps in internal hosts', function (scope) {
         const emptyHost = createEmptyHost(null) as HostElement;
         const opaqueHost = createOpaqueHost(Symbol.iterator) as HostElement;
 
-        scope.assert.deepEqual(readInternalHost(componentHost.type, componentHost.props), {
-            kind: 'component',
-            metadata
-        });
         scope.assert.deepEqual(readInternalHost(emptyHost.type, emptyHost.props), { kind: 'empty', value: null });
         scope.assert.deepEqual(readInternalHost(opaqueHost.type, opaqueHost.props), {
             kind: 'opaque',
@@ -59,13 +112,8 @@ export const testNode = suite('introspection host protocol', [
         return scope.assert.collect();
     }),
     test('treats a copy of real component metadata as unsupported', function (scope) {
-        const metadata = createComponentMetadata({
-            activityMode: undefined,
-            caughtError: undefined,
-            element: React.createElement('span'),
-            renderedReason: undefined
-        });
-        const componentHost = createComponentHost(metadata, 'child') as HostElement;
+        const componentHost = createExecutedComponentHost(React.createElement('span'), 'child') as HostElement;
+        const metadata = readComponentMetadata(componentHost);
         const forgedProps = Object.fromEntries(
             Object.entries(componentHost.props).map(function copyMetadata([ key, value ]) {
                 return [ key, value === metadata ? { ...metadata } : value ];

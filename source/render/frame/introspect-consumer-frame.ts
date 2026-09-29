@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-    createComponentHost,
-    createComponentMetadata,
-    createUnexecutedComponentHost
-} from '../protocol/introspect-host-protocol.ts';
+import { createExecutedComponentHost, createUnexecutedComponentHost } from '../protocol/introspect-host-protocol.ts';
 import type { IntrospectionElement, IntrospectionRenderChildren } from './introspect-frame-contract.ts';
 import type { IntrospectionFrameDepth } from './introspect-frame-depth.ts';
 
@@ -26,15 +22,7 @@ function renderConsumer(props: IntrospectionConsumerFrameProps, value: unknown):
         return createUnexecutedComponentHost(props.element, 'unsupported');
     }
 
-    return createComponentHost(
-        createComponentMetadata({
-            activityMode: undefined,
-            caughtError: undefined,
-            element: props.element,
-            renderedReason: undefined
-        }),
-        props.renderChildren(renderProp(value), props.depth)
-    );
+    return createExecutedComponentHost(props.element, props.renderChildren(renderProp(value), props.depth));
 }
 
 function createConsumerFrame(

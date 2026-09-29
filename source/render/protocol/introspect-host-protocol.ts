@@ -14,7 +14,7 @@ const introspectionComponentMetadata = '__reactIntrospectionComponentMetadata';
 const introspectionElementKeyMetadata = '__reactIntrospectionElementKeyMetadata';
 const introspectionValueMetadata = '__reactIntrospectionValueMetadata';
 
-export type IntrospectionComponentMetadata = {
+type IntrospectionComponentMetadata = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: unknown;
@@ -60,14 +60,14 @@ function filterProps(
     return result;
 }
 
-export type ComponentMetadataRequest = {
+type ComponentMetadataRequest = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly caughtError: IntrospectionError | undefined;
     readonly element: EncodedElement;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
 };
 
-export function createComponentMetadata(request: ComponentMetadataRequest): IntrospectionComponentMetadata {
+function createComponentMetadata(request: ComponentMetadataRequest): IntrospectionComponentMetadata {
     const { activityMode, caughtError, element, renderedReason } = request;
     const { props } = element;
 
@@ -88,7 +88,7 @@ export function createComponentMetadata(request: ComponentMetadataRequest): Intr
     return metadata;
 }
 
-export function createComponentHost(
+function createComponentHost(
     metadata: IntrospectionComponentMetadata,
     children: React.ReactNode
 ): React.ReactElement {
@@ -105,6 +105,40 @@ export function createEmptyHost(value: unknown): React.ReactElement {
     return React.createElement(introspectionEmptyHostType, {
         [introspectionValueMetadata]: value
     });
+}
+
+export function createExecutedComponentHost(element: EncodedElement, children: React.ReactNode): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element,
+            renderedReason: undefined
+        }),
+        children
+    );
+}
+
+export function createActivityComponentHost(
+    element: EncodedElement,
+    activityMode: 'hidden' | 'visible',
+    children: React.ReactNode
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata({ activityMode, caughtError: undefined, element, renderedReason: undefined }),
+        children
+    );
+}
+
+export function createCaughtErrorComponentHost(
+    element: EncodedElement,
+    caughtError: IntrospectionError,
+    children: React.ReactNode
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata({ activityMode: undefined, caughtError, element, renderedReason: undefined }),
+        children
+    );
 }
 
 export function createUnexecutedComponentHost(

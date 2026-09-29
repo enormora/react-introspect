@@ -8,9 +8,9 @@ import type {
 import { shallowEquals } from '../../values/introspect-shallow-equality.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
-    createComponentHost,
-    createComponentMetadata,
-    createEmptyHost
+    createCaughtErrorComponentHost,
+    createEmptyHost,
+    createExecutedComponentHost
 } from '../protocol/introspect-host-protocol.ts';
 import {
     type IntrospectionElement,
@@ -218,15 +218,13 @@ const IntrospectionClassFrameBase = class
 
         this.renderPass = renderPass;
 
-        return createComponentHost(
-            createComponentMetadata({
-                activityMode: undefined,
-                caughtError: caught === undefined ? undefined : createDiagnosticRecord(caught.cause),
-                element: this.props.element,
-                renderedReason: undefined
-            }),
-            renderPass.next.node
-        );
+        return caught === undefined
+            ? createExecutedComponentHost(this.props.element, renderPass.next.node)
+            : createCaughtErrorComponentHost(
+                this.props.element,
+                createDiagnosticRecord(caught.cause),
+                renderPass.next.node
+            );
     }
 
     public override componentDidMount(): void {
