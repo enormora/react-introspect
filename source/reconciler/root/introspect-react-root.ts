@@ -29,6 +29,10 @@ export function createReconcilerContainer(
 }
 
 export function hasScheduledRootTask(root: ReconcilerRoot): boolean {
+    if (!Object.hasOwn(root, 'callbackNode')) {
+        throw new Error('React Introspect expected the React root to expose callbackNode.');
+    }
+
     const task = root.callbackNode;
 
     return isObject(task) && typeof task.callback === 'function';
