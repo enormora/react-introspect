@@ -18,10 +18,8 @@ import {
     renderRootElement
 } from './introspect-react-root.ts';
 import {
-    awaitWaiter,
     createWaiterQueue,
     type WaitOperation,
-    waitForOutcome,
     withDeadline
 } from './introspect-wait.ts';
 
@@ -170,10 +168,12 @@ function createIntrospectionReconcilerSession(
                 return;
             }
 
-            const waiter = waiters.wait(predicate);
-            const outcome = waitForOutcome(waiter, flushUntilIdle);
-
-            await awaitWaiter(waiter, withDeadline(runtime.clock, options.waitTimeout, operation, outcome));
+            await waiters.waitUntil(predicate, {
+                clock: runtime.clock,
+                flushUntilIdle,
+                operation,
+                timeoutInMilliseconds: options.waitTimeout
+            });
         }
     };
 
