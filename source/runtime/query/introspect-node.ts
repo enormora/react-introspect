@@ -139,7 +139,7 @@ function nodeState(node: SnapshotNode): IntrospectionNodeState {
         activityMode: node.activityMode,
         reason: node.renderedReason ?? node.hiddenBy,
         rendered: node.renderedReason === undefined,
-        visible: node.visibility === 'visible'
+        visible: node.renderedReason !== 'unsupported' && node.visibility === 'visible'
     });
 }
 

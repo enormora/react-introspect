@@ -671,7 +671,7 @@ type IntrospectionNodeState = {
 };
 ```
 
-A hidden node reports why it is hidden: `'activity'` below a hidden `<Activity>`, `'suspended'` when Suspense keeps it behind a fallback after an update suspended. The outermost cause wins.
+`reason` reports why a node was not rendered (`'depth'`, `'unsupported'`) before why it is hidden. An executed node that is hidden reports `'activity'` below a hidden `<Activity>`, or `'suspended'` when Suspense keeps it behind a fallback after an update suspended; the outermost cause wins. Use `visible` to check visibility for every node.
 
 ### `node.caughtError`
 
