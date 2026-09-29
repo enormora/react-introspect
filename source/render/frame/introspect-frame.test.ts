@@ -625,6 +625,26 @@ export const testNode = suite('execution shallow function components', [
 
         return scope.assert.collect();
     }),
+    test('marks elements of unknown types unsupported', function (scope) {
+        const unknownType = { unknown: true } as unknown as React.FC<ButtonProps>;
+        const view = introspect(React.createElement(unknownType, { label: 'unknown' }), {
+            depth: 'full',
+            strictMode: false
+        });
+        const root = requireValue(view.root);
+
+        scope.assert.deepEqual({
+            renderedChildren: root.renderedChildren,
+            state: root.state,
+            visibility: root.visibility
+        }, {
+            renderedChildren: { reason: 'unsupported', status: 'notRendered' },
+            state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
+            visibility: 'notRendered'
+        });
+
+        return scope.assert.collect();
+    }),
     test('records unsupported memo payloads as opaque output', function (scope) {
         const view = introspect(React.createElement(OpaqueMemo as never), {
             strictMode: false

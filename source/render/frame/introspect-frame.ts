@@ -6,6 +6,7 @@ import {
     createComponentMetadata,
     createEmptyHost,
     createOpaqueHost,
+    createUnexecutedComponentHost,
     elementKeyProps
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
@@ -214,11 +215,8 @@ function createFrameElement(element: IntrospectionElement, depth: IntrospectionF
     });
 }
 
-function transformUnrenderedElement(element: IntrospectionElement): React.ReactElement {
-    return createComponentHost(
-        createComponentMetadata({ activityMode: undefined, caughtError: undefined, element, renderedReason: 'depth' }),
-        createEmptyHost(undefined)
-    );
+function transformUnsupportedElement(element: IntrospectionElement): React.ReactElement {
+    return createUnexecutedComponentHost(element, 'unsupported');
 }
 
 function transformComponentElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
@@ -226,7 +224,7 @@ function transformComponentElement(element: IntrospectionElement, depth: Introsp
 
     return canExecuteComponent(componentDepth, element.type)
         ? createFrameElement(element, componentDepth)
-        : transformUnrenderedElement(element);
+        : createUnexecutedComponentHost(element, 'depth');
 }
 
 function transformActivityElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
@@ -255,7 +253,7 @@ const elementTransforms: Readonly<
     host: transformRenderableElement,
     lazy: transformComponentElement,
     memo: transformComponentElement,
-    other: transformUnrenderedElement,
+    other: transformUnsupportedElement,
     profiler: transformNamedWrapperElement,
     strictMode: transformNamedWrapperElement,
     suspense: transformSuspenseElement,

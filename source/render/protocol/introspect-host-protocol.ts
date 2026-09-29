@@ -107,6 +107,16 @@ export function createEmptyHost(value: unknown): React.ReactElement {
     });
 }
 
+export function createUnexecutedComponentHost(
+    element: EncodedElement,
+    renderedReason: IntrospectionNotRenderedReason
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata({ activityMode: undefined, caughtError: undefined, element, renderedReason }),
+        createEmptyHost(undefined)
+    );
+}
+
 export function createOpaqueHost(value: unknown): React.ReactElement {
     return React.createElement(introspectionOpaqueHostType, {
         [introspectionValueMetadata]: value
