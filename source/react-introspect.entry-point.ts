@@ -15,7 +15,9 @@ import {
 import { createNodeConsoleDiagnostics } from './diagnostics/introspect-node-console-diagnostics.ts';
 import { createIntrospectionReconcilerModule } from './reconciler/root/introspect-reconciler.ts';
 import type { RuntimeIntrospectionView } from './runtime/types/introspect-runtime-types.ts';
-import { createNodeRuntimeDependencies } from './runtime/view/introspect-node-runtime-dependencies.entry-point.ts';
+import {
+    createNodeRuntimeDependencies
+} from './reconciler/scheduling/introspect-node-runtime-dependencies.entry-point.ts';
 import { createIntrospectionViewModule } from './runtime/view/introspect-view.ts';
 
 const nodeConsoleDiagnostics = createNodeConsoleDiagnostics(diagnosticsChannel);

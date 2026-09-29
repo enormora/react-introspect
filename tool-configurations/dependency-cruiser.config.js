@@ -24,6 +24,74 @@ export default {
             }
         },
         {
+            name: 'no-values-to-other-layers',
+            severity: 'error',
+            from: {
+                path: '^source/values/',
+                pathNot: testFiles
+            },
+            to: {
+                path: '^source/',
+                pathNot: '^source/values/'
+            }
+        },
+        {
+            name: 'no-public-to-other-layers',
+            severity: 'error',
+            from: {
+                path: '^source/public/',
+                pathNot: testFiles
+            },
+            to: {
+                path: '^source/',
+                pathNot: '^source/public/'
+            }
+        },
+        {
+            name: 'no-shared-layers-to-pipeline',
+            severity: 'error',
+            from: {
+                path: '^source/(diagnostics|matching|refs)/',
+                pathNot: testFiles
+            },
+            to: {
+                path: '^source/(reconciler|render|runtime|snapshot)/'
+            }
+        },
+        {
+            name: 'no-snapshot-to-upper-layers',
+            severity: 'error',
+            from: {
+                path: '^source/snapshot/',
+                pathNot: testFiles
+            },
+            to: {
+                path: '^source/(reconciler|render|runtime)/'
+            }
+        },
+        {
+            name: 'no-render-to-upper-layers',
+            severity: 'error',
+            from: {
+                path: '^source/render/',
+                pathNot: testFiles
+            },
+            to: {
+                path: '^source/(reconciler|runtime|snapshot)/'
+            }
+        },
+        {
+            name: 'no-reconciler-to-runtime',
+            severity: 'error',
+            from: {
+                path: '^source/reconciler/',
+                pathNot: testFiles
+            },
+            to: {
+                path: '^source/runtime/'
+            }
+        },
+        {
             name: 'no-orphans',
             severity: 'error',
             from: {

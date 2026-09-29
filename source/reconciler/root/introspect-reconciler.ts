@@ -28,7 +28,7 @@ import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
+import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
 import {
     createIntrospectionReconcilerRuntime,
