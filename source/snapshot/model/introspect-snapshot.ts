@@ -202,66 +202,65 @@ export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourc
     return Object.freeze(flattenReactNodes(children).map(toSourceNode));
 }
 
-type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'textContent' | 'type'> & {
+type SnapshotLeafKind = Exclude<SnapshotSourceNode['kind'], 'element'>;
+
+type SnapshotLeafDescription = {
+    readonly name: string;
+    readonly readTextContent: (request: LeafNodeRequest) => string;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+    readonly type: string;
 };
 
-function pushLeafSnapshotNode(request: LeafNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
-    const { renderedReason, ...leafShape } = leaf;
+function readNoTextContent(): string {
+    return '';
+}
+
+const snapshotLeafDescriptions: Readonly<Record<SnapshotLeafKind, SnapshotLeafDescription>> = {
+    empty: {
+        name: '#empty',
+        readTextContent: readNoTextContent,
+        renderedReason: undefined,
+        type: '#empty'
+    },
+    opaque: {
+        name: 'Opaque',
+        readTextContent: readNoTextContent,
+        renderedReason: 'unsupported',
+        type: 'opaque'
+    },
+    text: {
+        name: '#text',
+        readTextContent(request) {
+            return request.build.normalizeIdString(String(request.value));
+        },
+        renderedReason: undefined,
+        type: '#text'
+    }
+};
+
+function createLeafSnapshotNode(kind: SnapshotLeafKind, request: LeafNodeRequest): SnapshotNode {
+    const description = snapshotLeafDescriptions[kind];
 
     return request.build.createNode(function describeLeafNode() {
         return {
-            ...leafShape,
             activityMode: undefined,
             caughtError: undefined,
             givenChildren: Object.freeze([]),
             key: null,
+            kind,
+            name: description.name,
             parentId: request.parentId,
-            path: getIndexedPath(request.parentPath, request.index, leaf.name),
+            path: getIndexedPath(request.parentPath, request.index, description.name),
             props: Object.freeze({
                 value: normalizeSnapshotValue(request.value, request.build.normalizeIdString)
             }),
-            render: renderFromSource(renderedReason, request.inheritedHiddenBy),
-            renderedChildren: Object.freeze([])
+            render: renderFromSource(description.renderedReason, request.inheritedHiddenBy),
+            renderedChildren: Object.freeze([]),
+            textContent: description.readTextContent(request),
+            type: description.type
         };
     });
 }
-
-function createEmptySnapshotNode(request: LeafNodeRequest): SnapshotNode {
-    return pushLeafSnapshotNode(request, {
-        kind: 'empty',
-        name: '#empty',
-        renderedReason: undefined,
-        textContent: '',
-        type: '#empty'
-    });
-}
-
-function createOpaqueSnapshotNode(request: LeafNodeRequest): SnapshotNode {
-    return pushLeafSnapshotNode(request, {
-        kind: 'opaque',
-        name: 'Opaque',
-        renderedReason: 'unsupported',
-        textContent: '',
-        type: 'opaque'
-    });
-}
-
-function createTextSnapshotNode(request: LeafNodeRequest): SnapshotNode {
-    return pushLeafSnapshotNode(request, {
-        kind: 'text',
-        name: '#text',
-        renderedReason: undefined,
-        textContent: request.build.normalizeIdString(String(request.value)),
-        type: '#text'
-    });
-}
-
-const sourceLeafSnapshotFactories = {
-    empty: createEmptySnapshotNode,
-    opaque: createOpaqueSnapshotNode,
-    text: createTextSnapshotNode
-};
 
 const snapshotOperations = {
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
@@ -361,7 +360,7 @@ const snapshotOperations = {
             return snapshotOperations.createSourceElementSnapshotNode({ ...placement, element: node });
         }
 
-        return sourceLeafSnapshotFactories[node.kind]({
+        return createLeafSnapshotNode(node.kind, {
             ...placement,
             inheritedHiddenBy: hiddenByFromSource(placement.inheritedHiddenBy, node.hostVisibility, undefined),
             value: node.value
