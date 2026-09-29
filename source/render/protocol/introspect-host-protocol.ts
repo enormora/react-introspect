@@ -130,6 +130,17 @@ export function createActivityComponentHost(
     );
 }
 
+export function createCaughtErrorComponentHost(
+    element: EncodedElement,
+    caughtError: IntrospectionError,
+    children: React.ReactNode
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata({ activityMode: undefined, caughtError, element, renderedReason: undefined }),
+        children
+    );
+}
+
 export function createUnexecutedComponentHost(
     element: EncodedElement,
     renderedReason: IntrospectionNotRenderedReason
