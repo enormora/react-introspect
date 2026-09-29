@@ -1,36 +1,27 @@
 import type React from 'react';
-import createReconciler, { type ReconcilerInstance, type ReconcilerRoot } from 'react-reconciler';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
 import {
     createHostContainer,
-    createIntrospectionHostConfig,
     type IntrospectionHostContainer,
     validateContainerRefs
 } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
-import {
-    createEmptyIntrospectionSnapshot,
-    type IntrospectionSnapshot
-} from '../../snapshot/model/introspect-snapshot-contract.ts';
+import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
-import { isObject } from '../../values/introspect-value-kinds.ts';
-import { createIntrospectionReconcilerRuntime } from './introspect-reconciler-runtime.ts';
-
-type WaiterFailure = { readonly error: unknown; readonly kind: 'failed'; };
-
-type WaiterSatisfied = { readonly kind: 'satisfied'; };
-
-type PredicateOutcome = WaiterFailure | WaiterSatisfied | { readonly kind: 'pending'; };
-
-type WaiterOutcome = WaiterFailure | WaiterSatisfied | { readonly kind: 'cancelled'; };
-
-type DeadlineOutcome<Result> = { readonly kind: 'completed'; readonly value: Result; } | { readonly kind: 'expired'; };
-
-type Waiter = {
-    readonly predicate: () => boolean;
-    readonly resolve: (outcome: WaiterOutcome) => void;
-};
+import {
+    actAndFlush,
+    createReconcilerContainer,
+    flushPassiveEffects,
+    flushScheduledWork,
+    reconcilerRuntime,
+    renderRootElement
+} from './introspect-react-root.ts';
+import {
+    createWaiterQueue,
+    type WaitOperation,
+    withDeadline
+} from './introspect-wait.ts';
 
 type IntrospectionReconcilerRootOptions = {
     readonly diagnostics: IntrospectionDiagnostics;
@@ -55,41 +46,6 @@ export type IntrospectionReconcilerModuleDependencies = {
     readonly runtime: IntrospectionRuntimeDependencies;
 };
 
-const reconcilerRuntime = createIntrospectionReconcilerRuntime();
-const renderer = createReconciler(createIntrospectionHostConfig(reconcilerRuntime));
-
-function createReconcilerContainer(
-    rendererInstance: ReconcilerInstance,
-    container: IntrospectionHostContainer,
-    diagnostics: IntrospectionDiagnostics,
-    strictMode: boolean
-): ReconcilerRoot {
-    return rendererInstance.createContainer(
-        container,
-        1,
-        null,
-        strictMode,
-        null,
-        container.idNormalization.prefix,
-        diagnostics.recordUncaughtError,
-        diagnostics.recordCaughtError,
-        diagnostics.recordRecoverableError,
-        null
-    );
-}
-
-type WaitOperation = 'waitForIdle' | 'waitForNextRender' | 'waitForRenderCount' | 'waitUntil';
-
-type WaiterHandle = {
-    readonly cancel: () => void;
-    readonly settled: Promise<WaiterOutcome>;
-};
-
-type WaiterQueue = {
-    readonly settle: () => void;
-    readonly wait: (predicate: () => boolean) => WaiterHandle;
-};
-
 type IntrospectionReconcilerSession = {
     readonly act: (action: () => unknown) => unknown;
     readonly readRenderCount: () => number;
@@ -105,145 +61,10 @@ type SessionRenderTarget = {
     readonly readRenderCount: () => number;
 };
 
-function outcomeOfSatisfaction(satisfied: boolean): PredicateOutcome {
-    return satisfied ? { kind: 'satisfied' } : { kind: 'pending' };
-}
-
-function evaluatePredicate(predicate: () => boolean): PredicateOutcome {
-    try {
-        return outcomeOfSatisfaction(predicate());
-    } catch (error) {
-        return { error, kind: 'failed' };
-    }
-}
-
-function createWaiterQueue(): WaiterQueue {
-    const waiters = new Set<Waiter>();
-
-    return {
-        settle() {
-            for (const waiter of Array.from(waiters)) {
-                const outcome = evaluatePredicate(waiter.predicate);
-
-                if (outcome.kind !== 'pending') {
-                    waiters.delete(waiter);
-                    waiter.resolve(outcome);
-                }
-            }
-        },
-        wait(predicate) {
-            const { promise, resolve } = Promise.withResolvers<WaiterOutcome>();
-            const waiter = { predicate, resolve };
-
-            waiters.add(waiter);
-
-            return {
-                cancel() {
-                    waiters.delete(waiter);
-                    resolve({ kind: 'cancelled' });
-                },
-                settled: promise
-            };
-        }
-    };
-}
-
-async function completionOf<Result>(pending: Promise<Result>): Promise<DeadlineOutcome<Result>> {
-    return { kind: 'completed', value: await pending };
-}
-
-function valueBeforeDeadline<Result>(
-    outcome: DeadlineOutcome<Result>,
-    operation: WaitOperation,
-    timeoutInMilliseconds: number
-): Result {
-    if (outcome.kind === 'expired') {
-        throw new Error(`${operation} timed out after ${timeoutInMilliseconds} ms.`);
-    }
-
-    return outcome.value;
-}
-
-async function withDeadline<Result>(
-    clock: IntrospectionRuntimeDependencies['clock'],
-    timeoutInMilliseconds: number,
-    operation: WaitOperation,
-    pending: Promise<Result>
-): Promise<Result> {
-    const { promise: expiry, resolve: expire } = Promise.withResolvers<DeadlineOutcome<Result>>();
-    const expired: DeadlineOutcome<Result> = { kind: 'expired' };
-    const timeoutIdentifier = clock.setTimeout(expire, timeoutInMilliseconds, expired);
-
-    try {
-        const outcome = await Promise.race([ completionOf(pending), expiry ]);
-
-        return valueBeforeDeadline(outcome, operation, timeoutInMilliseconds);
-    } finally {
-        clock.clearTimeout(timeoutIdentifier);
-        expire(expired);
-    }
-}
-
-async function waitForOutcome(waiter: WaiterHandle, flushUntilIdle: () => Promise<void>): Promise<WaiterOutcome> {
-    await flushUntilIdle();
-
-    return waiter.settled;
-}
-
-function throwFailure(outcome: WaiterOutcome): void {
-    if (outcome.kind === 'failed') {
-        throw outcome.error;
-    }
-}
-
-async function awaitWaiter(waiter: WaiterHandle, pending: Promise<WaiterOutcome>): Promise<void> {
-    try {
-        throwFailure(await pending);
-    } finally {
-        waiter.cancel();
-    }
-}
-
-function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => unknown): unknown {
-    return reconcilerRuntime.run(runtime, function actWithRuntime() {
-        return runtime.actEnvironment.act(function runAction() {
-            const result = action();
-
-            renderer.flushSyncWork();
-            renderer.flushPassiveEffects();
-
-            return result;
-        });
-    });
-}
-
-function hasScheduledRootTask(root: ReconcilerRoot): boolean {
-    const task = root.callbackNode;
-
-    return isObject(task) && typeof task.callback === 'function';
-}
-
-async function flushMicrotasks(runtime: IntrospectionRuntimeDependencies): Promise<void> {
-    await reconcilerRuntime.run(runtime, async function flushMicrotasksWithRuntime() {
-        await runtime.microtasks.flush();
-    });
-}
-
-async function flushScheduledWork(runtime: IntrospectionRuntimeDependencies, root: ReconcilerRoot): Promise<void> {
-    await flushMicrotasks(runtime);
-
-    do {
-        await runtime.macrotasks.waitForNext();
-        await flushMicrotasks(runtime);
-    } while (hasScheduledRootTask(root));
-}
-
 function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
     const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
 
-    target.container.writeMounted(false);
-    target.container.writeChildren([]);
-    target.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
+    target.publish(target.container.discard(errorRenderCount));
 }
 
 function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
@@ -271,22 +92,10 @@ function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBef
     target.diagnostics.recordUncaughtError(new Error(message));
 }
 
-function renderRootElement(
-    runtime: IntrospectionRuntimeDependencies,
-    root: ReconcilerRoot,
-    element: Readonly<React.ReactElement> | null
-): void {
-    actAndFlush(runtime, function renderElement() {
-        renderer.flushSyncFromReconciler(function updateContainer() {
-            renderer.updateContainer(element, root, null, null);
-        });
-    });
-}
-
 function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, commitElement: () => void): void {
     const renderCountBefore = target.readRenderCount();
 
-    target.container.writeMounted(mounted);
+    target.container.beginCommit(mounted);
 
     try {
         commitElement();
@@ -321,9 +130,7 @@ function createIntrospectionReconcilerSession(
         },
         options.refs
     );
-    const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
-        return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
-    });
+    const root = createReconcilerContainer(runtime, container, options.diagnostics, options.strictMode);
     const target: SessionRenderTarget = {
         container,
         diagnostics: options.diagnostics,
@@ -335,10 +142,7 @@ function createIntrospectionReconcilerSession(
     async function flushUntilIdle(): Promise<void> {
         await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
             await flushScheduledWork(runtime, root);
-            reconcilerRuntime.run(runtime, function flushWithRuntime() {
-                renderer.flushPassiveEffects();
-                waiters.settle();
-            });
+            flushPassiveEffects(runtime, waiters.settle);
         });
     }
 
@@ -364,10 +168,12 @@ function createIntrospectionReconcilerSession(
                 return;
             }
 
-            const waiter = waiters.wait(predicate);
-            const outcome = waitForOutcome(waiter, flushUntilIdle);
-
-            await awaitWaiter(waiter, withDeadline(runtime.clock, options.waitTimeout, operation, outcome));
+            await waiters.waitUntil(predicate, {
+                clock: runtime.clock,
+                flushUntilIdle,
+                operation,
+                timeoutInMilliseconds: options.waitTimeout
+            });
         }
     };
 

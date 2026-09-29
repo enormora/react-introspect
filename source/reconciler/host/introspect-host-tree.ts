@@ -1,3 +1,5 @@
+// eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
+import { DefaultEventPriority } from 'react-reconciler/constants.js';
 import type { TimeoutIdentifier } from '@enormora/clock';
 import {
     readHostKey,
@@ -37,8 +39,9 @@ export type IntrospectionHostContainer = {
     readonly refs: IntrospectionRefs | undefined;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
+    readonly beginCommit: (mounted: boolean) => void;
+    readonly discard: (renderCount: number) => IntrospectionSnapshot;
     readonly readMounted: () => boolean;
-    readonly writeMounted: (mounted: boolean) => void;
 } & IntrospectionChildStore;
 
 type IntrospectionHostInstance = {
@@ -213,19 +216,26 @@ export function createHostContainer(
     refs: IntrospectionRefs | undefined
 ): IntrospectionHostContainer {
     let mounted = true;
+    const childStore = createChildStore();
 
     return {
-        ...createChildStore(),
+        ...childStore,
+        beginCommit(nextMounted: boolean) {
+            mounted = nextMounted;
+        },
+        discard(renderCount: number) {
+            mounted = false;
+            childStore.writeChildren([]);
+
+            return createEmptyIntrospectionSnapshot(renderCount);
+        },
         idNormalization,
         publish,
         readMounted() {
             return mounted;
         },
         readNextRenderCount,
-        refs,
-        writeMounted(nextMounted: boolean) {
-            mounted = nextMounted;
-        }
+        refs
     };
 }
 
@@ -331,8 +341,6 @@ export function validateContainerRefs(container: IntrospectionHostContainer): vo
     );
 }
 
-const defaultEventPriority = 32;
-
 function noop(): void {
     return undefined;
 }
@@ -346,7 +354,7 @@ function returnNull(): null {
 }
 
 function getDefaultEventPriority(): number {
-    return defaultEventPriority;
+    return DefaultEventPriority;
 }
 
 function publishContainerSnapshot(container: IntrospectionHostContainer): void {

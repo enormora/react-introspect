@@ -81,3 +81,8 @@ declare module 'react-reconciler' {
         hostConfiguration: HostConfig<Instance, TextInstance, Container, Props, HostContext>
     ): ReconcilerInstance;
 }
+
+declare module 'react-reconciler/constants.js' {
+    export const ConcurrentRoot: number;
+    export const DefaultEventPriority: number;
+}
