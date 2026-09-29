@@ -76,10 +76,22 @@ function nameElementKind<Name extends keyof ElementKindByName>(
     return typeNamers[name](elementKind);
 }
 
-export function getElementKind(type: unknown): SnapshotNodeKind {
-    const { kind } = classifyElementType(type);
+const snapshotNodeKinds: Readonly<Record<ReactElementKind['kind'], SnapshotNodeKind>> = {
+    activity: 'component',
+    context: 'component',
+    forwardRef: 'component',
+    fragment: 'fragment',
+    function: 'component',
+    host: 'host',
+    lazy: 'component',
+    memo: 'component',
+    other: 'component',
+    suspense: 'component',
+    viewTransition: 'component'
+};
 
-    return kind === 'host' || kind === 'fragment' ? kind : 'component';
+export function getElementKind(type: unknown): SnapshotNodeKind {
+    return snapshotNodeKinds[classifyElementType(type).kind];
 }
 
 export function getTextContent(nodes: readonly SnapshotNode[]): string {
