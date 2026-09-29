@@ -528,7 +528,7 @@ export const testNode = suite('class components and error boundaries', [
 
         scope.assert.equal(view.caughtErrors.length, 1);
         scope.assert.equal(view.find('span')?.textContent, 'primitive fallback');
-        scope.assert.equal(view.root?.caughtError, undefined);
+        scope.assert.equal(view.root?.caughtError?.message, 'undefined');
 
         return scope.assert.collect();
     }),
