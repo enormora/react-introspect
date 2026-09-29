@@ -14,7 +14,6 @@ function createTextNode(textContent: string): SnapshotNode {
         activityMode: undefined,
         caughtError: undefined,
         givenChildren: [],
-        hiddenBy: undefined,
         id: 1,
         key: null,
         kind: 'text',
@@ -23,10 +22,9 @@ function createTextNode(textContent: string): SnapshotNode {
         path: '#text',
         props: {},
         renderedChildren: [],
-        renderedReason: undefined,
+        render: { status: 'rendered', visibility: 'visible' },
         textContent,
-        type: '#text',
-        visibility: 'visible'
+        type: '#text'
     };
 }
 

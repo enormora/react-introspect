@@ -280,7 +280,7 @@ const assertUnexecutedPassThrough = defineCompositeAssertion({
         }, {
             renderedChildTypes: childTypes,
             state: { activityMode: undefined, reason: 'depth', rendered: false, visible: true },
-            visibility: 'notRendered'
+            visibility: 'visible'
         });
     },
     name: 'assertUnexecutedPassThrough'
@@ -584,7 +584,12 @@ export const testNode = suite('execution shallow function components', [
             strictMode: false
         });
 
-        scope.assert.equal(view.find('opaque')?.state.reason, 'unsupported');
+        const opaque = requireValue(view.find('opaque'));
+
+        scope.assert.deepEqual({ state: opaque.state, visibility: opaque.visibility }, {
+            state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
+            visibility: 'notRendered'
+        });
 
         return scope.assert.collect();
     }),

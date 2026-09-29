@@ -125,11 +125,15 @@ export const testNode = suite('introspection host tree', [
         hostConfig.hideTextInstance(text);
         hostConfig.appendChildToContainer(host.container, text);
 
-        scope.assert.equal(host.commit().root?.visibility, 'hidden');
+        scope.assert.deepEqual(requireValue(host.commit().root).render, {
+            hiddenBy: 'suspended',
+            status: 'rendered',
+            visibility: 'hidden'
+        });
 
         hostConfig.unhideTextInstance(text, 'status');
 
-        scope.assert.equal(host.commit().root?.visibility, 'visible');
+        scope.assert.deepEqual(requireValue(host.commit().root).render, { status: 'rendered', visibility: 'visible' });
 
         return scope.assert.collect();
     }),

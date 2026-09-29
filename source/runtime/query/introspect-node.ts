@@ -8,7 +8,8 @@ import {
     type IntrospectionSnapshot,
     isSnapshotNode,
     type SnapshotNode,
-    type SnapshotProps
+    type SnapshotProps,
+    type SnapshotRender
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { type NestedReplacement, replaceNestedTargets } from '../../values/introspect-nested-replacement.ts';
 import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
@@ -18,6 +19,10 @@ export type SnapshotReader = {
     readonly currentSnapshot: IntrospectionSnapshot;
     readonly hostEvent: Readonly<Record<PropertyKey, unknown>>;
     readonly act: (action: () => unknown) => unknown;
+};
+
+type RenderDescription = Pick<IntrospectionNodeState, 'reason' | 'rendered'> & {
+    readonly visibility: RuntimeIntrospectionNode['visibility'];
 };
 
 export type SnapshotQuery = {
@@ -134,12 +139,28 @@ function formatNode(node: SnapshotNode, depth: number): string {
     return `${prefix}${node.name}${children}`;
 }
 
+function describeRender(render: SnapshotRender): RenderDescription {
+    if (render.status === 'rendered') {
+        return {
+            reason: render.visibility === 'hidden' ? render.hiddenBy : undefined,
+            rendered: true,
+            visibility: render.visibility
+        };
+    }
+
+    return render.reason === 'unsupported'
+        ? { reason: 'unsupported', rendered: false, visibility: 'notRendered' }
+        : { reason: render.reason, rendered: false, visibility: render.visibility };
+}
+
 function nodeState(node: SnapshotNode): IntrospectionNodeState {
+    const { reason, rendered, visibility } = describeRender(node.render);
+
     return Object.freeze({
         activityMode: node.activityMode,
-        reason: node.renderedReason ?? node.hiddenBy,
-        rendered: node.renderedReason === undefined,
-        visible: node.visibility === 'visible'
+        reason,
+        rendered,
+        visible: visibility === 'visible'
     });
 }
 
@@ -190,9 +211,11 @@ function exposeSnapshotNode(
     }
 
     function readRenderedChildren(): RuntimeRenderedChildren {
-        if (node.renderedReason !== undefined && node.renderedReason !== 'depth') {
+        const { render } = node;
+
+        if (render.status === 'notRendered' && render.reason !== 'depth') {
             return {
-                reason: node.renderedReason,
+                reason: render.reason,
                 status: 'notRendered'
             };
         }
@@ -245,7 +268,7 @@ function exposeSnapshotNode(
             return node.type;
         },
         get visibility() {
-            return node.renderedReason === undefined ? node.visibility : 'notRendered';
+            return describeRender(node.render).visibility;
         },
         callProp(property: PropertyKey, ...parameters: readonly unknown[]) {
             return reader.act(function callSnapshotProp() {

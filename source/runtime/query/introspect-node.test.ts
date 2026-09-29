@@ -24,7 +24,6 @@ function createSnapshotNode(seed: SnapshotNodeSeed): SnapshotNode {
         activityMode: undefined,
         caughtError: undefined,
         givenChildren: [],
-        hiddenBy: undefined,
         id: seed.id,
         key: null,
         kind: 'host',
@@ -33,10 +32,9 @@ function createSnapshotNode(seed: SnapshotNodeSeed): SnapshotNode {
         path: seed.name,
         props: seed.props,
         renderedChildren: seed.renderedChildren,
-        renderedReason: undefined,
+        render: { status: 'rendered', visibility: 'visible' },
         textContent: seed.textContent,
-        type: seed.name,
-        visibility: 'visible'
+        type: seed.name
     });
 }
 

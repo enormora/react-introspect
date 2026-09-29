@@ -1,5 +1,8 @@
 import React from 'react';
-import type { IntrospectionHiddenReason } from '../../public/introspect-public-types.ts';
+import type {
+    IntrospectionHiddenReason,
+    IntrospectionNotRenderedReason
+} from '../../public/introspect-public-types.ts';
 import {
     createIdNormalizer,
     normalizeSnapshotProps,
@@ -19,7 +22,10 @@ import {
     type IntrospectionSnapshot,
     registerSnapshotNode,
     type SnapshotNode,
+    type SnapshotNotRendered,
     type SnapshotProps,
+    type SnapshotRender,
+    type SnapshotRendered,
     type SnapshotSourceElement,
     type SnapshotSourceNode,
     type SnapshotVisibility
@@ -91,8 +97,30 @@ function hiddenByFromSource(
     return activityMode === 'hidden' ? 'activity' : undefined;
 }
 
-function visibilityOf(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotVisibility {
-    return hiddenBy === undefined ? 'visible' : 'hidden';
+function renderedFromSource(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotRendered {
+    return hiddenBy === undefined
+        ? { status: 'rendered', visibility: 'visible' }
+        : { hiddenBy, status: 'rendered', visibility: 'hidden' };
+}
+
+const notRenderedFromSource: Readonly<
+    Record<IntrospectionNotRenderedReason, (hiddenBy: IntrospectionHiddenReason | undefined) => SnapshotNotRendered>
+> = {
+    depth(hiddenBy) {
+        return { reason: 'depth', status: 'notRendered', visibility: renderedFromSource(hiddenBy).visibility };
+    },
+    unsupported() {
+        return { reason: 'unsupported', status: 'notRendered' };
+    }
+};
+
+function renderFromSource(
+    renderedReason: IntrospectionNotRenderedReason | undefined,
+    hiddenBy: IntrospectionHiddenReason | undefined
+): SnapshotRender {
+    return renderedReason === undefined
+        ? renderedFromSource(hiddenBy)
+        : notRenderedFromSource[renderedReason](hiddenBy);
 }
 
 function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
@@ -174,12 +202,16 @@ export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourc
     return Object.freeze(flattenReactNodes(children).map(toSourceNode));
 }
 
-type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
+type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'textContent' | 'type'> & {
+    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+};
 
 function pushLeafSnapshotNode(request: LeafNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
+    const { renderedReason, ...leafShape } = leaf;
+
     return request.build.createNode(function describeLeafNode() {
         return {
-            ...leaf,
+            ...leafShape,
             activityMode: undefined,
             caughtError: undefined,
             givenChildren: Object.freeze([]),
@@ -189,9 +221,8 @@ function pushLeafSnapshotNode(request: LeafNodeRequest, leaf: SnapshotLeaf): Sna
             props: Object.freeze({
                 value: normalizeSnapshotValue(request.value, request.build.normalizeIdString)
             }),
-            hiddenBy: request.inheritedHiddenBy,
-            renderedChildren: Object.freeze([]),
-            visibility: visibilityOf(request.inheritedHiddenBy)
+            render: renderFromSource(renderedReason, request.inheritedHiddenBy),
+            renderedChildren: Object.freeze([])
         };
     });
 }
@@ -270,18 +301,16 @@ const snapshotOperations = {
                 activityMode: request.element.activityMode,
                 givenChildren,
                 caughtError: request.element.caughtError,
-                hiddenBy,
                 key: request.element.key,
                 kind: getElementKind(request.element.type),
                 name,
                 parentId: request.parentId,
                 path,
                 props: snapshotProps,
+                render: renderFromSource(request.element.renderedReason, hiddenBy),
                 renderedChildren,
-                renderedReason: request.element.renderedReason,
                 textContent: getTextContent(visibleChildren),
-                type: request.element.type,
-                visibility: visibilityOf(hiddenBy)
+                type: request.element.type
             };
         });
     },
