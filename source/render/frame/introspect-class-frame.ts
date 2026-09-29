@@ -68,12 +68,11 @@ type IntrospectionClassInstance = React.Component<Readonly<Record<PropertyKey, u
 
 type IntrospectionCaughtError = {
     readonly cause: unknown;
-    readonly pendingFold: boolean;
+    readonly phase: 'awaitingRecovery' | 'recovered' | 'unfolded';
 };
 
 type IntrospectionClassFrameState = {
     readonly caught: IntrospectionCaughtError | undefined;
-    readonly isAwaitingCatchRecovery: boolean;
     readonly userState: unknown;
 };
 
@@ -169,30 +168,30 @@ function readDerivedState(
         : state;
 }
 
+function recoverCaughtError(caught: IntrospectionCaughtError | undefined): IntrospectionCaughtError | undefined {
+    return caught?.phase === 'awaitingRecovery' ? { cause: caught.cause, phase: 'recovered' } : caught;
+}
+
 function foldBoundaryError(
     type: IntrospectionClassComponent,
     state: IntrospectionClassFrameState
 ): IntrospectionClassFrameState {
     const { caught } = state;
 
-    if (caught?.pendingFold !== true) {
+    if (caught?.phase !== 'unfolded') {
         return state;
     }
 
-    const foldedCaught = { cause: caught.cause, pendingFold: false };
-
     if (typeof type.getDerivedStateFromError === 'function') {
         return {
-            ...state,
-            caught: foldedCaught,
+            caught: { cause: caught.cause, phase: 'recovered' },
             userState: mergeState(state.userState, type.getDerivedStateFromError(caught.cause))
         };
     }
 
     return {
         ...state,
-        caught: foldedCaught,
-        isAwaitingCatchRecovery: true
+        caught: { cause: caught.cause, phase: 'awaitingRecovery' }
     };
 }
 
@@ -240,7 +239,6 @@ const IntrospectionClassFrameBase = class
         this.shouldForceRender = false;
         this.state = {
             caught: undefined,
-            isAwaitingCatchRecovery: false,
             userState: instance.state
         };
         this.userInstance = instance;
@@ -321,14 +319,16 @@ const IntrospectionClassFrameBase = class
         return {
             enqueueForceUpdate: (_instance: unknown, callback: (() => void) | undefined) => {
                 this.shouldForceRender = true;
-                this.setState({ isAwaitingCatchRecovery: false }, callback);
+                this.setState(function recoverFromCatch(state) {
+                    return { caught: recoverCaughtError(state.caught) };
+                }, callback);
             },
             enqueueSetState: (_instance: unknown, partialState: unknown, callback: (() => void) | undefined) => {
                 const update = toStateUpdate(partialState);
 
                 this.setState(function applyUserStateUpdate(state, props) {
                     return {
-                        isAwaitingCatchRecovery: false,
+                        caught: recoverCaughtError(state.caught),
                         userState: mergeState(state.userState, update(props.element.props, state.userState))
                     };
                 }, callback);
@@ -364,7 +364,7 @@ const IntrospectionClassFrameBase = class
     }
 
     protected renderUserOutput(): IntrospectionTransformedNode {
-        if (this.state.isAwaitingCatchRecovery) {
+        if (this.state.caught?.phase === 'awaitingRecovery') {
             return createEmptyHost(undefined);
         }
 
@@ -400,7 +400,7 @@ const IntrospectionClassFrameBase = class
 const IntrospectionClassBoundaryFrame = class extends IntrospectionClassFrameBase {
     public static getDerivedStateFromError(error: unknown): Partial<IntrospectionClassFrameState> {
         return {
-            caught: { cause: error, pendingFold: true }
+            caught: { cause: error, phase: 'unfolded' }
         };
     }
 
