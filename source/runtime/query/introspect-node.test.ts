@@ -169,6 +169,24 @@ export const testNode = suite('introspection node', [
 
         return scope.assert.collect();
     }),
+    test('exposes the same props object for every read of one snapshot node', function (scope) {
+        const snapshot = createSnapshot();
+        const reader = createReader(snapshot, {
+            read() {
+                return 1;
+            }
+        });
+        const button = requireValue(snapshot.nodes[0]);
+        const firstNode = createSnapshotQuery(reader, snapshot).node(button);
+        const secondNode = createSnapshotQuery(reader, snapshot).node(button);
+        const firstRead = firstNode.props;
+        const secondRead = firstNode.props;
+
+        scope.assert.equal(firstRead === secondRead, true);
+        scope.assert.equal(firstRead === secondNode.props, true);
+
+        return scope.assert.collect();
+    }),
     test('calls props, sends events, finds parents, and formats trees', function (scope) {
         const snapshot = createSnapshot();
         const reader = createReader(snapshot, {
