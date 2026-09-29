@@ -334,6 +334,12 @@ const IntrospectionClassFrameBase = class
         state: unknown
     ): IntrospectionClassRenderPass {
         const previous = this.committedRender;
+
+        if (previous !== undefined) {
+            assignClassField(this.userInstance, 'props', previous.props);
+            assignClassField(this.userInstance, 'state', previous.state);
+        }
+
         const shouldCommit = previous === undefined || this.shouldRender(previous, props, state);
 
         assignClassField(this.userInstance, 'props', props);
@@ -371,9 +377,6 @@ const IntrospectionClassFrameBase = class
         if (this.shouldForceRender) {
             return true;
         }
-
-        assignClassField(instance, 'props', previous.props);
-        assignClassField(instance, 'state', previous.state);
 
         if (typeof instance.shouldComponentUpdate === 'function') {
             return instance.shouldComponentUpdate(props, state, instance.context);
