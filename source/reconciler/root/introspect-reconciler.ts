@@ -48,6 +48,7 @@ export type IntrospectionReconcilerModuleDependencies = {
 
 type IntrospectionReconcilerSession = {
     readonly act: (action: () => unknown) => unknown;
+    readonly readMounted: () => boolean;
     readonly readRenderCount: () => number;
     readonly render: (element: Readonly<React.ReactElement> | null) => void;
     readonly waitForIdle: () => Promise<void>;
@@ -152,6 +153,7 @@ function createIntrospectionReconcilerSession(
                 return actAndFlush(runtime, action);
             });
         },
+        readMounted: container.readMounted,
         readRenderCount: target.readRenderCount,
         render(element) {
             options.diagnostics.run(function renderElementWithDiagnostics() {
@@ -201,7 +203,9 @@ function createIntrospectionReconcilerRoot(
     return {
         act: session.act,
         unmount() {
-            session.render(null);
+            if (session.readMounted()) {
+                session.render(null);
+            }
         },
         update(element: React.ReactElement) {
             session.render(element);

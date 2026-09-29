@@ -259,6 +259,19 @@ export const testNode = suite('custom reconciler host layer', [
 
         return scope.assert.collect();
     }),
+    test('does not commit again when an unmounted root is unmounted', function (scope) {
+        const view = introspect<HostSchema>(React.createElement(Page, { title: 'mounted' }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        view.unmount();
+        view.unmount();
+        scope.assert.equal(view.renderCount, 2);
+        scope.assert.undefined(view.root);
+
+        return scope.assert.collect();
+    }),
     test('waits for committed renders and idle work', async function (scope) {
         const view = introspect<HostSchema>(React.createElement(Page, { title: 'first' }), {
             depth: 'full',
