@@ -565,11 +565,7 @@ Statuses:
 - `'rendered'`
 - `'notRendered'`
 
-Reasons:
-
-- `'suspended'`
-- `'errored'`
-- `'unsupported'`
+The only `'notRendered'` reason is `'unsupported'`, for values React Introspect cannot execute.
 
 ### `view.textContent` and `node.textContent`
 
@@ -671,7 +667,7 @@ type IntrospectionNodeState = {
     rendered: boolean;
     visible: boolean;
     activityMode?: 'visible' | 'hidden';
-    reason?: 'depth' | 'suspended' | 'errored' | 'unsupported' | 'activity';
+    reason?: 'depth' | 'unsupported' | 'activity' | 'suspended';
 };
 ```
 

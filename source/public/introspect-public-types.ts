@@ -40,7 +40,9 @@ type IntrospectionComponentType = React.ExoticComponent<never> | React.JSXElemen
 
 export type IntrospectionHiddenReason = 'activity' | 'suspended';
 
-export type IntrospectionNotRenderedReason = 'depth' | 'errored' | 'suspended' | 'unsupported';
+export type IntrospectionNotRenderedReason = 'depth' | 'unsupported';
+
+export type IntrospectionChildrenNotRenderedReason = Exclude<IntrospectionNotRenderedReason, 'depth'>;
 
 export type IntrospectionFakeRefNode<Node = Record<PropertyKey, unknown>> = Node;
 
@@ -93,7 +95,7 @@ type RenderedChildNodes<HostSchema extends IntrospectionHostSchema> = {
 };
 
 type NotRenderedChildren = {
-    readonly reason: IntrospectionNotRenderedReason;
+    readonly reason: IntrospectionChildrenNotRenderedReason;
     readonly status: 'notRendered';
 };
 
