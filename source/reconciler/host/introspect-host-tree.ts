@@ -1,3 +1,4 @@
+import type { TimeoutIdentifier } from '@enormora/clock';
 import {
     readHostKey,
     readInternalHost,
@@ -19,7 +20,6 @@ import {
     createIntrospectionSnapshotFromSource,
     toSnapshotSourceNodes
 } from '../../snapshot/model/introspect-snapshot.ts';
-import type { IntrospectionReconcilerRuntime } from '../root/introspect-reconciler-runtime.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -59,10 +59,16 @@ type IntrospectionTextInstance = {
     readonly writeText: (text: string) => void;
 };
 
-type HostConfigScheduling = Pick<
-    IntrospectionReconcilerRuntime,
-    'cancelTimeout' | 'readEventTimestamp' | 'scheduleMicrotask' | 'scheduleTimeout'
->;
+export type IntrospectionHostScheduling = {
+    readonly cancelTimeout: (timeoutIdentifier: TimeoutIdentifier) => void;
+    readonly readEventTimestamp: () => number;
+    readonly scheduleMicrotask: (action: () => void) => void;
+    readonly scheduleTimeout: <HandlerArguments extends readonly unknown[]>(
+        handler: (...handlerArguments: HandlerArguments) => void,
+        delayInMilliseconds: number,
+        ...handlerArguments: HandlerArguments
+    ) => TimeoutIdentifier;
+};
 
 type IntrospectionHostContext = {
     readonly refs: IntrospectionRefs | undefined;
@@ -354,7 +360,7 @@ function prepareForCommit(): null {
 export type IntrospectionHostConfig = {
     readonly [member: string]: unknown;
     readonly appendChild: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
-    readonly appendChildToContainer: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
+    readonly appendChildToContainer: (container: IntrospectionHostContainer, child: IntrospectionHostChild) => void;
     readonly appendInitialChild: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
     readonly clearContainer: (container: IntrospectionHostContainer) => void;
     readonly commitTextUpdate: (instance: IntrospectionTextInstance, oldText: string, newText: string) => void;
@@ -364,7 +370,12 @@ export type IntrospectionHostConfig = {
         oldProps: IntrospectionHostProps,
         newProps: IntrospectionHostProps
     ) => void;
-    readonly finalizeInitialChildren: () => boolean;
+    readonly finalizeInitialChildren: (
+        instance: IntrospectionHostInstance,
+        type: string,
+        props: IntrospectionHostProps,
+        context: IntrospectionHostContext
+    ) => boolean;
     readonly getChildHostContext: (context: IntrospectionHostContext) => IntrospectionHostContext;
     readonly getPublicInstance: (instance: IntrospectionHostInstance) => unknown;
     readonly getRootHostContext: (container: IntrospectionHostContainer) => IntrospectionHostContext;
@@ -376,7 +387,7 @@ export type IntrospectionHostConfig = {
     ) => void;
     readonly prepareForCommit: () => null;
     readonly removeChild: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
-    readonly unhideInstance: (instance: IntrospectionHostInstance) => void;
+    readonly unhideInstance: (instance: IntrospectionHostInstance, props: IntrospectionHostProps) => void;
     readonly createInstance: (
         type: string,
         props: IntrospectionHostProps,
@@ -390,16 +401,16 @@ export type IntrospectionHostConfig = {
     ) => IntrospectionTextInstance;
     readonly hideTextInstance: (instance: IntrospectionTextInstance) => void;
     readonly insertInContainerBefore: (
-        parent: IntrospectionHostParent,
+        container: IntrospectionHostContainer,
         child: IntrospectionHostChild,
         beforeChild: IntrospectionHostChild
     ) => void;
-    readonly removeChildFromContainer: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
+    readonly removeChildFromContainer: (container: IntrospectionHostContainer, child: IntrospectionHostChild) => void;
     readonly resetAfterCommit: (container: IntrospectionHostContainer) => void;
     readonly unhideTextInstance: (instance: IntrospectionTextInstance, text: string) => void;
 };
 
-export function createIntrospectionHostConfig(scheduling: HostConfigScheduling): IntrospectionHostConfig {
+export function createIntrospectionHostConfig(scheduling: IntrospectionHostScheduling): IntrospectionHostConfig {
     return {
         NotPendingTransition: null,
         HostTransitionContext: {
