@@ -1,6 +1,8 @@
 import { createDeterministicClock, type DeterministicClock } from '@enormora/clock/deterministic-clock';
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
+// eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
+import { DefaultEventPriority, DiscreteEventPriority, NoEventPriority } from 'react-reconciler/constants.js';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import type {
     IntrospectionNodeState,
@@ -816,6 +818,26 @@ export const testNode = suite('custom reconciler host layer', [
             },
             { message: 'Expected Introspection runtime dependencies.' }
         );
+
+        return scope.assert.collect();
+    }),
+    test('resolves the update priority React sets and defaults otherwise', function (scope) {
+        const reconcilerRuntime = createIntrospectionReconcilerRuntime();
+        const initialPriorities = {
+            current: reconcilerRuntime.readCurrentUpdatePriority(),
+            resolved: reconcilerRuntime.resolveUpdatePriority()
+        };
+
+        reconcilerRuntime.writeCurrentUpdatePriority(DiscreteEventPriority);
+        const discretePriorities = {
+            current: reconcilerRuntime.readCurrentUpdatePriority(),
+            resolved: reconcilerRuntime.resolveUpdatePriority()
+        };
+
+        scope.assert.deepEqual({ discretePriorities, initialPriorities }, {
+            discretePriorities: { current: DiscreteEventPriority, resolved: DiscreteEventPriority },
+            initialPriorities: { current: NoEventPriority, resolved: DefaultEventPriority }
+        });
 
         return scope.assert.collect();
     }),

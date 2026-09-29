@@ -85,4 +85,6 @@ declare module 'react-reconciler' {
 declare module 'react-reconciler/constants.js' {
     export const ConcurrentRoot: number;
     export const DefaultEventPriority: number;
+    export const DiscreteEventPriority: number;
+    export const NoEventPriority: number;
 }

@@ -1,4 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+// eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
+import { DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants.js';
 import type { IntrospectionHostScheduling } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 
@@ -10,6 +12,7 @@ export type IntrospectionReconcilerRuntime = IntrospectionHostScheduling & {
 export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerRuntime {
     const runtimeStorage = new AsyncLocalStorage<IntrospectionRuntimeDependencies>();
     let defaultRuntime: IntrospectionRuntimeDependencies | null = null;
+    let currentUpdatePriority = NoEventPriority;
 
     function currentRuntime(): IntrospectionRuntimeDependencies {
         const runtime = runtimeStorage.getStore() ?? defaultRuntime;
@@ -32,8 +35,14 @@ export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerR
         cancelTimeout(timeoutIdentifier) {
             currentRuntime().clock.clearTimeout(timeoutIdentifier);
         },
+        readCurrentUpdatePriority() {
+            return currentUpdatePriority;
+        },
         readEventTimestamp() {
             return currentRuntime().clock.currentUnixEpochMilliseconds;
+        },
+        resolveUpdatePriority() {
+            return currentUpdatePriority === NoEventPriority ? DefaultEventPriority : currentUpdatePriority;
         },
         run: runWithRuntime,
         scheduleMicrotask(action) {
@@ -48,6 +57,9 @@ export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerR
         },
         makeDefault(runtime) {
             defaultRuntime = runtime;
+        },
+        writeCurrentUpdatePriority(priority) {
+            currentUpdatePriority = priority;
         }
     };
 }
