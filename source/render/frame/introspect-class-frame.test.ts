@@ -251,6 +251,12 @@ function StringBomb(): React.ReactNode {
     throw cause;
 }
 
+function UndefinedBomb(): React.ReactNode {
+    const cause: unknown = undefined;
+
+    throw cause;
+}
+
 const RefPanel = class extends React.Component<RefPanelProps> {
     public override render(): React.ReactNode {
         return React.createElement('output', null, this.props.label);
@@ -502,6 +508,27 @@ export const testNode = suite('class components and error boundaries', [
         scope.assert.equal(view.uncaughtErrors.length, 0);
         scope.assert.equal(view.root?.caughtError?.message, 'boom');
         scope.assert.equal(view.find('span')?.textContent, 'fallback');
+
+        return scope.assert.collect();
+    }),
+    test('reports a boundary that caught an undefined error', function (scope) {
+        const view = introspect(
+            React.createElement(
+                PrimitiveBoundary as never,
+                { recorder: createRecorder() },
+                React.createElement(UndefinedBomb)
+            ),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false,
+                warningMode: 'capture'
+            }
+        );
+
+        scope.assert.equal(view.caughtErrors.length, 1);
+        scope.assert.equal(view.find('span')?.textContent, 'primitive fallback');
+        scope.assert.equal(view.root?.caughtError, undefined);
 
         return scope.assert.collect();
     }),
