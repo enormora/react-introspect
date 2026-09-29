@@ -379,15 +379,5 @@ function createClassFrameType(type: IntrospectionClassComponent): React.Componen
 export function readClassFrameType(
     type: IntrospectionClassComponent
 ): React.ComponentType<IntrospectionClassFrameProps> {
-    const cachedFrame = classFramesByComponent.get(type);
-
-    if (cachedFrame !== undefined) {
-        return cachedFrame;
-    }
-
-    const frame = createClassFrameType(type);
-
-    classFramesByComponent.set(type, frame);
-
-    return frame;
+    return classFramesByComponent.getOrInsertComputed(type, createClassFrameType);
 }

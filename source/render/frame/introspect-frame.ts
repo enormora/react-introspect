@@ -228,17 +228,7 @@ function createMemoIntrospectionFrame(): IntrospectionFrameComponent {
 const framesByComponentType = new WeakMap<WeakKey, IntrospectionFrameComponent>();
 
 function readFrameForType(type: WeakKey, createFrame: () => IntrospectionFrameComponent): IntrospectionFrameComponent {
-    const cachedFrame = framesByComponentType.get(type);
-
-    if (cachedFrame !== undefined) {
-        return cachedFrame;
-    }
-
-    const frame = createFrame();
-
-    framesByComponentType.set(type, frame);
-
-    return frame;
+    return framesByComponentType.getOrInsertComputed(type, createFrame);
 }
 
 function transformUnsupportedElement(element: IntrospectionElement): React.ReactElement {

@@ -30,17 +30,9 @@ function createReactIdPattern(prefix: string): RegExp {
 }
 
 function replaceGeneratedId(state: IdReplacementState, generatedId: string): string {
-    const existingReplacement = state.replacements.get(generatedId);
-
-    if (existingReplacement !== undefined) {
-        return existingReplacement;
-    }
-
-    const replacement = state.normalization.generator?.(generatedId) ?? generatedId;
-
-    state.replacements.set(generatedId, replacement);
-
-    return replacement;
+    return state.replacements.getOrInsertComputed(generatedId, function generateReplacement(id) {
+        return state.normalization.generator?.(id) ?? id;
+    });
 }
 
 function isSupportedReactElement(value: unknown): value is SnapshotElement {
