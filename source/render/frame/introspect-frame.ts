@@ -9,7 +9,8 @@ import {
     elementKeyProps
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
-import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
+import { isClassComponent } from '../../values/introspect-class-component.ts';
+import { readClassFrameType } from './introspect-class-frame.ts';
 import {
     type IntrospectionElement,
     type IntrospectionTransformedNode,
