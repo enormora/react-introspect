@@ -695,7 +695,7 @@ export const testNode = suite('class components and error boundaries', [
         scope.assert.deepEqual([ memoRef.current?.props.label, lazyRef.current?.props.label ], [ 'memo', 'lazy' ]);
         scope.assert.equal(
             view.formatTree(),
-            'Fragment\n  RefPanel\n    output\n      #text\n  Component\n    output\n      #text'
+            'Fragment\n  RefPanel\n    output\n      #text\n  RefPanel\n    output\n      #text'
         );
 
         return scope.assert.collect();

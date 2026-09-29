@@ -93,6 +93,8 @@ function readResolvedLazyType(payload: unknown): unknown {
     return isObjectOrFunction(moduleObject) ? moduleObject.default : undefined;
 }
 
+const resolvedLazyTypes = new WeakMap<WeakKey, unknown>();
+
 function readLazyKind(type: unknown): ReactElementKind | undefined {
     const isLazy = hasReactType(type, lazyType) &&
         Object.hasOwn(type, lazyInitializerKey) &&
@@ -112,10 +114,12 @@ function readLazyKind(type: unknown): ReactElementKind | undefined {
         initialize() {
             const resolved: unknown = Reflect.apply(initializer, undefined, [ Reflect.get(type, lazyPayloadKey) ]);
 
+            resolvedLazyTypes.set(type, resolved);
+
             return resolved;
         },
         kind: 'lazy',
-        resolved: readResolvedLazyType(Reflect.get(type, lazyPayloadKey))
+        resolved: resolvedLazyTypes.get(type) ?? readResolvedLazyType(Reflect.get(type, lazyPayloadKey))
     };
 }
 
