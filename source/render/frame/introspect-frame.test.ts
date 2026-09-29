@@ -273,6 +273,24 @@ const AlwaysEqualMemoLabel = React.memo(LoggedLabel, alwaysEqual);
 
 const NestedMemoLabel = React.memo(React.memo(LoggedLabel, alwaysEqual));
 
+const LazyResolvedMemoLabel = React.memo(LoggedLabel);
+
+const LazyMemoLabel = {
+    $$typeof: Symbol.for('react.lazy'),
+    [lazyInitializerKey]() {
+        return LazyResolvedMemoLabel;
+    },
+    [lazyPayloadKey]: {}
+} as unknown as React.FC<LoggedLabelProps>;
+
+const LazyPlainLabel = {
+    $$typeof: Symbol.for('react.lazy'),
+    [lazyInitializerKey]() {
+        return LoggedLabel;
+    },
+    [lazyPayloadKey]: {}
+} as unknown as React.FC<LoggedLabelProps>;
+
 function createRefLabelProps(log: RenderLog): LoggedLabelProps & React.RefAttributes<unknown> {
     return {
         label: 'ref',
@@ -298,7 +316,9 @@ function RerenderingParent(props: RerenderingParentProps): React.ReactNode {
         React.createElement(LabelIgnoringMemoLabel, { label: `custom ${renders}`, log: props.log }),
         React.createElement(MemoClassLabel, { label: 'memo', log: props.log }),
         React.createElement(AlwaysEqualMemoLabel, createRefLabelProps(props.log)),
-        React.createElement(NestedMemoLabel, { label: `nested ${renders}`, log: props.log })
+        React.createElement(NestedMemoLabel, { label: `nested ${renders}`, log: props.log }),
+        React.createElement(LazyMemoLabel, { label: 'lazy memo', log: props.log }),
+        React.createElement(LazyPlainLabel, { label: 'lazy plain', log: props.log })
     );
 }
 
@@ -732,7 +752,17 @@ export const testNode = suite('execution shallow function components', [
 
         requireValue(view.find('button')).sendEvent('click');
 
-        scope.assert.deepEqual(log.rendered(), [ 'shallow', 'custom 0', 'class memo', 'ref', 'nested 0', 'ref' ]);
+        scope.assert.deepEqual(log.rendered(), [
+            'shallow',
+            'custom 0',
+            'class memo',
+            'ref',
+            'nested 0',
+            'lazy memo',
+            'lazy plain',
+            'ref',
+            'lazy plain'
+        ]);
         scope.assert.equal(view.find(LabelIgnoringMemoLabel)?.textContent, 'custom 0');
 
         return scope.assert.collect();

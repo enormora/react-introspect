@@ -195,10 +195,20 @@ function haveEqualFrameDepth(previous: IntrospectionFrameDepth, next: Introspect
     return previous.budget === next.budget && previous.counting === next.counting && previous.policy === next.policy;
 }
 
-function haveEqualMemoProps(previous: IntrospectionElement, next: IntrospectionElement): boolean {
-    const elementKind = classifyElementType(next.type);
+function readMemoKindThroughLazy(type: unknown): ReactElementKindByName['memo'] | undefined {
+    const elementKind = classifyElementType(type);
 
-    return elementKind.kind === 'memo' && elementKind.compare(previous.props, next.props);
+    if (elementKind.kind === 'lazy') {
+        return readMemoKindThroughLazy(elementKind.resolved);
+    }
+
+    return elementKind.kind === 'memo' ? elementKind : undefined;
+}
+
+function haveEqualMemoProps(previous: IntrospectionElement, next: IntrospectionElement): boolean {
+    const memoKind = readMemoKindThroughLazy(next.type);
+
+    return memoKind?.compare(previous.props, next.props) === true;
 }
 
 function areMemoFramePropsEqual(previous: IntrospectionFrameProps, next: IntrospectionFrameProps): boolean {
@@ -304,7 +314,7 @@ const elementTransforms: ElementTransforms = {
         return transformFunctionFrameElement(
             element,
             depth,
-            readFrameForType(elementKind.type, createIntrospectionFrame)
+            readFrameForType(elementKind.type, createMemoIntrospectionFrame)
         );
     },
     memo(element, depth, elementKind) {
