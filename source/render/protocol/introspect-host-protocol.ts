@@ -107,6 +107,18 @@ export function createEmptyHost(value: unknown): React.ReactElement {
     });
 }
 
+export function createExecutedComponentHost(element: EncodedElement, children: React.ReactNode): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element,
+            renderedReason: undefined
+        }),
+        children
+    );
+}
+
 export function createUnexecutedComponentHost(
     element: EncodedElement,
     renderedReason: IntrospectionNotRenderedReason

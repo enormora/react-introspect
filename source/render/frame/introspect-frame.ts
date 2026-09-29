@@ -5,6 +5,7 @@ import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
+    createExecutedComponentHost,
     createOpaqueHost,
     createUnexecutedComponentHost,
     elementKeyProps
@@ -177,19 +178,12 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
         return createClassFrameElement(props.element, props.depth, executableKind.component);
     }
 
-    const output = transformNode(
-        executeIntrospectionFrameElement(executableType, props.element),
-        nextDepth(props.depth, props.element.type)
-    );
-
-    return createComponentHost(
-        createComponentMetadata({
-            activityMode: undefined,
-            caughtError: undefined,
-            element: props.element,
-            renderedReason: undefined
-        }),
-        output
+    return createExecutedComponentHost(
+        props.element,
+        transformNode(
+            executeIntrospectionFrameElement(executableType, props.element),
+            nextDepth(props.depth, props.element.type)
+        )
     );
 }
 
