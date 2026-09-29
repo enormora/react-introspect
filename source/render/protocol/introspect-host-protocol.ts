@@ -1,6 +1,7 @@
 import React from 'react';
 import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import { assertSupportedReactValue } from '../../values/introspect-unsupported-react.ts';
+import { isReactReservedPropKey } from '../../values/introspect-react-element-kind.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 type EncodedElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
@@ -41,10 +42,7 @@ const unsupportedComponentMetadata: IntrospectionComponentMetadata = {
 };
 
 function isPublicPropKey(key: PropertyKey): boolean {
-    return key !== 'children' &&
-        key !== 'key' &&
-        key !== 'ref' &&
-        key !== introspectionElementKeyMetadata;
+    return !isReactReservedPropKey(key) && key !== introspectionElementKeyMetadata;
 }
 
 function filterProps(
@@ -120,9 +118,7 @@ export function elementKeyProps(element: EncodedElement): Readonly<Record<Proper
 }
 
 function isPublicHostPropKey(key: PropertyKey): boolean {
-    return key !== 'children' &&
-        key !== 'key' &&
-        key !== 'ref' &&
+    return !isReactReservedPropKey(key) &&
         key !== introspectionComponentMetadata &&
         key !== introspectionElementKeyMetadata &&
         key !== introspectionValueMetadata;

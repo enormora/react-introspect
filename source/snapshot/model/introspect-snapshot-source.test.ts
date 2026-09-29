@@ -99,7 +99,7 @@ export const testNode = suite('snapshots of given children and elements in props
             '#4<0 empty #empty key=null path=Icon > #empty[3] given=[] rendered=[] reason=undefined text="" hidden props={"value":null}',
             '#5<0 empty #empty key=null path=Icon > #empty[4] given=[] rendered=[] reason=undefined text="" hidden props={"value":false}',
             '#7<6 text #text key=null path=Icon > em[5] > #text[0] given=[] rendered=[] reason=undefined text="x-" hidden props={"value":"x-"}',
-            '#6<0 host em key=k path=Icon > em[5] given=[7] rendered=[7] reason=undefined text="x-" hidden props={"ref":{"current":null},"title":"emphasis"}',
+            '#6<0 host em key=k path=Icon > em[5] given=[7] rendered=[7] reason=undefined text="x-" hidden props={"title":"emphasis"}',
             '#9<8 empty #empty key=null path=Icon > b[6] > #empty[0] given=[] rendered=[] reason=undefined text="" hidden props={}',
             '#8<0 host b key=b path=Icon > b[6] given=[9] rendered=[9] reason=undefined text="" hidden props={}',
             '#11<10 empty #empty key=null path=Icon > i[7] > #empty[0] given=[] rendered=[] reason=undefined text="" hidden props={}',

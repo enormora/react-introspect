@@ -7,7 +7,7 @@ import {
     type SnapshotElementDescriber
 } from '../normalization/introspect-id-normalization.ts';
 import {
-    freezePropsWithoutChildren,
+    freezePublicElementProps,
     getElementKind,
     getIndexedPath,
     getTextContent,
@@ -140,7 +140,7 @@ function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSo
         givenChildren: children,
         key: element.key ?? null,
         kind: 'element',
-        props: freezePropsWithoutChildren(element.props),
+        props: freezePublicElementProps(element.props),
         renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
         type: element.type,
         visibility: 'visible'

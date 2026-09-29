@@ -101,7 +101,7 @@ if (button !== undefined) {
 
     // @ts-expect-error: Type '"missing"' is not assignable to type '"label" | "disabled" | "onSave"'.
     button.pickProps([ 'missing' ]);
-    // @ts-expect-error: Property 'children' does not exist on type 'IntrospectionPropValues<IntrospectionWithoutKeys<ButtonProps & { children?: ReactNode; }, "children">, Readonly<Record<never, unknown>>>'.
+    // @ts-expect-error: Property 'children' does not exist on type 'IntrospectionPropValues<IntrospectionWithoutKeys<ButtonProps & { children?: ReactNode; }, ReactReservedPropKey>, Readonly<Record<...>>>'.
     String(button.props.children);
 }
 
@@ -205,6 +205,8 @@ const intrinsicButton = intrinsicView.find('button');
 if (intrinsicButton !== undefined) {
     expect(intrinsicButton.props.type).type.toBe<'button' | 'reset' | 'submit' | undefined>();
     expect(intrinsicButton.props).type.not.toHaveProperty('children');
+    expect(intrinsicButton.props).type.not.toHaveProperty('key');
+    expect(intrinsicButton.props).type.not.toHaveProperty('ref');
 }
 
 const introspectForm = createIntrospect<React.JSX.IntrinsicElements>({ depth: 2, transparent: [ Button ] });
