@@ -121,10 +121,6 @@ function renderFromSource(
         : notRenderedFromSource[renderedReason](hiddenBy);
 }
 
-function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
-    return element.givenChildren === element.renderedChildren;
-}
-
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
     const nodes: SnapshotNode[] = [];
     const valueAncestors = new WeakSet();
@@ -175,7 +171,7 @@ function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSo
         key: element.key ?? null,
         kind: 'element',
         props: freezePublicElementProps(element.props),
-        renderedChildren: children,
+        renderedChildren: 'given',
         renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
         type: element.type,
         hostVisibility: 'visible'
@@ -332,13 +328,15 @@ const snapshotOperations = {
             return Object.freeze([]);
         }
 
-        if (sourceElementSharesGivenChildren(request.element)) {
+        const { renderedChildren } = request.element;
+
+        if (renderedChildren === 'given') {
             return request.givenChildren;
         }
 
         return snapshotOperations.createSourceChildSnapshots({
             build: request.build,
-            children: request.element.renderedChildren,
+            children: renderedChildren,
             inheritedHiddenBy: request.inheritedHiddenBy,
             parentId: request.parentId,
             parentPath: request.parentPath

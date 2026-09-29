@@ -177,16 +177,14 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
         };
     }
 
-    const children = child.readChildren().map(toSourceNode);
-
     return {
         activityMode: undefined,
         caughtError: undefined,
-        givenChildren: children,
+        givenChildren: child.readChildren().map(toSourceNode),
         kind: 'element',
         key: readHostKey(child.readProps()),
         props: readPublicHostProps(child.readProps()),
-        renderedChildren: children,
+        renderedChildren: 'given',
         renderedReason: undefined,
         type: child.type,
         hostVisibility: child.readVisibility()
