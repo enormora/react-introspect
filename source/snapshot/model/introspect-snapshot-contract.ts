@@ -30,26 +30,26 @@ export type SnapshotSourceElement = {
     readonly props: SnapshotProps;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly type: unknown;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
     readonly givenChildren: readonly SnapshotSourceNode[];
 };
 
 type SnapshotSourceEmpty = {
     readonly kind: 'empty';
     readonly value: unknown;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
 };
 
 type SnapshotSourceOpaque = {
     readonly kind: 'opaque';
     readonly value: unknown;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
 };
 
 type SnapshotSourceText = {
     readonly kind: 'text';
     readonly value: bigint | number | string;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
 };
 
 type SnapshotRenderedVisible = {

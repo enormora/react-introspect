@@ -151,13 +151,13 @@ function detachChild(child: IntrospectionHostChild): void {
 
 function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
     if (child.kind === 'text') {
-        return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
+        return { kind: 'text', value: child.readText(), hostVisibility: child.readVisibility() };
     }
 
     const internalHost = readInternalHost(child.type, child.readProps());
 
     if (internalHost.kind === 'empty' || internalHost.kind === 'opaque') {
-        return { kind: internalHost.kind, value: internalHost.value, visibility: child.readVisibility() };
+        return { kind: internalHost.kind, value: internalHost.value, hostVisibility: child.readVisibility() };
     }
 
     if (internalHost.kind === 'component') {
@@ -173,7 +173,7 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
             props: metadata.props,
             renderedReason: metadata.renderedReason,
             type: metadata.type,
-            visibility: child.readVisibility()
+            hostVisibility: child.readVisibility()
         };
     }
 
@@ -189,7 +189,7 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
         props: readPublicHostProps(child.readProps()),
         renderedReason: undefined,
         type: child.type,
-        visibility: child.readVisibility()
+        hostVisibility: child.readVisibility()
     };
 }
 

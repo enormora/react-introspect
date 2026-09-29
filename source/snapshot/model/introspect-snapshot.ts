@@ -180,22 +180,22 @@ function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSo
         props: freezePublicElementProps(element.props),
         renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
         type: element.type,
-        visibility: 'visible'
+        hostVisibility: 'visible'
     };
 }
 
 function toSourceNode(node: unknown): SnapshotSourceNode {
     if (isEmptyReactNode(node)) {
-        return { kind: 'empty', value: node, visibility: 'visible' };
+        return { kind: 'empty', value: node, hostVisibility: 'visible' };
     }
 
     if (typeof node === 'string' || typeof node === 'number' || typeof node === 'bigint') {
-        return { kind: 'text', value: node, visibility: 'visible' };
+        return { kind: 'text', value: node, hostVisibility: 'visible' };
     }
 
     return React.isValidElement<SnapshotProps>(node)
         ? toSourceElement(node)
-        : { kind: 'opaque', value: node, visibility: 'visible' };
+        : { kind: 'opaque', value: node, hostVisibility: 'visible' };
 }
 
 export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourceNode[] {
@@ -270,7 +270,7 @@ const snapshotOperations = {
             const path = getIndexedPath(request.parentPath, request.index, name);
             const hiddenBy = hiddenByFromSource(
                 request.inheritedHiddenBy,
-                request.element.visibility,
+                request.element.hostVisibility,
                 request.element.activityMode
             );
             const childPlacement = {
@@ -363,7 +363,7 @@ const snapshotOperations = {
 
         return sourceLeafSnapshotFactories[node.kind]({
             ...placement,
-            inheritedHiddenBy: hiddenByFromSource(placement.inheritedHiddenBy, node.visibility, undefined),
+            inheritedHiddenBy: hiddenByFromSource(placement.inheritedHiddenBy, node.hostVisibility, undefined),
             value: node.value
         });
     }
@@ -387,7 +387,7 @@ export function createIntrospectionSnapshotFromSource(
                     props: {},
                     renderedReason: undefined,
                     type: React.Fragment,
-                    visibility: 'visible'
+                    hostVisibility: 'visible'
                 }
             ],
             renderCount,
