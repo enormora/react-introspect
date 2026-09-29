@@ -40,7 +40,13 @@ export type IntrospectionHostContainer = {
     readonly beginCommit: (mounted: boolean) => void;
     readonly discard: (renderCount: number) => void;
     readonly readMounted: () => boolean;
+    readonly validateRefs: () => void;
 } & IntrospectionChildStore;
+
+export type IntrospectionHostContainerControl = Pick<
+    IntrospectionHostContainer,
+    'beginCommit' | 'discard' | 'readMounted' | 'validateRefs'
+>;
 
 type IntrospectionHostInstance = {
     readonly kind: 'host';
@@ -205,35 +211,6 @@ function clearContainer(container: IntrospectionHostContainer): void {
     container.writeChildren([]);
 }
 
-export function createHostContainer(
-    publish: (snapshot: IntrospectionSnapshot) => void,
-    readNextRenderCount: () => number,
-    idNormalization: IntrospectionIdNormalization,
-    refs: IntrospectionRefs | undefined
-): IntrospectionHostContainer {
-    let mounted = true;
-    const childStore = createChildStore();
-
-    return {
-        ...childStore,
-        beginCommit(nextMounted: boolean) {
-            mounted = nextMounted;
-        },
-        discard(renderCount: number) {
-            mounted = false;
-            childStore.writeChildren([]);
-            publish(createEmptyIntrospectionSnapshot(renderCount));
-        },
-        idNormalization,
-        publish,
-        readMounted() {
-            return mounted;
-        },
-        readNextRenderCount,
-        refs
-    };
-}
-
 function createHostInstance(
     type: string,
     props: IntrospectionHostProps,
@@ -329,11 +306,44 @@ function unhideHostChild(child: IntrospectionHostChild): void {
     child.writeVisibility('visible');
 }
 
-export function validateContainerRefs(container: IntrospectionHostContainer): void {
+function validateContainerRefs(container: IntrospectionHostContainer): void {
     validateIntrospectionRefs(
         container.refs,
         container.readChildren().flatMap(collectRefTargets)
     );
+}
+
+export function createHostContainer(
+    publish: (snapshot: IntrospectionSnapshot) => void,
+    readNextRenderCount: () => number,
+    idNormalization: IntrospectionIdNormalization,
+    refs: IntrospectionRefs | undefined
+): IntrospectionHostContainer {
+    let mounted = true;
+    const childStore = createChildStore();
+    const container: IntrospectionHostContainer = {
+        ...childStore,
+        beginCommit(nextMounted: boolean) {
+            mounted = nextMounted;
+        },
+        discard(renderCount: number) {
+            mounted = false;
+            childStore.writeChildren([]);
+            publish(createEmptyIntrospectionSnapshot(renderCount));
+        },
+        idNormalization,
+        publish,
+        readMounted() {
+            return mounted;
+        },
+        readNextRenderCount,
+        refs,
+        validateRefs() {
+            validateContainerRefs(container);
+        }
+    };
+
+    return container;
 }
 
 function noop(): void {
@@ -408,7 +418,10 @@ export type IntrospectionHostConfig = {
         child: IntrospectionHostChild,
         beforeChild: IntrospectionHostChild
     ) => void;
-    readonly removeChildFromContainer: (container: IntrospectionHostContainer, child: IntrospectionHostChild) => void;
+    readonly removeChildFromContainer: (
+        container: IntrospectionHostContainer,
+        child: IntrospectionHostChild
+    ) => void;
     readonly resetAfterCommit: (container: IntrospectionHostContainer) => void;
     readonly unhideTextInstance: (instance: IntrospectionTextInstance, text: string) => void;
 };

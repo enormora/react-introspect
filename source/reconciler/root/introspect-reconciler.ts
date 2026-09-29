@@ -1,11 +1,7 @@
 import type React from 'react';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
-import {
-    createHostContainer,
-    type IntrospectionHostContainer,
-    validateContainerRefs
-} from '../host/introspect-host-tree.ts';
+import { createHostContainer, type IntrospectionHostContainerControl } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
 import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
@@ -56,7 +52,7 @@ type IntrospectionReconcilerSession = {
 };
 
 type SessionRenderTarget = {
-    readonly container: IntrospectionHostContainer;
+    readonly container: IntrospectionHostContainerControl;
     readonly diagnostics: IntrospectionDiagnostics;
     readonly readRenderCount: () => number;
 };
@@ -105,7 +101,7 @@ function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, co
         return;
     }
 
-    validateContainerRefs(target.container);
+    target.container.validateRefs();
     captureMissingInitialCommit(target, renderCountBefore);
 }
 
