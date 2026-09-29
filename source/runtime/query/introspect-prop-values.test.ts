@@ -38,7 +38,18 @@ function readRootProps(view: IntrospectionView): Readonly<Record<PropertyKey, un
     return typeof props === 'object' && props !== null ? props as Readonly<Record<PropertyKey, unknown>> : {};
 }
 
+function readNodeProps(value: unknown): unknown {
+    return typeof value === 'object' && value !== null ? Reflect.get(value, 'props') : undefined;
+}
+
 export const testNode = suite('prop values on introspection nodes', [
+    test('hides ref from the props of elements found in props', function (scope) {
+        const view = introspectCard();
+
+        scope.assert.deepEqual(readNodeProps(readRootProps(view).icon), { title: 'icon' });
+
+        return scope.assert.collect();
+    }),
     test('exposes elements inside null-prototype prop objects as introspection nodes', function (scope) {
         const view = introspectCard();
         const options: unknown = readRootProps(view).options;

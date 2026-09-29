@@ -1,4 +1,8 @@
-import { classifyElementType, type ReactElementKind } from '../../values/introspect-react-element-kind.ts';
+import {
+    classifyElementType,
+    isReactReservedPropKey,
+    type ReactElementKind
+} from '../../values/introspect-react-element-kind.ts';
 import type {
     SnapshotNode,
     SnapshotNodeKind,
@@ -35,11 +39,11 @@ export function getTextContent(nodes: readonly SnapshotNode[]): string {
         .join('');
 }
 
-export function freezePropsWithoutChildren(props: SnapshotProps): SnapshotProps {
+export function freezePublicElementProps(props: SnapshotProps): SnapshotProps {
     const publicProps: Record<PropertyKey, unknown> = {};
 
     for (const key of Reflect.ownKeys(props)) {
-        if (key !== 'children' && key !== 'key') {
+        if (!isReactReservedPropKey(key)) {
             publicProps[key] = props[key];
         }
     }

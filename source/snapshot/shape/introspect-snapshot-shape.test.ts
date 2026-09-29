@@ -2,7 +2,7 @@ import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { SnapshotNode } from '../model/introspect-snapshot-contract.ts';
 import {
-    freezePropsWithoutChildren,
+    freezePublicElementProps,
     getElementKind,
     getIndexedPath,
     getTextContent,
@@ -42,7 +42,7 @@ export const testNode = suite('introspection snapshot shape', [
         const children = [ createTextNode('Save'), createTextNode(' now') ];
 
         scope.assert.equal(getTextContent(children), 'Save now');
-        scope.assert.deepEqual(freezePropsWithoutChildren({ children: 'ignored', key: 'k', title: 'Save' }), {
+        scope.assert.deepEqual(freezePublicElementProps({ children: 'ignored', key: 'k', ref: 'r', title: 'Save' }), {
             title: 'Save'
         });
         scope.assert.equal(getIndexedPath('root', 0, 'button'), 'button');

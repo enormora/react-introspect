@@ -416,7 +416,7 @@ assert.equal(button.isStale, true);
 
 ### `node.props`
 
-Returns typed props without `children`.
+Returns typed props without `children`, `key` and `ref`.
 
 ```tsx
 type UserCardProps = {
