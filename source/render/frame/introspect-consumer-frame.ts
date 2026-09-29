@@ -1,0 +1,71 @@
+import React from 'react';
+import {
+    createComponentHost,
+    createComponentMetadata,
+    createUnexecutedComponentHost
+} from '../protocol/introspect-host-protocol.ts';
+import type { IntrospectionElement, IntrospectionRenderChildren } from './introspect-frame-contract.ts';
+import type { IntrospectionFrameDepth } from './introspect-frame-depth.ts';
+
+export type IntrospectionConsumerFrameProps = {
+    readonly depth: IntrospectionFrameDepth;
+    readonly element: IntrospectionElement;
+    readonly renderChildren: IntrospectionRenderChildren;
+};
+
+type ConsumerRenderProp = (value: unknown) => React.ReactNode;
+
+function isConsumerRenderProp(value: unknown): value is ConsumerRenderProp {
+    return typeof value === 'function';
+}
+
+function renderConsumer(props: IntrospectionConsumerFrameProps, value: unknown): React.ReactElement {
+    const renderProp = props.element.props.children;
+
+    if (!isConsumerRenderProp(renderProp)) {
+        return createUnexecutedComponentHost(props.element, 'unsupported');
+    }
+
+    return createComponentHost(
+        createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element: props.element,
+            renderedReason: undefined
+        }),
+        props.renderChildren(renderProp(value), props.depth)
+    );
+}
+
+function createConsumerFrame(
+    context: React.Context<unknown>
+): React.ComponentClass<IntrospectionConsumerFrameProps> {
+    const frame = class IntrospectionConsumerFrame extends React.Component<IntrospectionConsumerFrameProps> {
+        public override render(): React.ReactElement {
+            return renderConsumer(this.props, this.context);
+        }
+    };
+
+    return Object.assign(frame, { contextType: context });
+}
+
+const consumerFramesByContext = new WeakMap<
+    React.Context<unknown>,
+    React.ComponentClass<IntrospectionConsumerFrameProps>
+>();
+
+export function readConsumerFrame(
+    context: React.Context<unknown>
+): React.ComponentClass<IntrospectionConsumerFrameProps> {
+    const cachedFrame = consumerFramesByContext.get(context);
+
+    if (cachedFrame !== undefined) {
+        return cachedFrame;
+    }
+
+    const frame = createConsumerFrame(context);
+
+    consumerFramesByContext.set(context, frame);
+
+    return frame;
+}

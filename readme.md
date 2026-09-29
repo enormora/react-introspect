@@ -988,7 +988,7 @@ introspect(<FieldList />, {
 
 ### Context
 
-Providers pass through.
+Providers pass through, and `Context.Consumer` runs its render prop with the nearest provider's value.
 
 ```tsx
 const ThemeContext = React.createContext('light');
@@ -1011,6 +1011,12 @@ const card = view.find(Card);
 assert.ok(card);
 assert.equal(card.props.theme, 'dark');
 ```
+
+### StrictMode and Profiler
+
+Both pass through: their children execute and they show up as `StrictMode` and `Profiler` nodes.
+
+`Profiler`'s `onRender` reports timings for the introspected tree, not for your app's real renderer.
 
 ### Harness wrappers and routers
 

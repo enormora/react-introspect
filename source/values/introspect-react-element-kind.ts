@@ -43,7 +43,11 @@ type MemoKind = {
     readonly inner: unknown;
 };
 
-export type ReactElementKind = ClassKind | ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
+type ConsumerKind = { readonly kind: 'consumer'; readonly context: React.Context<unknown>; };
+
+type WrapperElementKind = ForwardRefKind | LazyKind | MemoKind;
+
+export type ReactElementKind = ClassKind | ConsumerKind | FunctionKind | HostKind | MarkerKind | WrapperElementKind;
 
 export type ReactElementKindByName = {
     readonly [Kind in ReactElementKind as Kind['kind']]: Kind;
@@ -174,8 +178,25 @@ function readBuiltInKind(type: unknown): ReactElementKind | undefined {
     return markerName === undefined ? undefined : { kind: markerName };
 }
 
-function readContextKind(type: unknown): ReactElementKind | undefined {
-    return hasReactType(type, contextType) ? { kind: 'context' } : undefined;
+const consumerType = Symbol.for('react.consumer');
+const consumerContextKey = '_context';
+
+function isReactContext(value: unknown): value is React.Context<unknown> {
+    return hasReactType(value, contextType);
+}
+
+function readConsumerKind(type: unknown): ReactElementKind | undefined {
+    if (!hasReactType(type, consumerType)) {
+        return undefined;
+    }
+
+    const context = type[consumerContextKey];
+
+    return isReactContext(context) ? { context, kind: 'consumer' } : undefined;
+}
+
+function readContextElementKind(type: unknown): ReactElementKind | undefined {
+    return hasReactType(type, contextType) ? { kind: 'context' } : readConsumerKind(type);
 }
 
 function readComponentKind(type: unknown): ReactElementKind {
@@ -191,7 +212,7 @@ export function classifyElementType(type: unknown): ReactElementKind {
         readLazyKind(type) ??
         readMemoKind(type) ??
         readForwardRefKind(type) ??
-        readContextKind(type) ??
+        readContextElementKind(type) ??
         readComponentKind(type);
 }
 

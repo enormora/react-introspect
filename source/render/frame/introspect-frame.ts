@@ -11,8 +11,8 @@ import {
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
 import { createIntrospectionUsageError } from '../../values/introspect-usage-error.ts';
-import type { IntrospectionClassComponent } from '../../values/introspect-class-component.ts';
 import { readClassFrameType } from './introspect-class-frame.ts';
+import { readConsumerFrame } from './introspect-consumer-frame.ts';
 import {
     type IntrospectionElement,
     type IntrospectionTransformedNode,
@@ -158,7 +158,7 @@ function transformWrapperElement(
 function createClassFrameElement(
     element: IntrospectionElement,
     depth: IntrospectionFrameDepth,
-    type: IntrospectionClassComponent
+    type: ReactElementKindByName['class']['component']
 ): React.ReactElement {
     return React.createElement(readClassFrameType(type), {
         depth,
@@ -195,10 +195,20 @@ function haveEqualFrameDepth(previous: IntrospectionFrameDepth, next: Introspect
     return previous.budget === next.budget && previous.counting === next.counting && previous.policy === next.policy;
 }
 
-function haveEqualMemoProps(previous: IntrospectionElement, next: IntrospectionElement): boolean {
-    const elementKind = classifyElementType(next.type);
+function readMemoKindThroughLazy(type: unknown): ReactElementKindByName['memo'] | undefined {
+    const elementKind = classifyElementType(type);
 
-    return elementKind.kind === 'memo' && elementKind.compare(previous.props, next.props);
+    if (elementKind.kind === 'lazy') {
+        return readMemoKindThroughLazy(elementKind.resolved);
+    }
+
+    return elementKind.kind === 'memo' ? elementKind : undefined;
+}
+
+function haveEqualMemoProps(previous: IntrospectionElement, next: IntrospectionElement): boolean {
+    const memoKind = readMemoKindThroughLazy(next.type);
+
+    return memoKind?.compare(previous.props, next.props) === true;
 }
 
 function areMemoFramePropsEqual(previous: IntrospectionFrameProps, next: IntrospectionFrameProps): boolean {
@@ -283,6 +293,14 @@ const elementTransforms: ElementTransforms = {
             return createClassFrameElement(element, componentDepth, elementKind.component);
         });
     },
+    consumer(element, depth, elementKind) {
+        return React.createElement(readConsumerFrame(elementKind.context), {
+            depth,
+            element,
+            key: element.key ?? undefined,
+            renderChildren: transformNode
+        });
+    },
     context: transformRenderableElement,
     forwardRef(element, depth, elementKind) {
         return transformFunctionFrameElement(
@@ -304,7 +322,7 @@ const elementTransforms: ElementTransforms = {
         return transformFunctionFrameElement(
             element,
             depth,
-            readFrameForType(elementKind.type, createIntrospectionFrame)
+            readFrameForType(elementKind.type, createMemoIntrospectionFrame)
         );
     },
     memo(element, depth, elementKind) {
