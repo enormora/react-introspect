@@ -52,11 +52,38 @@ type SnapshotSourceText = {
     readonly visibility: SnapshotVisibility;
 };
 
+type SnapshotRenderedVisible = {
+    readonly status: 'rendered';
+    readonly visibility: 'visible';
+};
+
+type SnapshotRenderedHidden = {
+    readonly status: 'rendered';
+    readonly visibility: 'hidden';
+    readonly hiddenBy: IntrospectionHiddenReason;
+};
+
+type SnapshotBelowDepth = {
+    readonly status: 'notRendered';
+    readonly reason: 'depth';
+    readonly visibility: SnapshotVisibility;
+};
+
+type SnapshotUnsupported = {
+    readonly status: 'notRendered';
+    readonly reason: 'unsupported';
+};
+
+export type SnapshotRendered = SnapshotRenderedHidden | SnapshotRenderedVisible;
+
+export type SnapshotNotRendered = SnapshotBelowDepth | SnapshotUnsupported;
+
+export type SnapshotRender = SnapshotNotRendered | SnapshotRendered;
+
 export type SnapshotNode = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: readonly SnapshotNode[];
-    readonly hiddenBy: IntrospectionHiddenReason | undefined;
     readonly id: number;
     readonly key: string | null;
     readonly kind: SnapshotNodeKind;
@@ -64,11 +91,10 @@ export type SnapshotNode = {
     readonly parentId: number | undefined;
     readonly path: string;
     readonly props: SnapshotProps;
+    readonly render: SnapshotRender;
     readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly textContent: string;
     readonly type: unknown;
-    readonly visibility: SnapshotVisibility;
 };
 
 export function createEmptyIntrospectionSnapshot(renderCount: number): IntrospectionSnapshot {
