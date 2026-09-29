@@ -331,7 +331,13 @@ export type IntrospectionListLocator<
     HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
 > = IntrospectionNodeSequence<Props, Type, HostSchema>;
 
-export type IntrospectionView<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema> = {
+type AvailableDisposeSymbol = SymbolConstructor extends { readonly dispose: infer Key extends symbol; } ? Key : never;
+
+type IntrospectionDisposable = Readonly<Record<AvailableDisposeSymbol, () => void>>;
+
+export type IntrospectionView<
+    HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
+> = IntrospectionDisposable & {
     readonly caughtErrors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
     readonly renderCount: number;

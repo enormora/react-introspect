@@ -103,6 +103,9 @@ function createIntrospectionViewWithDependencies(
     }
 
     const view: RuntimeIntrospectionView = Object.freeze({
+        [Symbol.dispose]() {
+            reconcilerRoot.unmount();
+        },
         get caughtErrors() {
             return diagnostics.caughtErrors;
         },

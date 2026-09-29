@@ -78,6 +78,9 @@ function createView(nodes: readonly RuntimeIntrospectionNode[]): RuntimeIntrospe
         root: undefined,
         textContent: '',
         uncaughtErrors: [],
+        [Symbol.dispose]() {
+            return undefined;
+        },
         unmount() {
             return undefined;
         },
