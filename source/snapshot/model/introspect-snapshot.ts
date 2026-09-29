@@ -7,7 +7,6 @@ import {
 } from '../normalization/introspect-id-normalization.ts';
 import {
     freezePropsWithoutChildren,
-    getElementChildrenState,
     getElementKind,
     getIndexedPath,
     getTextContent,
@@ -136,6 +135,43 @@ function flattenReactNodes(children: unknown): readonly unknown[] {
     return [ children ];
 }
 
+function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSourceElement {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- React values map to source nodes recursively
+    const children = toSourceNodes(element.props.children);
+
+    return {
+        activityMode: undefined,
+        caughtError: undefined,
+        children,
+        givenChildren: children,
+        givenChildrenKind: 'source',
+        key: element.key ?? null,
+        kind: 'element',
+        props: freezePropsWithoutChildren(element.props),
+        renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
+        type: element.type,
+        visibility: 'visible'
+    };
+}
+
+function toSourceNode(node: unknown): SnapshotSourceNode {
+    if (isEmptyReactNode(node)) {
+        return { kind: 'empty', value: node, visibility: 'visible' };
+    }
+
+    if (typeof node === 'string' || typeof node === 'number' || typeof node === 'bigint') {
+        return { kind: 'text', value: node, visibility: 'visible' };
+    }
+
+    return React.isValidElement<SnapshotProps>(node)
+        ? toSourceElement(node)
+        : { kind: 'opaque', value: node, visibility: 'visible' };
+}
+
+function toSourceNodes(children: unknown): readonly SnapshotSourceNode[] {
+    return Object.freeze(flattenReactNodes(children).map(toSourceNode));
+}
+
 type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
 
 function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
@@ -206,46 +242,12 @@ const snapshotOperations = {
     createChildSnapshots(request: ChildSnapshotsRequest): readonly SnapshotNode[] {
         const { children, ...placement } = request;
 
-        return createSiblingSnapshots(placement, flattenReactNodes(children), snapshotOperations.createSnapshotNode);
+        return snapshotOperations.createSourceChildSnapshots({ ...placement, children: toSourceNodes(children) });
     },
     createElementSnapshotNode(request: ElementNodeRequest): SnapshotNode {
-        const { props } = request.element;
-        const { type } = request.element;
-        const id = request.build.allocateId();
-        const name = getTypeName(type);
-        const path = getIndexedPath(request.parentPath, request.index, name);
-        const givenChildren = snapshotOperations.createChildSnapshots({
-            build: request.build,
-            children: props.children,
-            inheritedVisibility: request.inheritedVisibility,
-            parentId: id,
-            parentPath: path
-        });
-        const childrenState = getElementChildrenState(type, givenChildren);
-        const snapshotProps = snapshotOperations.createPropsSnapshot({
-            build: request.build,
-            inheritedVisibility: request.inheritedVisibility,
-            ownerId: id,
-            ownerPath: path,
-            props: freezePropsWithoutChildren(props)
-        });
-
-        return request.build.push({
-            activityMode: undefined,
-            givenChildren,
-            caughtError: undefined,
-            id,
-            key: request.element.key ?? null,
-            kind: getElementKind(type),
-            name,
-            parentId: request.parentId,
-            path,
-            props: snapshotProps,
-            renderedChildren: childrenState.renderedChildren,
-            renderedReason: childrenState.renderedReason,
-            textContent: childrenState.textContent,
-            type,
-            visibility: request.inheritedVisibility
+        return snapshotOperations.createSourceElementSnapshotNode({
+            ...request,
+            element: toSourceElement(request.element)
         });
     },
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
@@ -340,24 +342,6 @@ const snapshotOperations = {
             parentId: request.parentId,
             parentPath: request.parentPath
         });
-    },
-    createSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
-        if (isEmptyReactNode(request.node)) {
-            return createEmptySnapshotNode(request);
-        }
-
-        if (typeof request.node === 'string' || typeof request.node === 'number' || typeof request.node === 'bigint') {
-            return createTextSnapshotNode(request);
-        }
-
-        if (React.isValidElement<SnapshotProps>(request.node)) {
-            return snapshotOperations.createElementSnapshotNode({
-                ...request,
-                element: request.node
-            });
-        }
-
-        return createOpaqueSnapshotNode(request);
     },
     createSourceChildSnapshots(request: SourceChildSnapshotsRequest): readonly SnapshotNode[] {
         const { children, ...placement } = request;
