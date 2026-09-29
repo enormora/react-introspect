@@ -215,7 +215,10 @@ function createLeafSnapshotNode(kind: SnapshotLeafKind, request: LeafNodeRequest
 const snapshotOperations = {
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
         return request.build.createNode(function describeElementNode(id) {
-            const name = getTypeName(request.element.type);
+            const name = getTypeName(
+                request.element.type,
+                request.element.output.status === 'rendered' ? 'executed' : 'unexecuted'
+            );
             const path = getIndexedPath(request.parentPath, request.index, name);
             const hiddenBy = hiddenByFromSource(
                 request.inheritedHiddenBy,

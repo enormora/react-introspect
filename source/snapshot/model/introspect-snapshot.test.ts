@@ -186,6 +186,28 @@ function createMixedSnapshot(): IntrospectionSnapshot {
     return publishedSnapshot;
 }
 
+function ResolvedLabel(): React.ReactNode {
+    return null;
+}
+
+type IconSlotProps = {
+    readonly icon: React.ReactNode;
+};
+
+function IconSlot(props: IconSlotProps): React.ReactNode {
+    return props.icon;
+}
+
+function createResolvedLazyLabel(): React.FC {
+    return {
+        $$typeof: Symbol.for('react.lazy'),
+        _init() {
+            return ResolvedLabel;
+        },
+        _payload: { _result: { default: ResolvedLabel }, _status: 1 }
+    } as unknown as React.FC;
+}
+
 export const testNode = suite('snapshot tree model', [
     test('builds frozen committed snapshots with node ids and kinds', function (scope) {
         const snapshot = createMixedSnapshot();
@@ -234,6 +256,23 @@ export const testNode = suite('snapshot tree model', [
         scope.assert.equal(
             widget.renderedChildren.status === 'rendered' ? widget.renderedChildren.nodes.first?.type : undefined,
             'em'
+        );
+
+        return scope.assert.collect();
+    }),
+    test('names lazy components after their resolved component only where they executed', function (scope) {
+        const ResolvedLazyLabel = createResolvedLazyLabel();
+        const view = introspect(
+            React.createElement(IconSlot, { icon: React.createElement(ResolvedLazyLabel) }),
+            { depth: 'full', strictMode: false }
+        );
+        const slot = requireValue(view.find(IconSlot));
+        const propIcon: unknown = slot.props.icon;
+
+        scope.assert.equal(requireValue(view.find(ResolvedLazyLabel)).name, 'ResolvedLabel');
+        scope.assert.equal(
+            typeof propIcon === 'object' && propIcon !== null ? Reflect.get(propIcon, 'name') : undefined,
+            'Component'
         );
 
         return scope.assert.collect();
