@@ -9,7 +9,11 @@ type FunctionComponentType = ((props: PropsRecord) => React.ReactNode) & { reado
 
 type MarkerKind = { readonly kind: 'activity' | 'context' | 'fragment' | 'other' | 'suspense' | 'viewTransition'; };
 
-type ForwardRefKind = { readonly kind: 'forwardRef'; readonly render: ForwardRefRender; };
+type ForwardRefKind = {
+    readonly kind: 'forwardRef';
+    readonly displayName: string | undefined;
+    readonly render: ForwardRefRender;
+};
 
 type FunctionKind = { readonly kind: 'function'; readonly component: FunctionComponentType; };
 
@@ -17,7 +21,7 @@ type HostKind = { readonly kind: 'host'; readonly name: string; };
 
 type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; };
 
-type MemoKind = { readonly kind: 'memo'; readonly inner: unknown; };
+type MemoKind = { readonly kind: 'memo'; readonly displayName: string | undefined; readonly inner: unknown; };
 
 export type ReactElementKind = ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
 
@@ -42,8 +46,16 @@ function hasReactType(value: unknown, type: symbol): value is PropsRecord {
     return isObjectOrFunction(value) && value.$$typeof === type;
 }
 
+export function readDisplayName(type: PropsRecord): string | undefined {
+    const { displayName } = type;
+
+    return typeof displayName === 'string' && displayName !== '' ? displayName : undefined;
+}
+
 function readMemoKind(type: unknown): ReactElementKind | undefined {
-    return hasReactType(type, memoType) && Object.hasOwn(type, 'type') ? { inner: type.type, kind: 'memo' } : undefined;
+    return hasReactType(type, memoType) && Object.hasOwn(type, 'type')
+        ? { displayName: readDisplayName(type), inner: type.type, kind: 'memo' }
+        : undefined;
 }
 
 function readForwardRefKind(type: unknown): ReactElementKind | undefined {
@@ -53,7 +65,7 @@ function readForwardRefKind(type: unknown): ReactElementKind | undefined {
 
     const { render } = type;
 
-    return isForwardRefRender(render) ? { kind: 'forwardRef', render } : undefined;
+    return isForwardRefRender(render) ? { displayName: readDisplayName(type), kind: 'forwardRef', render } : undefined;
 }
 
 function readLazyKind(type: unknown): ReactElementKind | undefined {
