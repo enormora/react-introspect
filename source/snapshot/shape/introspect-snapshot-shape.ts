@@ -1,6 +1,6 @@
+import { isReactReservedPropKey } from '../../values/introspect-public-props.ts';
 import {
     classifyElementType,
-    isReactReservedPropKey,
     type ReactElementKind,
     type ReactElementKindByName,
     readDisplayName
