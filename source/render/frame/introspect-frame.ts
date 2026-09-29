@@ -201,6 +201,25 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
     );
 }
 
+function haveEqualFrameDepth(previous: IntrospectionFrameDepth, next: IntrospectionFrameDepth): boolean {
+    return previous.budget === next.budget && previous.counting === next.counting && previous.policy === next.policy;
+}
+
+function haveEqualMemoProps(previous: IntrospectionElement, next: IntrospectionElement): boolean {
+    const elementKind = classifyElementType(next.type);
+
+    return elementKind.kind === 'memo' && elementKind.compare(previous.props, next.props);
+}
+
+function areMemoFramePropsEqual(previous: IntrospectionFrameProps, next: IntrospectionFrameProps): boolean {
+    return previous.element.type === next.element.type &&
+        readElementRef(previous.element) === readElementRef(next.element) &&
+        haveEqualFrameDepth(previous.depth, next.depth) &&
+        haveEqualMemoProps(previous.element, next.element);
+}
+
+const MemoIntrospectionFrame = React.memo(IntrospectionFrame, areMemoFramePropsEqual);
+
 function createFrameElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
     const elementKind = classifyElementType(element.type);
 
@@ -208,7 +227,7 @@ function createFrameElement(element: IntrospectionElement, depth: IntrospectionF
         return createClassFrameElement(element, depth, elementKind.component);
     }
 
-    return React.createElement(IntrospectionFrame, {
+    return React.createElement(elementKind.kind === 'memo' ? MemoIntrospectionFrame : IntrospectionFrame, {
         depth,
         element,
         key: element.key ?? undefined

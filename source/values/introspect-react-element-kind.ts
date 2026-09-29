@@ -1,5 +1,6 @@
 import React from 'react';
 import { type IntrospectionClassComponent, isClassComponent } from './introspect-class-component.ts';
+import { shallowEquals } from './introspect-shallow-equality.ts';
 import { isObjectOrFunction } from './introspect-value-kinds.ts';
 
 type PropsRecord = Readonly<Record<PropertyKey, unknown>>;
@@ -26,7 +27,14 @@ type HostKind = { readonly kind: 'host'; readonly name: string; };
 
 type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; readonly resolved: unknown; };
 
-type MemoKind = { readonly kind: 'memo'; readonly displayName: string | undefined; readonly inner: unknown; };
+type MemoCompare = (previous: PropsRecord, next: PropsRecord) => boolean;
+
+type MemoKind = {
+    readonly kind: 'memo';
+    readonly compare: MemoCompare;
+    readonly displayName: string | undefined;
+    readonly inner: unknown;
+};
 
 export type ReactElementKind = ClassKind | ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
 
@@ -63,10 +71,28 @@ export function readDisplayName(type: PropsRecord): string | undefined {
     return typeof displayName === 'string' && displayName !== '' ? displayName : undefined;
 }
 
+function isMemoCompare(value: unknown): value is MemoCompare {
+    return typeof value === 'function';
+}
+
 function readMemoKind(type: unknown): ReactElementKind | undefined {
-    return hasReactType(type, memoType) && Object.hasOwn(type, 'type')
-        ? { displayName: readDisplayName(type), inner: type.type, kind: 'memo' }
-        : undefined;
+    if (!hasReactType(type, memoType) || !Object.hasOwn(type, 'type')) {
+        return undefined;
+    }
+
+    const ownCompare = isMemoCompare(type.compare) ? type.compare : shallowEquals;
+    const innerKind = readMemoKind(type.type);
+
+    return {
+        compare: innerKind?.kind === 'memo'
+            ? function compareEitherMemoLevel(previous, next) {
+                return ownCompare(previous, next) || innerKind.compare(previous, next);
+            }
+            : ownCompare,
+        displayName: readDisplayName(type),
+        inner: type.type,
+        kind: 'memo'
+    };
 }
 
 function readForwardRefKind(type: unknown): ReactElementKind | undefined {

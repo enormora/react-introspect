@@ -224,6 +224,73 @@ function createRenderLog(): RenderLog {
     };
 }
 
+type LoggedLabelProps = ButtonProps & {
+    readonly log: RenderLog;
+};
+
+type RerenderingParentProps = {
+    readonly log: RenderLog;
+};
+
+function LoggedLabel(props: LoggedLabelProps): React.ReactNode {
+    props.log.record(props.label);
+
+    return React.createElement('span', null, props.label);
+}
+
+const ShallowMemoLabel = React.memo(LoggedLabel);
+
+const LabelIgnoringMemoLabel = React.memo(LoggedLabel, function ignoresLabel(previous, next) {
+    return previous.log === next.log;
+});
+
+const LoggedClassLabel = class extends React.Component<LoggedLabelProps> {
+    public override render(): React.ReactNode {
+        this.props.log.record(`class ${this.props.label}`);
+
+        return React.createElement('span', null, this.props.label);
+    }
+};
+
+const MemoClassLabel = React.memo(LoggedClassLabel);
+
+function alwaysEqual(): boolean {
+    return true;
+}
+
+const AlwaysEqualMemoLabel = React.memo(LoggedLabel, alwaysEqual);
+
+const NestedMemoLabel = React.memo(React.memo(LoggedLabel, alwaysEqual));
+
+function createRefLabelProps(log: RenderLog): LoggedLabelProps & React.RefAttributes<unknown> {
+    return {
+        label: 'ref',
+        log,
+        ref() {
+            return undefined;
+        }
+    };
+}
+
+function RerenderingParent(props: RerenderingParentProps): React.ReactNode {
+    const [ renders, setRenders ] = React.useState(0);
+
+    return React.createElement(
+        React.Fragment,
+        null,
+        React.createElement('button', {
+            onClick() {
+                setRenders(renders + 1);
+            }
+        }),
+        React.createElement(ShallowMemoLabel, { label: 'shallow', log: props.log }),
+        React.createElement(LabelIgnoringMemoLabel, { label: `custom ${renders}`, log: props.log }),
+        React.createElement(MemoClassLabel, { label: 'memo', log: props.log }),
+        React.createElement(AlwaysEqualMemoLabel, createRefLabelProps(props.log)),
+        React.createElement(NestedMemoLabel, { label: `nested ${renders}`, log: props.log })
+    );
+}
+
 function createAnchoredComponents(): AnchoredComponents {
     const log = createRenderLog();
     const Button: React.FC<ButtonProps> = function Button(props) {
@@ -642,6 +709,20 @@ export const testNode = suite('execution shallow function components', [
             state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
             visibility: 'notRendered'
         });
+
+        return scope.assert.collect();
+    }),
+    test('skips memo components whose compare reports equal props', function (scope) {
+        const log = createRenderLog();
+        const view = introspect(React.createElement(RerenderingParent, { log }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        requireValue(view.find('button')).sendEvent('click');
+
+        scope.assert.deepEqual(log.rendered(), [ 'shallow', 'custom 0', 'class memo', 'ref', 'nested 0', 'ref' ]);
+        scope.assert.equal(view.find(LabelIgnoringMemoLabel)?.textContent, 'custom 0');
 
         return scope.assert.collect();
     }),
