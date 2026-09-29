@@ -1012,6 +1012,12 @@ assert.ok(card);
 assert.equal(card.props.theme, 'dark');
 ```
 
+### StrictMode and Profiler
+
+Both pass through: their children execute and they show up as `StrictMode` and `Profiler` nodes.
+
+`Profiler`'s `onRender` reports timings for the introspected tree, not for your app's real renderer.
+
 ### Harness wrappers and routers
 
 Every executed component consumes one level of `depth`. Wrappers from the test harness would eat that budget.
