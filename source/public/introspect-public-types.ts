@@ -296,7 +296,7 @@ export type IntrospectionNode<
     readonly findClosest: IntrospectionQuery<HostSchema, 'node'>;
     readonly formatTree: () => string;
     readonly omitProps: <Key extends keyof Props>(keys: readonly Key[]) => IntrospectionWithoutKeys<Props, Key>;
-    readonly pickProps: <Key extends keyof Props>(keys: readonly Key[]) => Pick<Props, Key>;
+    readonly pickProps: <Key extends keyof Props>(keys: readonly [Key, Key, ...(readonly Key[])]) => Pick<Props, Key>;
     readonly sendEvent: IntrospectionSendEvent;
 };
 
@@ -325,7 +325,9 @@ export type IntrospectionLocator<
     readonly omitProps: <Key extends keyof Props>(
         keys: readonly Key[]
     ) => IntrospectionWithoutKeys<Props, Key> | undefined;
-    readonly pickProps: <Key extends keyof Props>(keys: readonly Key[]) => Pick<Props, Key> | undefined;
+    readonly pickProps: <Key extends keyof Props>(
+        keys: readonly [Key, Key, ...(readonly Key[])]
+    ) => Pick<Props, Key> | undefined;
     readonly sendEvent: IntrospectionSendEvent;
 };
 

@@ -118,7 +118,7 @@ async function writeConsumerProject(consumerProjectFolder: string, packagedOutpu
             '    { depth: 2 }',
             ');',
             'const button = view.find(Button);',
-            "button?.pickProps([ 'label' ]);",
+            "button?.pickProps([ 'label', 'onSave' ]);",
             "view.find('button')?.sendEvent('click');",
             'createFakeRefNode({ focus() {} });',
             "matchRefs([{ type: 'input', node: {} }]);",

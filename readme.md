@@ -324,7 +324,7 @@ assert.equal(save.node?.props.disabled, true);
 Locators project node data the same way. Each projection returns `undefined` when nothing matches, so one assertion covers both cases.
 
 ```tsx
-assert.deepEqual(view.locate('button').pickProps([ 'type' ]), { type: 'submit' });
+assert.deepEqual(view.locate('button').pickProps([ 'type', 'disabled' ]), { type: 'submit', disabled: false });
 assert.equal(view.locate(Status).textContent, 'Saved');
 assert.equal(view.locate(ErrorBanner).props, undefined);
 ```
@@ -492,10 +492,10 @@ assert.deepEqual(button.pickProps([ 'label', 'disabled' ]), {
 });
 ```
 
-Unknown prop keys are TypeScript errors.
+Unknown prop keys are TypeScript errors. `pickProps()` needs at least two keys. Read a single prop from `props`.
 
 ```tsx
-button.pickProps([ 'label' ]);
+button.pickProps([ 'label', 'disabled' ]);
 button.omitProps([ 'onSave' ]);
 ```
 

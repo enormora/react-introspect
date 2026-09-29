@@ -24,13 +24,18 @@ declare const selector: IntrospectionSelector<HostSchema, HostSchema['button'], 
 expect(view.find('button')).type.toBe<IntrospectionNode<HostSchema['button'], 'button', HostSchema> | undefined>();
 expect(view.findAll('button')).type.toBeAssignableTo<IntrospectionList<HostSchema['button'], 'button', HostSchema>>();
 expect(buttonNode.props.disabled).type.toBe<boolean>();
-expect(buttonNode.pickProps([ 'title' ])).type.toBe<Pick<HostSchema['button'], 'title'>>();
+expect(buttonNode.pickProps([ 'title', 'disabled' ])).type.toBe<Pick<HostSchema['button'], 'disabled' | 'title'>>();
+expect(buttonNode.pickProps).type.not.toBeCallableWith([ 'title' ]);
+expect(buttonNode.pickProps).type.not.toBeCallableWith([]);
 expect(selector).type.toBeAssignableTo<IntrospectionSelector<HostSchema, HostSchema['button'], 'button'>>();
 expect({ depth: 'full', strictMode: false } as const).type.toBeAssignableTo<IntrospectionOptions<HostSchema>>();
-expect(view.locate('button').pickProps([ 'title' ])).type.toBe<Pick<HostSchema['button'], 'title'> | undefined>();
+expect(view.locate('button').pickProps([ 'title', 'disabled' ])).type.toBe<
+    Pick<HostSchema['button'], 'disabled' | 'title'> | undefined
+>();
+expect(view.locate('button').pickProps).type.not.toBeCallableWith([ 'title' ]);
 expect(view.locate('button').props).type.toBe<HostSchema['button'] | undefined>();
 expect(view.locate('button').type).type.toBe<'button' | undefined>();
-expect(view.locate('button').pickProps).type.not.toBeCallableWith([ 'missing' ]);
+expect(view.locate('button').pickProps).type.not.toBeCallableWith([ 'title', 'missing' ]);
 expect({ depthFrom: Page, transparent: [ MemoPage ] }).type.toBeAssignableTo<IntrospectionOptions>();
 expect({ depthFrom: 'main' }).type.not.toBeAssignableTo<IntrospectionOptions>();
 expect({ transparent: [ 'section' ] }).type.not.toBeAssignableTo<IntrospectionOptions>();
