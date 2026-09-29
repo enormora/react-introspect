@@ -13,17 +13,54 @@ type NamedFunction = {
     readonly name: string;
 };
 
-const builtInTypeNames: Readonly<Record<Exclude<ReactElementKind['kind'], 'function' | 'host'>, string>> = {
-    activity: 'Activity',
-    context: 'Component',
-    forwardRef: 'Component',
-    fragment: 'Fragment',
-    lazy: 'Component',
-    memo: 'Component',
-    other: 'Component',
-    suspense: 'Component',
-    viewTransition: 'ViewTransition'
+type ElementKindByName = {
+    readonly [Kind in ReactElementKind as Kind['kind']]: Kind;
 };
+
+type TypeNamers = {
+    readonly [Name in keyof ElementKindByName]: (elementKind: ElementKindByName[Name]) => string;
+};
+
+function getFunctionTypeName(type: NamedFunction): string {
+    const displayName: unknown = Reflect.get(type, 'displayName');
+
+    return typeof displayName === 'string' ? displayName : type.name;
+}
+
+function nameComponent(): string {
+    return 'Component';
+}
+
+const typeNamers: TypeNamers = {
+    activity() {
+        return 'Activity';
+    },
+    context: nameComponent,
+    forwardRef: nameComponent,
+    fragment() {
+        return 'Fragment';
+    },
+    function(elementKind) {
+        return getFunctionTypeName(elementKind.component);
+    },
+    host(elementKind) {
+        return elementKind.name;
+    },
+    lazy: nameComponent,
+    memo: nameComponent,
+    other: nameComponent,
+    suspense: nameComponent,
+    viewTransition() {
+        return 'ViewTransition';
+    }
+};
+
+function nameElementKind<Name extends keyof ElementKindByName>(
+    name: Name,
+    elementKind: ElementKindByName[Name]
+): string {
+    return typeNamers[name](elementKind);
+}
 
 export function getElementKind(type: unknown): SnapshotNodeKind {
     const { kind } = classifyElementType(type);
@@ -55,20 +92,8 @@ export function getIndexedPath(parentPath: string, index: number | string, name:
     return parentPath === 'root' ? name : `${parentPath} > ${name}[${index}]`;
 }
 
-function getFunctionTypeName(type: NamedFunction): string {
-    const displayName: unknown = Reflect.get(type, 'displayName');
-
-    return typeof displayName === 'string' ? displayName : type.name;
-}
-
 export function getTypeName(type: unknown): string {
     const elementKind = classifyElementType(type);
 
-    if (elementKind.kind === 'host') {
-        return elementKind.name;
-    }
-
-    return elementKind.kind === 'function'
-        ? getFunctionTypeName(elementKind.component)
-        : builtInTypeNames[elementKind.kind];
+    return nameElementKind(elementKind.kind, elementKind);
 }
