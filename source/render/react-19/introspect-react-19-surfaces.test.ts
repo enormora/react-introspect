@@ -70,16 +70,6 @@ const assertHiddenDescendant = defineCompositeAssertion({
     name: 'assertHiddenDescendant'
 });
 
-function createCyclicIdObject(id: string): Record<PropertyKey, unknown> {
-    const value: Record<PropertyKey, unknown> = {};
-
-    Object.setPrototypeOf(value, null);
-    value.id = id;
-    value.self = value;
-
-    return value;
-}
-
 export const testNode = suite('React 19 special surfaces', [
     test('passes idPrefix through to React useId', function (scope) {
         const renderedIds: string[] = [];
@@ -138,20 +128,19 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('keeps unresolved generated ids and cuts cyclic props', function (scope) {
+    test('keeps unresolved generated ids', function (scope) {
         const generatedId = '_react-introspect-edge-r_0_';
         const normalized = normalizeSnapshotValue(
-            createCyclicIdObject(generatedId),
+            generatedId,
             createIdNormalizer({
                 generator() {
                     return undefined as never;
                 },
                 prefix: 'react-introspect-edge-'
             })
-        ) as Record<PropertyKey, unknown>;
+        );
 
-        scope.assert.equal(normalized.id, generatedId);
-        scope.assert.equal(normalized.self, '[Circular]');
+        scope.assert.equal(normalized, generatedId);
 
         return scope.assert.collect();
     }),

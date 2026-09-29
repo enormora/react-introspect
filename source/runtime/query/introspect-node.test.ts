@@ -1,5 +1,9 @@
 import { suite, test } from '@overkill-dev/test';
-import type { IntrospectionSnapshot, SnapshotNode } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import {
+    type IntrospectionSnapshot,
+    registerSnapshotNode,
+    type SnapshotNode
+} from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { createSnapshotQuery, type SnapshotReader } from './introspect-node.ts';
 
 type Count = {
@@ -16,7 +20,7 @@ type SnapshotNodeSeed = {
 };
 
 function createSnapshotNode(seed: SnapshotNodeSeed): SnapshotNode {
-    return {
+    return registerSnapshotNode({
         activityMode: undefined,
         caughtError: undefined,
         givenChildren: [],
@@ -32,7 +36,7 @@ function createSnapshotNode(seed: SnapshotNodeSeed): SnapshotNode {
         textContent: seed.textContent,
         type: seed.name,
         visibility: 'visible'
-    };
+    });
 }
 
 function createSnapshot(): IntrospectionSnapshot {
@@ -81,6 +85,14 @@ function createReader(snapshot: IntrospectionSnapshot, count: Count): SnapshotRe
     };
 }
 
+function createCyclicRecord(): Readonly<Record<string, unknown>> {
+    const cyclic: Record<string, unknown> = {};
+
+    cyclic.self = cyclic;
+
+    return cyclic;
+}
+
 function requireValue<Value>(value: Value | undefined): Value {
     if (value === undefined) {
         throw new Error('Expected value to exist.');
@@ -118,6 +130,43 @@ export const testNode = suite('introspection node', [
         scope.assert.equal(node.find('span')?.textContent, 'Save');
         scope.assert.deepEqual(node.pickProps([ 'title' ]), { title: 'Save' });
         scope.assert.deepEqual(node.omitProps([ 'onClick' ]), { title: 'Save' });
+
+        return scope.assert.collect();
+    }),
+    test('keeps prop values without snapshot nodes by reference', function (scope) {
+        const snapshot = createSnapshot();
+        const reader = createReader(snapshot, {
+            read() {
+                return 1;
+            }
+        });
+        const label = requireValue(snapshot.nodes[1]);
+        const config = { theme: 'dark' };
+        const cyclic = createCyclicRecord();
+        const props = { config, cyclic, slots: [ label, config ] };
+        const node = createSnapshotQuery(reader, snapshot).node(createSnapshotNode({
+            id: 3,
+            name: 'panel',
+            parentId: undefined,
+            props,
+            renderedChildren: [],
+            textContent: ''
+        }));
+        const slots = node.props.slots as readonly unknown[];
+
+        scope.assert.deepEqual({
+            config: node.props.config === config,
+            cyclic: node.props.cyclic === cyclic,
+            firstSlot: (slots[0] as { readonly name: string; }).name,
+            secondSlot: slots[1] === config,
+            slotsRebuilt: slots !== props.slots
+        }, {
+            config: true,
+            cyclic: true,
+            firstSlot: 'span',
+            secondSlot: true,
+            slotsRebuilt: true
+        });
 
         return scope.assert.collect();
     }),

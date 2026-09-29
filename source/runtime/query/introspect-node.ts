@@ -10,6 +10,7 @@ import {
     type SnapshotNode,
     type SnapshotProps
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import { type NestedReplacement, replaceNestedTargets } from '../../values/introspect-nested-replacement.ts';
 import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
 import { createIntrospectionList } from './introspect-list.ts';
 
@@ -148,37 +149,23 @@ function findSnapshotNode(snapshot: IntrospectionSnapshot, id: number): Snapshot
     });
 }
 
-function isPlainPropObject(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype;
-}
+function exposePropElements(
+    props: SnapshotProps,
+    createPropNode: (propNode: SnapshotNode) => RuntimeIntrospectionNode
+): SnapshotProps {
+    const replacement: NestedReplacement<SnapshotNode> = {
+        ancestors: new WeakSet(),
+        isTarget: isSnapshotNode,
+        replaceTarget: createPropNode
+    };
+    const exposed: Record<PropertyKey, unknown> = {};
 
-const propElementExposure = {
-    exposeProps(
-        props: SnapshotProps,
-        createPropNode: (propNode: SnapshotNode) => RuntimeIntrospectionNode
-    ): SnapshotProps {
-        const exposed: Record<PropertyKey, unknown> = {};
-
-        for (const key of Reflect.ownKeys(props)) {
-            exposed[key] = propElementExposure.exposeValue(props[key], createPropNode);
-        }
-
-        return Object.freeze(exposed);
-    },
-    exposeValue(value: unknown, createPropNode: (propNode: SnapshotNode) => RuntimeIntrospectionNode): unknown {
-        if (isSnapshotNode(value)) {
-            return createPropNode(value);
-        }
-
-        if (Array.isArray(value)) {
-            return Object.freeze(value.map(function exposeItem(item: unknown) {
-                return propElementExposure.exposeValue(item, createPropNode);
-            }));
-        }
-
-        return isPlainPropObject(value) ? propElementExposure.exposeProps(value, createPropNode) : value;
+    for (const key of Reflect.ownKeys(props)) {
+        exposed[key] = replaceNestedTargets(props[key], replacement, '');
     }
-};
+
+    return Object.freeze(exposed);
+}
 
 const exposedPropsBySnapshotNode = new WeakMap<SnapshotNode, SnapshotProps>();
 
@@ -195,7 +182,7 @@ function exposeSnapshotNode(
             return cachedProps;
         }
 
-        const exposedProps = propElementExposure.exposeProps(node.props, query.node);
+        const exposedProps = exposePropElements(node.props, query.node);
 
         exposedPropsBySnapshotNode.set(node, exposedProps);
 

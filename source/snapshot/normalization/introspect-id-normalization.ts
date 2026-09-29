@@ -1,17 +1,15 @@
 import React from 'react';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
-import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
+import { type NestedReplacement, replaceNestedTargets } from '../../values/introspect-nested-replacement.ts';
 
 export type IntrospectionIdNormalization = {
     readonly generator: ((generatedId: string) => string) | undefined;
     readonly prefix: string;
 };
 
-export type SnapshotElementDescriber = (
-    element: React.ReactElement<Readonly<Record<PropertyKey, unknown>>>,
-    location: string,
-    normalizeElementProps: () => Readonly<Record<PropertyKey, unknown>>
-) => unknown;
+type SnapshotElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
+
+export type SnapshotElementDescriber = (element: SnapshotElement, location: string) => unknown;
 
 export type SnapshotPropsNormalization = {
     readonly ancestors: WeakSet<WeakKey>;
@@ -26,12 +24,6 @@ type IdReplacementState = {
 };
 
 type IdReplacementMap = Map<string, string>;
-
-function isPlainObject(value: Readonly<Record<PropertyKey, unknown>>): boolean {
-    const prototype: unknown = Object.getPrototypeOf(value);
-
-    return prototype === Object.prototype || prototype === null;
-}
 
 function createReactIdPattern(prefix: string): RegExp {
     return new RegExp(`_${RegExp.escape(prefix)}[rR]_[0-9a-z]+(?:_[0-9a-z]+)*_`, 'gu');
@@ -51,98 +43,24 @@ function replaceGeneratedId(state: IdReplacementState, generatedId: string): str
     return replacement;
 }
 
-function isNormalizableSnapshotObject(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return isObjectOrFunction(value) && typeof value !== 'function' && isPlainObject(value);
+function isSupportedReactElement(value: unknown): value is SnapshotElement {
+    assertNotPortal(value);
+
+    return React.isValidElement<Readonly<Record<PropertyKey, unknown>>>(value);
 }
 
-function isCircularValue(value: unknown, state: SnapshotPropsNormalization): boolean {
-    return isObjectOrFunction(value) && state.ancestors.has(value);
+function toElementReplacement(normalization: SnapshotPropsNormalization): NestedReplacement<SnapshotElement> {
+    return {
+        ancestors: normalization.ancestors,
+        isTarget: isSupportedReactElement,
+        replaceTarget: normalization.describeElement
+    };
 }
 
-function normalizeCircularValue(): string {
-    return '[Circular]';
-}
-
-function childLocation(location: string, key: PropertyKey): string {
-    return location === '' ? String(key) : `${location}.${String(key)}`;
-}
-
-const snapshotValueNormalizer = {
-    normalizeArray(
-        value: readonly unknown[],
-        state: SnapshotPropsNormalization,
-        location: string
-    ): readonly unknown[] {
-        state.ancestors.add(value);
-
-        const normalized = Object.freeze(value.map(function normalizeArrayItem(item, index) {
-            return isCircularValue(item, state)
-                ? normalizeCircularValue()
-                : snapshotValueNormalizer.normalizeValue(item, state, childLocation(location, index));
-        }));
-
-        state.ancestors.delete(value);
-
-        return normalized;
-    },
-    normalizePlainObject(
-        value: Readonly<Record<PropertyKey, unknown>>,
-        state: SnapshotPropsNormalization,
-        location: string
-    ): Readonly<Record<PropertyKey, unknown>> {
-        const normalized: Record<PropertyKey, unknown> = {};
-
-        state.ancestors.add(value);
-
-        for (const key of Reflect.ownKeys(value)) {
-            const child: unknown = value[key];
-
-            normalized[key] = isCircularValue(child, state)
-                ? normalizeCircularValue()
-                : snapshotValueNormalizer.normalizeValue(child, state, childLocation(location, key));
-        }
-
-        state.ancestors.delete(value);
-
-        return Object.freeze(normalized);
-    },
-    normalizeValue(
-        value: unknown,
-        state: SnapshotPropsNormalization,
-        location: string
-    ): unknown {
-        if (typeof value === 'string') {
-            return state.normalizeIdString(value);
-        }
-
-        if (Array.isArray(value)) {
-            return snapshotValueNormalizer.normalizeArray(value, state, location);
-        }
-
-        assertNotPortal(value);
-
-        if (React.isValidElement<Readonly<Record<PropertyKey, unknown>>>(value)) {
-            return state.describeElement(value, location, function normalizeElementProps() {
-                return snapshotValueNormalizer.normalizePlainObject(value.props, state, location);
-            });
-        }
-
-        return isNormalizableSnapshotObject(value)
-            ? snapshotValueNormalizer.normalizePlainObject(value, state, location)
-            : value;
-    }
-};
-
-function describeElementAsPlainData(
-    element: React.ReactElement<Readonly<Record<PropertyKey, unknown>>>,
-    _location: string,
-    normalizeElementProps: () => Readonly<Record<PropertyKey, unknown>>
-): Readonly<Record<PropertyKey, unknown>> {
-    return Object.freeze({
-        key: element.key,
-        props: normalizeElementProps(),
-        type: element.type
-    });
+function normalizeSnapshotProp(value: unknown, normalization: SnapshotPropsNormalization, location: string): unknown {
+    return typeof value === 'string'
+        ? normalization.normalizeIdString(value)
+        : replaceNestedTargets(value, toElementReplacement(normalization), location);
 }
 
 export function createIdNormalizer(idNormalization: IntrospectionIdNormalization): (value: string) => string {
@@ -165,17 +83,27 @@ export function normalizeSnapshotProps(
     props: Readonly<Record<PropertyKey, unknown>>,
     normalization: SnapshotPropsNormalization
 ): Readonly<Record<PropertyKey, unknown>> {
-    return snapshotValueNormalizer.normalizePlainObject(props, normalization, '');
+    const normalized: Record<PropertyKey, unknown> = {};
+
+    for (const key of Reflect.ownKeys(props)) {
+        normalized[key] = normalizeSnapshotProp(props[key], normalization, String(key));
+    }
+
+    return Object.freeze(normalized);
 }
 
 export function normalizeSnapshotValue(value: unknown, normalizeIdString: (value: string) => string): unknown {
-    return snapshotValueNormalizer.normalizeValue(
-        value,
-        {
-            ancestors: new WeakSet(),
-            describeElement: describeElementAsPlainData,
-            normalizeIdString
+    const normalization: SnapshotPropsNormalization = {
+        ancestors: new WeakSet(),
+        describeElement(element, location) {
+            return Object.freeze({
+                key: element.key,
+                props: replaceNestedTargets(element.props, toElementReplacement(normalization), location),
+                type: element.type
+            });
         },
-        ''
-    );
+        normalizeIdString
+    };
+
+    return normalizeSnapshotProp(value, normalization, '');
 }
