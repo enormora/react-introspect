@@ -1,10 +1,9 @@
 import type React from 'react';
-import createReconciler, { type ReconcilerInstance, type ReconcilerRoot } from 'react-reconciler';
+import type { ReconcilerRoot } from 'react-reconciler';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
 import {
     createHostContainer,
-    createIntrospectionHostConfig,
     type IntrospectionHostContainer,
     validateContainerRefs
 } from '../host/introspect-host-tree.ts';
@@ -14,8 +13,12 @@ import {
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
-import { isObject } from '../../values/introspect-value-kinds.ts';
-import { createIntrospectionReconcilerRuntime } from './introspect-reconciler-runtime.ts';
+import {
+    createReconcilerContainer,
+    hasScheduledRootTask,
+    reconcilerRuntime,
+    renderer
+} from './introspect-react-root.ts';
 
 type WaiterFailure = { readonly error: unknown; readonly kind: 'failed'; };
 
@@ -54,29 +57,6 @@ export type IntrospectionReconcilerModule = {
 export type IntrospectionReconcilerModuleDependencies = {
     readonly runtime: IntrospectionRuntimeDependencies;
 };
-
-const reconcilerRuntime = createIntrospectionReconcilerRuntime();
-const renderer = createReconciler(createIntrospectionHostConfig(reconcilerRuntime));
-
-function createReconcilerContainer(
-    rendererInstance: ReconcilerInstance,
-    container: IntrospectionHostContainer,
-    diagnostics: IntrospectionDiagnostics,
-    strictMode: boolean
-): ReconcilerRoot {
-    return rendererInstance.createContainer(
-        container,
-        1,
-        null,
-        strictMode,
-        null,
-        container.idNormalization.prefix,
-        diagnostics.recordUncaughtError,
-        diagnostics.recordCaughtError,
-        diagnostics.recordRecoverableError,
-        null
-    );
-}
 
 type WaitOperation = 'waitForIdle' | 'waitForNextRender' | 'waitForRenderCount' | 'waitUntil';
 
@@ -217,12 +197,6 @@ function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => un
     });
 }
 
-function hasScheduledRootTask(root: ReconcilerRoot): boolean {
-    const task = root.callbackNode;
-
-    return isObject(task) && typeof task.callback === 'function';
-}
-
 async function flushMicrotasks(runtime: IntrospectionRuntimeDependencies): Promise<void> {
     await reconcilerRuntime.run(runtime, async function flushMicrotasksWithRuntime() {
         await runtime.microtasks.flush();
@@ -322,7 +296,7 @@ function createIntrospectionReconcilerSession(
         options.refs
     );
     const root = reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
-        return createReconcilerContainer(renderer, container, options.diagnostics, options.strictMode);
+        return createReconcilerContainer(container, options.diagnostics, options.strictMode);
     });
     const target: SessionRenderTarget = {
         container,
