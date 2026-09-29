@@ -1,5 +1,6 @@
 import type {
     IntrospectionError,
+    IntrospectionHiddenReason,
     IntrospectionNodeKind,
     IntrospectionNotRenderedReason
 } from '../../public/introspect-public-types.ts';
@@ -15,8 +16,6 @@ export type SnapshotProps = Readonly<Record<PropertyKey, unknown>>;
 export type SnapshotNodeKind = IntrospectionNodeKind;
 
 export type SnapshotVisibility = 'hidden' | 'visible';
-
-export type SnapshotHiddenCause = 'activity' | 'suspended';
 
 type SnapshotSourceVisibleNode = SnapshotSourceElement | SnapshotSourceEmpty;
 
@@ -57,7 +56,7 @@ export type SnapshotNode = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: readonly SnapshotNode[];
-    readonly hiddenBy: SnapshotHiddenCause | undefined;
+    readonly hiddenBy: IntrospectionHiddenReason | undefined;
     readonly id: number;
     readonly key: string | null;
     readonly kind: SnapshotNodeKind;

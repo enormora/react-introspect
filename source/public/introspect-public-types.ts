@@ -14,7 +14,7 @@ export type IntrospectionNodeState = {
     readonly rendered: boolean;
     readonly visible: boolean;
     readonly activityMode: 'hidden' | 'visible' | undefined;
-    readonly reason: IntrospectionNotRenderedReason | 'activity' | undefined;
+    readonly reason: IntrospectionHiddenReason | IntrospectionNotRenderedReason | undefined;
 };
 
 export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema> = {
@@ -37,6 +37,8 @@ export type IntrospectionHostSchema = Readonly<Record<never, unknown>>;
 export type IntrospectionNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';
 
 type IntrospectionComponentType = React.ExoticComponent<never> | React.JSXElementConstructor<never>;
+
+export type IntrospectionHiddenReason = 'activity' | 'suspended';
 
 export type IntrospectionNotRenderedReason = 'depth' | 'errored' | 'suspended' | 'unsupported';
 
