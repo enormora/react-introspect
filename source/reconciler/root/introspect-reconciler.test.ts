@@ -143,6 +143,10 @@ function ReadyPanel(): React.ReactNode {
     return React.createElement('span', null, 'ready');
 }
 
+function CrashesOnRender(): React.ReactNode {
+    throw new Error('render crashed');
+}
+
 function RendersNull(): React.ReactNode {
     return null;
 }
@@ -741,6 +745,23 @@ export const testNode = suite('custom reconciler host layer', [
             return scope.assert.collect();
         }
     ),
+    test('keeps counting renders after an uncaught render error', function (scope) {
+        const view = introspect(React.createElement(ReadyPanel), {
+            depth: 'full',
+            errorMode: 'capture',
+            strictMode: false
+        });
+        const renderCounts = [ view.renderCount ];
+
+        view.update(React.createElement(CrashesOnRender));
+        renderCounts.push(view.renderCount);
+        view.update(React.createElement(ReadyPanel));
+        renderCounts.push(view.renderCount);
+
+        scope.assert.deepEqual(renderCounts, [ 1, 2, 3 ]);
+
+        return scope.assert.collect();
+    }),
     test('routes scheduler hooks through injected runtime module', async function (scope) {
         const unitRuntime = createUnitRuntimeDependencies();
         const schedulerEvents: string[] = [];
