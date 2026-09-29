@@ -52,29 +52,30 @@ type SnapshotSourceText = {
     readonly hostVisibility: SnapshotVisibility;
 };
 
-type SnapshotRenderedVisible = {
-    readonly status: 'rendered';
+type SnapshotPlacedVisible = {
     readonly visibility: 'visible';
 };
 
-type SnapshotRenderedHidden = {
-    readonly status: 'rendered';
+type SnapshotPlacedHidden = {
     readonly visibility: 'hidden';
     readonly hiddenBy: IntrospectionHiddenReason;
 };
 
-type SnapshotBelowDepth = {
+export type SnapshotPlacement = SnapshotPlacedHidden | SnapshotPlacedVisible;
+
+type SnapshotRendered = SnapshotPlacement & {
+    readonly status: 'rendered';
+};
+
+type SnapshotBelowDepth = SnapshotPlacement & {
     readonly status: 'notRendered';
     readonly reason: 'depth';
-    readonly visibility: SnapshotVisibility;
 };
 
 type SnapshotUnsupported = {
     readonly status: 'notRendered';
     readonly reason: 'unsupported';
 };
-
-export type SnapshotRendered = SnapshotRenderedHidden | SnapshotRenderedVisible;
 
 export type SnapshotNotRendered = SnapshotBelowDepth | SnapshotUnsupported;
 

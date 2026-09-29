@@ -23,9 +23,9 @@ import {
     registerSnapshotNode,
     type SnapshotNode,
     type SnapshotNotRendered,
+    type SnapshotPlacement,
     type SnapshotProps,
     type SnapshotRender,
-    type SnapshotRendered,
     type SnapshotSourceElement,
     type SnapshotSourceNode,
     type SnapshotVisibility
@@ -97,17 +97,15 @@ function hiddenByFromSource(
     return activityMode === 'hidden' ? 'activity' : undefined;
 }
 
-function renderedFromSource(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotRendered {
-    return hiddenBy === undefined
-        ? { status: 'rendered', visibility: 'visible' }
-        : { hiddenBy, status: 'rendered', visibility: 'hidden' };
+function placementFromSource(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotPlacement {
+    return hiddenBy === undefined ? { visibility: 'visible' } : { hiddenBy, visibility: 'hidden' };
 }
 
 const notRenderedFromSource: Readonly<
     Record<IntrospectionNotRenderedReason, (hiddenBy: IntrospectionHiddenReason | undefined) => SnapshotNotRendered>
 > = {
     depth(hiddenBy) {
-        return { reason: 'depth', status: 'notRendered', visibility: renderedFromSource(hiddenBy).visibility };
+        return { ...placementFromSource(hiddenBy), reason: 'depth', status: 'notRendered' };
     },
     unsupported() {
         return { reason: 'unsupported', status: 'notRendered' };
@@ -119,7 +117,7 @@ function renderFromSource(
     hiddenBy: IntrospectionHiddenReason | undefined
 ): SnapshotRender {
     return renderedReason === undefined
-        ? renderedFromSource(hiddenBy)
+        ? { ...placementFromSource(hiddenBy), status: 'rendered' }
         : notRenderedFromSource[renderedReason](hiddenBy);
 }
 
