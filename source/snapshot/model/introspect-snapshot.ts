@@ -3,7 +3,8 @@ import {
     createIdNormalizer,
     normalizeSnapshotProps,
     normalizeSnapshotValue,
-    type IntrospectionIdNormalization
+    type IntrospectionIdNormalization,
+    type SnapshotElementDescriber
 } from '../normalization/introspect-id-normalization.ts';
 import {
     freezePropsWithoutChildren,
@@ -27,7 +28,7 @@ type SnapshotNodeDescription = Pick<SnapshotNode, Exclude<keyof SnapshotNode, 'i
 
 type SnapshotBuilder = {
     readonly normalizeIdString: (value: string) => string;
-    readonly valueAncestors: WeakSet<WeakKey>;
+    readonly normalizeProps: (props: SnapshotProps, describeElement: SnapshotElementDescriber) => SnapshotProps;
     readonly createNode: (describe: (id: number) => SnapshotNodeDescription) => SnapshotNode;
     readonly readNodes: () => readonly SnapshotNode[];
 };
@@ -91,6 +92,7 @@ function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boole
 
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
     const nodes: SnapshotNode[] = [];
+    const valueAncestors = new WeakSet();
     let nextId = 0;
 
     return {
@@ -109,7 +111,9 @@ function createSnapshotBuilder(normalizeIdString: (value: string) => string): Sn
         readNodes() {
             return Object.freeze(nodes.slice());
         },
-        valueAncestors: new WeakSet()
+        normalizeProps(props, describeElement) {
+            return normalizeSnapshotProps(props, { ancestors: valueAncestors, describeElement, normalizeIdString });
+        }
     };
 }
 
@@ -278,20 +282,16 @@ const snapshotOperations = {
         });
     },
     createPropsSnapshot(request: PropsSnapshotRequest): SnapshotProps {
-        return normalizeSnapshotProps(request.props, {
-            ancestors: request.build.valueAncestors,
-            describeElement(element, location) {
-                return snapshotOperations.createSourceElementSnapshotNode({
-                    build: request.build,
-                    element: toSourceElement(element),
-                    index: location,
-                    inheritedVisibility: request.inheritedVisibility,
-                    node: element,
-                    parentId: request.ownerId,
-                    parentPath: request.ownerPath
-                });
-            },
-            normalizeIdString: request.build.normalizeIdString
+        return request.build.normalizeProps(request.props, function describeElement(element, location) {
+            return snapshotOperations.createSourceElementSnapshotNode({
+                build: request.build,
+                element: toSourceElement(element),
+                index: location,
+                inheritedVisibility: request.inheritedVisibility,
+                node: element,
+                parentId: request.ownerId,
+                parentPath: request.ownerPath
+            });
         });
     },
     createSourceElementGivenChildren(request: SourceElementChildrenRequest): readonly SnapshotNode[] {

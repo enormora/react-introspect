@@ -7,7 +7,7 @@ export type IntrospectionIdNormalization = {
     readonly prefix: string;
 };
 
-type SnapshotElementDescriber = (
+export type SnapshotElementDescriber = (
     element: React.ReactElement<Readonly<Record<PropertyKey, unknown>>>,
     location: string,
     normalizeElementProps: () => Readonly<Record<PropertyKey, unknown>>
