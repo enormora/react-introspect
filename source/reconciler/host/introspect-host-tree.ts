@@ -34,8 +34,8 @@ type IntrospectionChildStore = {
 };
 
 export type IntrospectionHostContainer = {
-    readonly readIdNormalization: () => IntrospectionIdNormalization;
-    readonly readRefs: () => IntrospectionRefs | undefined;
+    readonly idNormalization: IntrospectionIdNormalization;
+    readonly refs: IntrospectionRefs | undefined;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
     readonly readMounted: () => boolean;
@@ -213,17 +213,13 @@ export function createHostContainer(
 
     return {
         ...createChildStore(),
+        idNormalization,
         publish,
-        readIdNormalization() {
-            return idNormalization;
-        },
         readMounted() {
             return mounted;
         },
         readNextRenderCount,
-        readRefs() {
-            return refs;
-        },
+        refs,
         writeMounted(nextMounted: boolean) {
             mounted = nextMounted;
         }
@@ -287,7 +283,7 @@ function getChildHostContext(context: IntrospectionHostContext): IntrospectionHo
 }
 
 function getRootHostContext(container: IntrospectionHostContainer): IntrospectionHostContext {
-    return { refs: container.readRefs() };
+    return { refs: container.refs };
 }
 
 function insertBefore(
@@ -311,7 +307,7 @@ function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapsho
     return createIntrospectionSnapshotFromSource(
         container.readChildren().map(toSourceNode),
         container.readNextRenderCount(),
-        container.readIdNormalization()
+        container.idNormalization
     );
 }
 
@@ -325,7 +321,7 @@ function unhideHostChild(child: IntrospectionHostChild): void {
 
 export function validateContainerRefs(container: IntrospectionHostContainer): void {
     validateIntrospectionRefs(
-        container.readRefs(),
+        container.refs,
         container.readChildren().flatMap(collectRefTargets)
     );
 }

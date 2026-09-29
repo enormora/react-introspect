@@ -70,7 +70,7 @@ function createReconcilerContainer(
         null,
         strictMode,
         null,
-        container.readIdNormalization().prefix,
+        container.idNormalization.prefix,
         diagnostics.recordUncaughtError,
         diagnostics.recordCaughtError,
         diagnostics.recordRecoverableError,
