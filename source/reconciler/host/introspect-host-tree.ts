@@ -1,5 +1,4 @@
 import {
-    isInternalHostType,
     readHostKey,
     readInternalHost,
     readPublicHostProps
@@ -98,7 +97,7 @@ function resolvePublicInstance(
     type: string,
     props: IntrospectionHostProps
 ): unknown {
-    if (isInternalHostType(type)) {
+    if (readInternalHost(type, props).kind !== 'host') {
         return null;
     }
 
@@ -112,7 +111,7 @@ function collectRefTargets(child: IntrospectionHostChild): readonly Introspectio
 
     const childTargets = child.readChildren().flatMap(collectRefTargets);
 
-    if (isInternalHostType(child.type)) {
+    if (readInternalHost(child.type, child.readProps()).kind !== 'host') {
         return childTargets;
     }
 
