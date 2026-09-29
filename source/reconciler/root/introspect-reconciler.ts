@@ -1,11 +1,7 @@
 import type React from 'react';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
-import {
-    createHostContainer,
-    type IntrospectionHostContainer,
-    validateContainerRefs
-} from '../host/introspect-host-tree.ts';
+import { createHostContainer, type IntrospectionHostContainerControl } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
 import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
@@ -56,16 +52,15 @@ type IntrospectionReconcilerSession = {
 };
 
 type SessionRenderTarget = {
-    readonly container: IntrospectionHostContainer;
+    readonly container: IntrospectionHostContainerControl;
     readonly diagnostics: IntrospectionDiagnostics;
-    readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readRenderCount: () => number;
 };
 
 function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
     const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
 
-    target.publish(target.container.discard(errorRenderCount));
+    target.container.discard(errorRenderCount);
 }
 
 function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
@@ -106,7 +101,7 @@ function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, co
         return;
     }
 
-    validateContainerRefs(target.container);
+    target.container.validateRefs();
     captureMissingInitialCommit(target, renderCountBefore);
 }
 
@@ -135,7 +130,6 @@ function createIntrospectionReconcilerSession(
     const target: SessionRenderTarget = {
         container,
         diagnostics: options.diagnostics,
-        publish: options.publish,
         readRenderCount() {
             return renderCount;
         }

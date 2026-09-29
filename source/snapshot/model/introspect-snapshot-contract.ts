@@ -24,57 +24,58 @@ export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | Sna
 export type SnapshotSourceElement = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly kind: 'element';
-    readonly children: readonly SnapshotSourceNode[];
+    readonly renderedChildren: readonly SnapshotSourceNode[] | 'given';
     readonly caughtError: IntrospectionError | undefined;
     readonly key: string | null;
     readonly props: SnapshotProps;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly type: unknown;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
     readonly givenChildren: readonly SnapshotSourceNode[];
 };
 
 type SnapshotSourceEmpty = {
     readonly kind: 'empty';
     readonly value: unknown;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
 };
 
 type SnapshotSourceOpaque = {
     readonly kind: 'opaque';
     readonly value: unknown;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
 };
 
 type SnapshotSourceText = {
     readonly kind: 'text';
     readonly value: bigint | number | string;
-    readonly visibility: SnapshotVisibility;
+    readonly hostVisibility: SnapshotVisibility;
 };
 
-type SnapshotRenderedVisible = {
-    readonly status: 'rendered';
+type SnapshotPlacedVisible = {
     readonly visibility: 'visible';
 };
 
-type SnapshotRenderedHidden = {
-    readonly status: 'rendered';
+type SnapshotPlacedHidden = {
     readonly visibility: 'hidden';
     readonly hiddenBy: IntrospectionHiddenReason;
 };
 
-type SnapshotBelowDepth = {
+export type SnapshotPlacement = SnapshotPlacedHidden | SnapshotPlacedVisible;
+
+type SnapshotRendered = SnapshotPlacement & {
+    readonly status: 'rendered';
+};
+
+type SnapshotBelowDepth = SnapshotPlacement & {
     readonly status: 'notRendered';
     readonly reason: 'depth';
-    readonly visibility: SnapshotVisibility;
 };
 
 type SnapshotUnsupported = {
     readonly status: 'notRendered';
     readonly reason: 'unsupported';
 };
-
-export type SnapshotRendered = SnapshotRenderedHidden | SnapshotRenderedVisible;
 
 export type SnapshotNotRendered = SnapshotBelowDepth | SnapshotUnsupported;
 

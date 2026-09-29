@@ -9,7 +9,7 @@ import {
     elementKeyProps
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
-import { isClassComponent, readClassFrameType } from './introspect-class-frame.ts';
+import { readClassFrameType } from './introspect-class-frame.ts';
 import {
     type IntrospectionElement,
     type IntrospectionTransformedNode,
@@ -63,7 +63,7 @@ function executeWrappedElement(
         return executeWrappedElement(elementKind.inner, props, ref);
     }
 
-    if (elementKind.kind === 'function' && !isClassComponent(elementKind.component)) {
+    if (elementKind.kind === 'function') {
         return elementKind.component(props);
     }
 
@@ -168,13 +168,15 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
 }
 
 function createFrameElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    if (isClassComponent(element.type)) {
-        return React.createElement(readClassFrameType(element.type), {
+    const elementKind = classifyElementType(element.type);
+
+    if (elementKind.kind === 'class') {
+        return React.createElement(readClassFrameType(elementKind.component), {
             depth,
             element,
             key: element.key ?? undefined,
             renderChildren: transformNode,
-            type: element.type
+            type: elementKind.component
         });
     }
 
@@ -218,6 +220,7 @@ const elementTransforms: Readonly<
     >
 > = {
     activity: transformActivityElement,
+    class: transformComponentElement,
     context: transformRenderableElement,
     forwardRef: transformComponentElement,
     fragment: transformFragmentElement,

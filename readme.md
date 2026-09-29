@@ -367,7 +367,7 @@ assert.equal(button.name, 'Button');
 assert.equal(button.key, 'primary');
 ```
 
-Names follow React's warnings: a `displayName` wins, `memo` components take the wrapped component's name, and `forwardRef` components are named `ForwardRef(Render)`.
+Names follow React's warnings: a `displayName` wins, `memo` components take the wrapped component's name (or `Memo`), `lazy` components take the name of the component they resolved to (or `Component` until it has loaded), and `forwardRef` components are named `ForwardRef(Render)`.
 
 ### `node.kind`
 

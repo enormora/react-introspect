@@ -1,4 +1,5 @@
 import React from 'react';
+import { type IntrospectionClassComponent, isClassComponent } from './introspect-class-component.ts';
 import { isObjectOrFunction } from './introspect-value-kinds.ts';
 
 type PropsRecord = Readonly<Record<PropertyKey, unknown>>;
@@ -15,15 +16,17 @@ type ForwardRefKind = {
     readonly render: ForwardRefRender;
 };
 
+type ClassKind = { readonly kind: 'class'; readonly component: IntrospectionClassComponent; };
+
 type FunctionKind = { readonly kind: 'function'; readonly component: FunctionComponentType; };
 
 type HostKind = { readonly kind: 'host'; readonly name: string; };
 
-type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; };
+type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; readonly resolved: unknown; };
 
 type MemoKind = { readonly kind: 'memo'; readonly displayName: string | undefined; readonly inner: unknown; };
 
-export type ReactElementKind = ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
+export type ReactElementKind = ClassKind | ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
 
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
@@ -68,6 +71,20 @@ function readForwardRefKind(type: unknown): ReactElementKind | undefined {
     return isForwardRefRender(render) ? { displayName: readDisplayName(type), kind: 'forwardRef', render } : undefined;
 }
 
+const lazyStatusKey = '_status';
+const lazyResultKey = '_result';
+const resolvedLazyStatus = 1;
+
+function readResolvedLazyType(payload: unknown): unknown {
+    if (!isObjectOrFunction(payload) || payload[lazyStatusKey] !== resolvedLazyStatus) {
+        return undefined;
+    }
+
+    const moduleObject = payload[lazyResultKey];
+
+    return isObjectOrFunction(moduleObject) ? moduleObject.default : undefined;
+}
+
 function readLazyKind(type: unknown): ReactElementKind | undefined {
     const isLazy = hasReactType(type, lazyType) &&
         Object.hasOwn(type, lazyInitializerKey) &&
@@ -89,7 +106,8 @@ function readLazyKind(type: unknown): ReactElementKind | undefined {
 
             return resolved;
         },
-        kind: 'lazy'
+        kind: 'lazy',
+        resolved: readResolvedLazyType(Reflect.get(type, lazyPayloadKey))
     };
 }
 
@@ -118,6 +136,10 @@ function readContextKind(type: unknown): ReactElementKind | undefined {
 }
 
 function readComponentKind(type: unknown): ReactElementKind {
+    if (isClassComponent(type)) {
+        return { component: type, kind: 'class' };
+    }
+
     return isFunctionComponentType(type) ? { component: type, kind: 'function' } : { kind: 'other' };
 }
 

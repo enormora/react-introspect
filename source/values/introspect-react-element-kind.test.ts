@@ -6,6 +6,12 @@ function Label(): React.ReactNode {
     return null;
 }
 
+const LabelClass = class extends React.Component<React.PropsWithChildren> {
+    public override render(): React.ReactNode {
+        return this.props.children;
+    }
+};
+
 function readKind(type: unknown): string {
     return classifyElementType(type).kind;
 }
@@ -30,6 +36,7 @@ export const testNode = suite('React element kinds', [
                 MemoLabel,
                 ForwardLabel,
                 LazyLabel,
+                LabelClass,
                 Label,
                 Symbol.for('react.unknown')
             ]
@@ -44,6 +51,7 @@ export const testNode = suite('React element kinds', [
                 'memo',
                 'forwardRef',
                 'lazy',
+                'class',
                 'function',
                 'other'
             ]

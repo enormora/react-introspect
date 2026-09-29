@@ -11,25 +11,24 @@ import {
     type SnapshotElementDescriber
 } from '../normalization/introspect-id-normalization.ts';
 import {
-    freezePublicElementProps,
     getElementKind,
     getIndexedPath,
     getTextContent,
     getTypeName
 } from '../shape/introspect-snapshot-shape.ts';
-import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kinds.ts';
 import {
     type IntrospectionSnapshot,
     registerSnapshotNode,
     type SnapshotNode,
     type SnapshotNotRendered,
+    type SnapshotPlacement,
     type SnapshotProps,
     type SnapshotRender,
-    type SnapshotRendered,
     type SnapshotSourceElement,
     type SnapshotSourceNode,
     type SnapshotVisibility
 } from './introspect-snapshot-contract.ts';
+import { toSourceElement } from './introspect-snapshot-source-mapping.ts';
 
 type SnapshotNodeDescription = Pick<SnapshotNode, Exclude<keyof SnapshotNode, 'id'>>;
 
@@ -97,17 +96,15 @@ function hiddenByFromSource(
     return activityMode === 'hidden' ? 'activity' : undefined;
 }
 
-function renderedFromSource(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotRendered {
-    return hiddenBy === undefined
-        ? { status: 'rendered', visibility: 'visible' }
-        : { hiddenBy, status: 'rendered', visibility: 'hidden' };
+function placementFromSource(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotPlacement {
+    return hiddenBy === undefined ? { visibility: 'visible' } : { hiddenBy, visibility: 'hidden' };
 }
 
 const notRenderedFromSource: Readonly<
     Record<IntrospectionNotRenderedReason, (hiddenBy: IntrospectionHiddenReason | undefined) => SnapshotNotRendered>
 > = {
     depth(hiddenBy) {
-        return { reason: 'depth', status: 'notRendered', visibility: renderedFromSource(hiddenBy).visibility };
+        return { ...placementFromSource(hiddenBy), reason: 'depth', status: 'notRendered' };
     },
     unsupported() {
         return { reason: 'unsupported', status: 'notRendered' };
@@ -119,12 +116,8 @@ function renderFromSource(
     hiddenBy: IntrospectionHiddenReason | undefined
 ): SnapshotRender {
     return renderedReason === undefined
-        ? renderedFromSource(hiddenBy)
+        ? { ...placementFromSource(hiddenBy), status: 'rendered' }
         : notRenderedFromSource[renderedReason](hiddenBy);
-}
-
-function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
-    return element.givenChildren === element.children;
 }
 
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
@@ -154,114 +147,65 @@ function createSnapshotBuilder(normalizeIdString: (value: string) => string): Sn
     };
 }
 
-function flattenReactNodes(children: unknown): readonly unknown[] {
-    if (Array.isArray(children)) {
-        return children.flatMap(flattenReactNodes);
-    }
+type SnapshotLeafKind = Exclude<SnapshotSourceNode['kind'], 'element'>;
 
-    if (isIterable(children) && !React.isValidElement(children)) {
-        return Array.from(children).flatMap(flattenReactNodes);
-    }
-
-    return [ children ];
-}
-
-function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSourceElement {
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- React values map to source nodes recursively
-    const children = toSnapshotSourceNodes(element.props.children);
-
-    return {
-        activityMode: undefined,
-        caughtError: undefined,
-        children,
-        givenChildren: children,
-        key: element.key ?? null,
-        kind: 'element',
-        props: freezePublicElementProps(element.props),
-        renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
-        type: element.type,
-        visibility: 'visible'
-    };
-}
-
-function toSourceNode(node: unknown): SnapshotSourceNode {
-    if (isEmptyReactNode(node)) {
-        return { kind: 'empty', value: node, visibility: 'visible' };
-    }
-
-    if (typeof node === 'string' || typeof node === 'number' || typeof node === 'bigint') {
-        return { kind: 'text', value: node, visibility: 'visible' };
-    }
-
-    return React.isValidElement<SnapshotProps>(node)
-        ? toSourceElement(node)
-        : { kind: 'opaque', value: node, visibility: 'visible' };
-}
-
-export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourceNode[] {
-    return Object.freeze(flattenReactNodes(children).map(toSourceNode));
-}
-
-type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'textContent' | 'type'> & {
+type SnapshotLeafDescription = {
+    readonly name: string;
+    readonly readTextContent: (request: LeafNodeRequest) => string;
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+    readonly type: string;
 };
 
-function pushLeafSnapshotNode(request: LeafNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
-    const { renderedReason, ...leafShape } = leaf;
+function readNoTextContent(): string {
+    return '';
+}
+
+const snapshotLeafDescriptions: Readonly<Record<SnapshotLeafKind, SnapshotLeafDescription>> = {
+    empty: {
+        name: '#empty',
+        readTextContent: readNoTextContent,
+        renderedReason: undefined,
+        type: '#empty'
+    },
+    opaque: {
+        name: 'Opaque',
+        readTextContent: readNoTextContent,
+        renderedReason: 'unsupported',
+        type: 'opaque'
+    },
+    text: {
+        name: '#text',
+        readTextContent(request) {
+            return request.build.normalizeIdString(String(request.value));
+        },
+        renderedReason: undefined,
+        type: '#text'
+    }
+};
+
+function createLeafSnapshotNode(kind: SnapshotLeafKind, request: LeafNodeRequest): SnapshotNode {
+    const description = snapshotLeafDescriptions[kind];
 
     return request.build.createNode(function describeLeafNode() {
         return {
-            ...leafShape,
             activityMode: undefined,
             caughtError: undefined,
             givenChildren: Object.freeze([]),
             key: null,
+            kind,
+            name: description.name,
             parentId: request.parentId,
-            path: getIndexedPath(request.parentPath, request.index, leaf.name),
+            path: getIndexedPath(request.parentPath, request.index, description.name),
             props: Object.freeze({
                 value: normalizeSnapshotValue(request.value, request.build.normalizeIdString)
             }),
-            render: renderFromSource(renderedReason, request.inheritedHiddenBy),
-            renderedChildren: Object.freeze([])
+            render: renderFromSource(description.renderedReason, request.inheritedHiddenBy),
+            renderedChildren: Object.freeze([]),
+            textContent: description.readTextContent(request),
+            type: description.type
         };
     });
 }
-
-function createEmptySnapshotNode(request: LeafNodeRequest): SnapshotNode {
-    return pushLeafSnapshotNode(request, {
-        kind: 'empty',
-        name: '#empty',
-        renderedReason: undefined,
-        textContent: '',
-        type: '#empty'
-    });
-}
-
-function createOpaqueSnapshotNode(request: LeafNodeRequest): SnapshotNode {
-    return pushLeafSnapshotNode(request, {
-        kind: 'opaque',
-        name: 'Opaque',
-        renderedReason: 'unsupported',
-        textContent: '',
-        type: 'opaque'
-    });
-}
-
-function createTextSnapshotNode(request: LeafNodeRequest): SnapshotNode {
-    return pushLeafSnapshotNode(request, {
-        kind: 'text',
-        name: '#text',
-        renderedReason: undefined,
-        textContent: request.build.normalizeIdString(String(request.value)),
-        type: '#text'
-    });
-}
-
-const sourceLeafSnapshotFactories = {
-    empty: createEmptySnapshotNode,
-    opaque: createOpaqueSnapshotNode,
-    text: createTextSnapshotNode
-};
 
 const snapshotOperations = {
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
@@ -270,7 +214,7 @@ const snapshotOperations = {
             const path = getIndexedPath(request.parentPath, request.index, name);
             const hiddenBy = hiddenByFromSource(
                 request.inheritedHiddenBy,
-                request.element.visibility,
+                request.element.hostVisibility,
                 request.element.activityMode
             );
             const childPlacement = {
@@ -335,13 +279,15 @@ const snapshotOperations = {
             return Object.freeze([]);
         }
 
-        if (sourceElementSharesGivenChildren(request.element)) {
+        const { renderedChildren } = request.element;
+
+        if (renderedChildren === 'given') {
             return request.givenChildren;
         }
 
         return snapshotOperations.createSourceChildSnapshots({
             build: request.build,
-            children: request.element.children,
+            children: renderedChildren,
             inheritedHiddenBy: request.inheritedHiddenBy,
             parentId: request.parentId,
             parentPath: request.parentPath
@@ -361,9 +307,9 @@ const snapshotOperations = {
             return snapshotOperations.createSourceElementSnapshotNode({ ...placement, element: node });
         }
 
-        return sourceLeafSnapshotFactories[node.kind]({
+        return createLeafSnapshotNode(node.kind, {
             ...placement,
-            inheritedHiddenBy: hiddenByFromSource(placement.inheritedHiddenBy, node.visibility, undefined),
+            inheritedHiddenBy: hiddenByFromSource(placement.inheritedHiddenBy, node.hostVisibility, undefined),
             value: node.value
         });
     }
@@ -379,15 +325,15 @@ export function createIntrospectionSnapshotFromSource(
             [
                 {
                     activityMode: undefined,
-                    children,
                     caughtError: undefined,
                     givenChildren: [],
                     kind: 'element',
                     key: null,
                     props: {},
+                    renderedChildren: children,
                     renderedReason: undefined,
                     type: React.Fragment,
-                    visibility: 'visible'
+                    hostVisibility: 'visible'
                 }
             ],
             renderCount,

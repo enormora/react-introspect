@@ -1,5 +1,10 @@
 import React from 'react';
 import { createDiagnosticRecord } from '../../diagnostics/introspect-diagnostics.ts';
+import type {
+    IntrospectionClassComponent,
+    IntrospectionClassInstance,
+    IntrospectionClassUpdater
+} from '../../values/introspect-class-component.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
@@ -22,50 +27,6 @@ export type IntrospectionClassFrameProps = {
     readonly type: IntrospectionClassComponent;
 };
 
-type IntrospectionClassComponent = {
-    readonly getDerivedStateFromError?: (error: unknown) => unknown;
-    readonly getDerivedStateFromProps?: (
-        props: Readonly<Record<PropertyKey, unknown>>,
-        state: unknown
-    ) => unknown;
-    readonly prototype: {
-        readonly componentDidCatch?: (error: unknown, errorInfo: unknown) => void;
-        readonly isReactComponent?: unknown;
-    };
-    new (
-        props: Readonly<Record<PropertyKey, unknown>>,
-        context: unknown
-    ): IntrospectionClassInstance;
-};
-
-type IntrospectionClassUpdater = {
-    readonly enqueueForceUpdate: (
-        instance: unknown,
-        callback: (() => void) | undefined
-    ) => void;
-    readonly enqueueSetState: (
-        instance: unknown,
-        state: unknown,
-        callback: (() => void) | undefined
-    ) => void;
-};
-
-type IntrospectionClassInstance = React.Component<Readonly<Record<PropertyKey, unknown>>, unknown> & {
-    readonly componentDidCatch?: (error: unknown, errorInfo: unknown) => void;
-    readonly componentDidMount?: () => void;
-    readonly componentDidUpdate?: (props: unknown, state: unknown, snapshot: unknown) => void;
-    readonly componentWillUnmount?: () => void;
-    readonly context: unknown;
-    readonly getSnapshotBeforeUpdate?: (props: unknown, state: unknown) => unknown;
-    readonly isPureReactComponent?: boolean;
-    readonly props: Readonly<Record<PropertyKey, unknown>>;
-    readonly refs: Readonly<Record<PropertyKey, unknown>>;
-    readonly render: () => React.ReactNode;
-    readonly shouldComponentUpdate?: (props: unknown, state: unknown, context: unknown) => boolean;
-    readonly state: unknown;
-    readonly updater: IntrospectionClassUpdater;
-};
-
 type IntrospectionCaughtError = {
     readonly cause: unknown;
     readonly phase: 'awaitingRecovery' | 'recovered' | 'unfolded';
@@ -73,6 +34,7 @@ type IntrospectionCaughtError = {
 
 type IntrospectionClassFrameState = {
     readonly caught: IntrospectionCaughtError | undefined;
+    readonly isCapturing: boolean;
     readonly userState: unknown;
 };
 
@@ -92,14 +54,8 @@ type IntrospectionClassRender = {
 type IntrospectionClassRenderPass = {
     readonly next: IntrospectionClassRender;
     readonly previous: IntrospectionClassRender | undefined;
-    readonly shouldCommit: boolean;
+    readonly shouldUpdate: boolean;
 };
-
-export function isClassComponent(value: unknown): value is IntrospectionClassComponent {
-    const prototype: unknown = typeof value === 'function' ? Reflect.get(value, 'prototype') : undefined;
-
-    return isObjectOrFunction(prototype) && prototype.isReactComponent !== undefined;
-}
 
 function isErrorBoundary(type: IntrospectionClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
@@ -184,6 +140,7 @@ function foldBoundaryError(
 
     if (typeof type.getDerivedStateFromError === 'function') {
         return {
+            ...state,
             caught: { cause: caught.cause, phase: 'recovered' },
             userState: mergeState(state.userState, type.getDerivedStateFromError(caught.cause))
         };
@@ -239,6 +196,7 @@ const IntrospectionClassFrameBase = class
         this.shouldForceRender = false;
         this.state = {
             caught: undefined,
+            isCapturing: false,
             userState: instance.state
         };
         this.userInstance = instance;
@@ -252,6 +210,7 @@ const IntrospectionClassFrameBase = class
 
         return {
             ...foldedState,
+            isCapturing: state.caught?.phase === 'unfolded',
             userState: readDerivedState(props.type, props.element.props, foldedState.userState)
         };
     }
@@ -289,7 +248,7 @@ const IntrospectionClassFrameBase = class
         this.commitRenderPass();
         applyElementRef(readElementRef(this.props.element), this.userInstance);
 
-        if (renderPass?.shouldCommit === true && renderPass.previous !== undefined) {
+        if (renderPass?.shouldUpdate === true && renderPass.previous !== undefined) {
             this.userInstance.componentDidUpdate?.(renderPass.previous.props, renderPass.previous.state, snapshot);
         }
     }
@@ -297,7 +256,7 @@ const IntrospectionClassFrameBase = class
     public override getSnapshotBeforeUpdate(): unknown {
         const { renderPass } = this;
 
-        if (renderPass?.shouldCommit !== true || renderPass.previous === undefined) {
+        if (renderPass?.shouldUpdate !== true || renderPass.previous === undefined) {
             return null;
         }
 
@@ -347,19 +306,19 @@ const IntrospectionClassFrameBase = class
             assignClassField(this.userInstance, 'state', previous.state);
         }
 
-        const shouldCommit = previous === undefined || this.shouldRender(previous, props, state);
+        const shouldUpdate = previous === undefined || this.shouldRender(previous, props, state);
 
         assignClassField(this.userInstance, 'props', props);
         assignClassField(this.userInstance, 'state', state);
 
         return {
             next: {
-                node: shouldCommit ? this.renderUserOutput() : previous.node,
+                node: shouldUpdate || this.state.isCapturing ? this.renderUserOutput() : previous.node,
                 props,
                 state
             },
             previous,
-            shouldCommit
+            shouldUpdate
         };
     }
 

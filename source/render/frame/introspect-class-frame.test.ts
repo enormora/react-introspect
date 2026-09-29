@@ -325,6 +325,32 @@ const Boundary = class extends React.Component<BoundaryProps, BoundaryState> {
     }
 };
 
+const PropsGatedBoundary = class extends Boundary {
+    public override shouldComponentUpdate(nextProps: BoundaryProps): boolean {
+        this.props.recorder.push('shouldComponentUpdate');
+
+        return nextProps.children !== this.props.children;
+    }
+
+    public override componentDidUpdate(): void {
+        this.props.recorder.push('componentDidUpdate');
+    }
+};
+
+function ThrowsOnClick(): React.ReactNode {
+    const [ armed, setArmed ] = React.useState(false);
+
+    if (armed) {
+        throw new Error('clicked into a crash');
+    }
+
+    return React.createElement('button', {
+        onClick() {
+            setArmed(true);
+        }
+    }, 'arm');
+}
+
 const PrimitiveBoundary = class extends React.Component<BoundaryProps, unknown> {
     public static getDerivedStateFromError(): string {
         return 'failed';
@@ -572,6 +598,34 @@ export const testNode = suite('class components and error boundaries', [
         scope.assert.deepEqual(view.caughtErrors.map(readErrorMessage), [ 'boom' ]);
         scope.assert.equal(view.root?.caughtError?.message, 'boom');
         scope.assert.equal(view.find('span')?.textContent, 'catch fallback');
+
+        return scope.assert.collect();
+    }),
+    test('renders the boundary fallback even when shouldComponentUpdate declines the capture render', function (scope) {
+        const recorder = createRecorder();
+        const view = introspect(
+            React.createElement(PropsGatedBoundary, { recorder }, React.createElement(ThrowsOnClick)),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false,
+                warningMode: 'capture'
+            }
+        );
+
+        requireValue(view.find('button')).sendEvent('click');
+
+        scope.assert.equal(view.find('span')?.textContent, 'fallback');
+        scope.assert.undefined(view.find('button'));
+        scope.assert.deepEqual({
+            askedShouldComponentUpdate: recorder.entries.includes('shouldComponentUpdate'),
+            caught: recorder.entries.includes('clicked into a crash'),
+            ranComponentDidUpdate: recorder.entries.includes('componentDidUpdate')
+        }, {
+            askedShouldComponentUpdate: true,
+            caught: true,
+            ranComponentDidUpdate: false
+        });
 
         return scope.assert.collect();
     }),

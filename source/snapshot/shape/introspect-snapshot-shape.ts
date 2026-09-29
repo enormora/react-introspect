@@ -19,7 +19,7 @@ type ElementKindByName = {
 };
 
 type TypeNamers = {
-    readonly [Name in keyof ElementKindByName]: (elementKind: ElementKindByName[Name]) => string;
+    readonly [Name in keyof ElementKindByName]: (elementKind: ElementKindByName[Name]) => string | undefined;
 };
 
 function getFunctionTypeName(type: NamedFunction): string {
@@ -32,20 +32,28 @@ function nameWrapper(wrapperName: string, innerName: string): string {
 
 function nameMemoInner(inner: unknown): string {
     // eslint-disable-next-line @typescript-eslint/no-use-before-define -- memo names recurse into the wrapped type
-    const innerName = getTypeName(inner);
+    const innerName = findTypeName(inner);
 
-    return innerName === '' ? 'Memo' : innerName;
+    return innerName === undefined || innerName === '' ? 'Memo' : innerName;
 }
 
-function nameComponent(): string {
-    return 'Component';
+function nameLazy(elementKind: ElementKindByName['lazy']): string | undefined {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- lazy names recurse into the resolved type
+    return findTypeName(elementKind.resolved);
+}
+
+function nameNothing(): undefined {
+    return undefined;
 }
 
 const typeNamers: TypeNamers = {
     activity() {
         return 'Activity';
     },
-    context: nameComponent,
+    class(elementKind) {
+        return getFunctionTypeName(elementKind.component);
+    },
+    context: nameNothing,
     forwardRef(elementKind) {
         return elementKind.displayName ?? nameWrapper('ForwardRef', getFunctionTypeName(elementKind.render));
     },
@@ -58,12 +66,12 @@ const typeNamers: TypeNamers = {
     host(elementKind) {
         return elementKind.name;
     },
-    lazy: nameComponent,
+    lazy: nameLazy,
     memo(elementKind) {
         return elementKind.displayName ?? nameMemoInner(elementKind.inner);
     },
-    other: nameComponent,
-    suspense: nameComponent,
+    other: nameNothing,
+    suspense: nameNothing,
     viewTransition() {
         return 'ViewTransition';
     }
@@ -72,14 +80,27 @@ const typeNamers: TypeNamers = {
 function nameElementKind<Name extends keyof ElementKindByName>(
     name: Name,
     elementKind: ElementKindByName[Name]
-): string {
+): string | undefined {
     return typeNamers[name](elementKind);
 }
 
-export function getElementKind(type: unknown): SnapshotNodeKind {
-    const { kind } = classifyElementType(type);
+const snapshotNodeKinds: Readonly<Record<ReactElementKind['kind'], SnapshotNodeKind>> = {
+    activity: 'component',
+    class: 'component',
+    context: 'component',
+    forwardRef: 'component',
+    fragment: 'fragment',
+    function: 'component',
+    host: 'host',
+    lazy: 'component',
+    memo: 'component',
+    other: 'component',
+    suspense: 'component',
+    viewTransition: 'component'
+};
 
-    return kind === 'host' || kind === 'fragment' ? kind : 'component';
+export function getElementKind(type: unknown): SnapshotNodeKind {
+    return snapshotNodeKinds[classifyElementType(type).kind];
 }
 
 export function getTextContent(nodes: readonly SnapshotNode[]): string {
@@ -106,8 +127,12 @@ export function getIndexedPath(parentPath: string, index: number | string, name:
     return parentPath === 'root' ? name : `${parentPath} > ${name}[${index}]`;
 }
 
-export function getTypeName(type: unknown): string {
+function findTypeName(type: unknown): string | undefined {
     const elementKind = classifyElementType(type);
 
     return nameElementKind(elementKind.kind, elementKind);
+}
+
+export function getTypeName(type: unknown): string {
+    return findTypeName(type) ?? 'Component';
 }

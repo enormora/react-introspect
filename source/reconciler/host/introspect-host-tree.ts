@@ -18,10 +18,8 @@ import {
     type IntrospectionSnapshot,
     type SnapshotSourceNode
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import {
-    createIntrospectionSnapshotFromSource,
-    toSnapshotSourceNodes
-} from '../../snapshot/model/introspect-snapshot.ts';
+import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
+import { toSnapshotSourceNodes } from '../../snapshot/model/introspect-snapshot-source-mapping.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -40,9 +38,15 @@ export type IntrospectionHostContainer = {
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
     readonly beginCommit: (mounted: boolean) => void;
-    readonly discard: (renderCount: number) => IntrospectionSnapshot;
+    readonly discard: (renderCount: number) => void;
     readonly readMounted: () => boolean;
+    readonly validateRefs: () => void;
 } & IntrospectionChildStore;
+
+export type IntrospectionHostContainerControl = Pick<
+    IntrospectionHostContainer,
+    'beginCommit' | 'discard' | 'readMounted' | 'validateRefs'
+>;
 
 type IntrospectionHostInstance = {
     readonly kind: 'host';
@@ -151,13 +155,13 @@ function detachChild(child: IntrospectionHostChild): void {
 
 function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
     if (child.kind === 'text') {
-        return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
+        return { kind: 'text', value: child.readText(), hostVisibility: child.readVisibility() };
     }
 
     const internalHost = readInternalHost(child.type, child.readProps());
 
     if (internalHost.kind === 'empty' || internalHost.kind === 'opaque') {
-        return { kind: internalHost.kind, value: internalHost.value, visibility: child.readVisibility() };
+        return { kind: internalHost.kind, value: internalHost.value, hostVisibility: child.readVisibility() };
     }
 
     if (internalHost.kind === 'component') {
@@ -165,31 +169,29 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
 
         return {
             activityMode: metadata.activityMode,
-            children: child.readChildren().map(toSourceNode),
             caughtError: metadata.caughtError,
             givenChildren: toSnapshotSourceNodes(metadata.givenChildren),
             kind: 'element',
             key: metadata.key,
             props: metadata.props,
+            renderedChildren: child.readChildren().map(toSourceNode),
             renderedReason: metadata.renderedReason,
             type: metadata.type,
-            visibility: child.readVisibility()
+            hostVisibility: child.readVisibility()
         };
     }
 
-    const children = child.readChildren().map(toSourceNode);
-
     return {
         activityMode: undefined,
-        children,
         caughtError: undefined,
-        givenChildren: children,
+        givenChildren: child.readChildren().map(toSourceNode),
         kind: 'element',
         key: readHostKey(child.readProps()),
         props: readPublicHostProps(child.readProps()),
+        renderedChildren: 'given',
         renderedReason: undefined,
         type: child.type,
-        visibility: child.readVisibility()
+        hostVisibility: child.readVisibility()
     };
 }
 
@@ -207,36 +209,6 @@ function appendChild(parent: IntrospectionHostParent, child: IntrospectionHostCh
 
 function clearContainer(container: IntrospectionHostContainer): void {
     container.writeChildren([]);
-}
-
-export function createHostContainer(
-    publish: (snapshot: IntrospectionSnapshot) => void,
-    readNextRenderCount: () => number,
-    idNormalization: IntrospectionIdNormalization,
-    refs: IntrospectionRefs | undefined
-): IntrospectionHostContainer {
-    let mounted = true;
-    const childStore = createChildStore();
-
-    return {
-        ...childStore,
-        beginCommit(nextMounted: boolean) {
-            mounted = nextMounted;
-        },
-        discard(renderCount: number) {
-            mounted = false;
-            childStore.writeChildren([]);
-
-            return createEmptyIntrospectionSnapshot(renderCount);
-        },
-        idNormalization,
-        publish,
-        readMounted() {
-            return mounted;
-        },
-        readNextRenderCount,
-        refs
-    };
 }
 
 function createHostInstance(
@@ -334,11 +306,44 @@ function unhideHostChild(child: IntrospectionHostChild): void {
     child.writeVisibility('visible');
 }
 
-export function validateContainerRefs(container: IntrospectionHostContainer): void {
+function validateContainerRefs(container: IntrospectionHostContainer): void {
     validateIntrospectionRefs(
         container.refs,
         container.readChildren().flatMap(collectRefTargets)
     );
+}
+
+export function createHostContainer(
+    publish: (snapshot: IntrospectionSnapshot) => void,
+    readNextRenderCount: () => number,
+    idNormalization: IntrospectionIdNormalization,
+    refs: IntrospectionRefs | undefined
+): IntrospectionHostContainer {
+    let mounted = true;
+    const childStore = createChildStore();
+    const container: IntrospectionHostContainer = {
+        ...childStore,
+        beginCommit(nextMounted: boolean) {
+            mounted = nextMounted;
+        },
+        discard(renderCount: number) {
+            mounted = false;
+            childStore.writeChildren([]);
+            publish(createEmptyIntrospectionSnapshot(renderCount));
+        },
+        idNormalization,
+        publish,
+        readMounted() {
+            return mounted;
+        },
+        readNextRenderCount,
+        refs,
+        validateRefs() {
+            validateContainerRefs(container);
+        }
+    };
+
+    return container;
 }
 
 function noop(): void {
@@ -385,7 +390,7 @@ export type IntrospectionHostConfig = {
         context: IntrospectionHostContext
     ) => boolean;
     readonly getChildHostContext: (context: IntrospectionHostContext) => IntrospectionHostContext;
-    readonly getPublicInstance: (instance: IntrospectionHostInstance) => unknown;
+    readonly getPublicInstance: (instance: IntrospectionHostChild) => unknown;
     readonly getRootHostContext: (container: IntrospectionHostContainer) => IntrospectionHostContext;
     readonly hideInstance: (instance: IntrospectionHostInstance) => void;
     readonly insertBefore: (
@@ -413,7 +418,10 @@ export type IntrospectionHostConfig = {
         child: IntrospectionHostChild,
         beforeChild: IntrospectionHostChild
     ) => void;
-    readonly removeChildFromContainer: (container: IntrospectionHostContainer, child: IntrospectionHostChild) => void;
+    readonly removeChildFromContainer: (
+        container: IntrospectionHostContainer,
+        child: IntrospectionHostChild
+    ) => void;
     readonly resetAfterCommit: (container: IntrospectionHostContainer) => void;
     readonly unhideTextInstance: (instance: IntrospectionTextInstance, text: string) => void;
 };
@@ -455,8 +463,8 @@ export function createIntrospectionHostConfig(scheduling: IntrospectionHostSched
         finalizeInitialChildren: alwaysFalse,
         getChildHostContext,
         getCurrentUpdatePriority: getDefaultEventPriority,
-        getPublicInstance(instance: IntrospectionHostInstance) {
-            return instance.readPublicInstance();
+        getPublicInstance(instance: IntrospectionHostChild) {
+            return instance.kind === 'host' ? instance.readPublicInstance() : instance;
         },
         getRootHostContext,
         hideInstance: hideHostChild,

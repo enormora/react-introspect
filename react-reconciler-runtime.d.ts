@@ -1,9 +1,9 @@
 declare module 'react-reconciler' {
     export type ReconcilerRoot = Record<string, unknown>;
 
-    export type ReconcilerInstance = {
+    export type ReconcilerInstance<Container> = {
         readonly createContainer: (
-            containerInfo: unknown,
+            containerInfo: Container,
             tag: number,
             hydrationCallbacks: null,
             isStrictMode: boolean,
@@ -58,7 +58,7 @@ declare module 'react-reconciler' {
             hostContext: HostContext
         ) => boolean;
         readonly getChildHostContext: (parentHostContext: HostContext, type: string) => HostContext;
-        readonly getPublicInstance: (instance: Instance) => unknown;
+        readonly getPublicInstance: (instance: Instance | TextInstance) => unknown;
         readonly getRootHostContext: (rootContainer: Container) => HostContext;
         readonly hideInstance: (instance: Instance) => void;
         readonly hideTextInstance: (textInstance: TextInstance) => void;
@@ -79,7 +79,7 @@ declare module 'react-reconciler' {
 
     export default function createReconciler<Instance, TextInstance, Container, Props, HostContext>(
         hostConfiguration: HostConfig<Instance, TextInstance, Container, Props, HostContext>
-    ): ReconcilerInstance;
+    ): ReconcilerInstance<Container>;
 }
 
 declare module 'react-reconciler/constants.js' {

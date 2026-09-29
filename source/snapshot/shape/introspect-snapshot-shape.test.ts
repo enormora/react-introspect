@@ -44,6 +44,33 @@ function InputComponent(): React.ReactNode {
     return null;
 }
 
+const lazyInitializerKey = '_init';
+const lazyPayloadKey = '_payload';
+
+function failToInitialize(): never {
+    throw new Error('naming must not initialize a lazy component');
+}
+
+function createLazyType(payload: unknown): unknown {
+    return {
+        $$typeof: Symbol.for('react.lazy'),
+        [lazyInitializerKey]: failToInitialize,
+        [lazyPayloadKey]: payload
+    };
+}
+
+function createResolvedLazyLabel(): unknown {
+    return createLazyType({ _result: { default: Label }, _status: 1 });
+}
+
+function createPendingLazyType(): unknown {
+    return createLazyType({ _result: undefined, _status: 0 });
+}
+
+function createMemoType(inner: unknown): unknown {
+    return { $$typeof: Symbol.for('react.memo'), type: inner };
+}
+
 export const testNode = suite('introspection snapshot shape', [
     test('derives text, public props, paths, and element kinds', function (scope) {
         const children = [ createTextNode('Save'), createTextNode(' now') ];
@@ -96,6 +123,33 @@ export const testNode = suite('introspection snapshot shape', [
             'ShownInput'
         );
         scope.assert.equal(getTypeName(Object.assign(React.memo(Label), { displayName: '' })), 'Label');
+
+        return scope.assert.collect();
+    }),
+    test('names lazy components after the component they resolved to', function (scope) {
+        scope.assert.equal(getTypeName(createResolvedLazyLabel()), 'Label');
+        scope.assert.equal(getTypeName(createMemoType(createResolvedLazyLabel())), 'Label');
+        scope.assert.equal(getTypeName(createPendingLazyType()), 'Component');
+        scope.assert.equal(getTypeName(createLazyType({ _result: undefined, _status: 1 })), 'Component');
+
+        return scope.assert.collect();
+    }),
+    test('names a pending lazy component without starting to load it', function (scope) {
+        const loads: string[] = [];
+        const PendingPage = React.lazy(async function loadPage() {
+            loads.push('load');
+
+            return { default: Label };
+        });
+
+        scope.assert.equal(getTypeName(PendingPage), 'Component');
+        scope.assert.deepEqual(loads, []);
+
+        return scope.assert.collect();
+    }),
+    test('names memo components without a known inner name Memo', function (scope) {
+        scope.assert.equal(getTypeName(createMemoType({})), 'Memo');
+        scope.assert.equal(getTypeName(createMemoType(createPendingLazyType())), 'Memo');
 
         return scope.assert.collect();
     })
