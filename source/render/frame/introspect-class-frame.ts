@@ -5,6 +5,7 @@ import type {
     IntrospectionClassInstance,
     IntrospectionClassUpdater
 } from '../../values/introspect-class-component.ts';
+import { shallowEquals } from '../../values/introspect-shallow-equality.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
@@ -67,19 +68,6 @@ type IntrospectionClassRenderPass = {
 function isErrorBoundary(type: IntrospectionClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
         typeof type.prototype.componentDidCatch === 'function';
-}
-
-function shallowEquals(
-    left: Readonly<Record<PropertyKey, unknown>>,
-    right: Readonly<Record<PropertyKey, unknown>>
-): boolean {
-    const leftKeys = Reflect.ownKeys(left);
-    const rightKeys = Reflect.ownKeys(right);
-
-    return leftKeys.length === rightKeys.length &&
-        leftKeys.every(function hasSameValue(key) {
-            return Object.is(left[key], right[key]);
-        });
 }
 
 function shallowStateEquals(left: unknown, right: unknown): boolean {
