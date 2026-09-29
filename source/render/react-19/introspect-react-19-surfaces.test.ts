@@ -179,6 +179,26 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
+    test('marks components below the depth inside hidden Activity as hidden', function (scope) {
+        const view = introspect(
+            React.createElement(React.Activity, {
+                children: React.createElement(Panel),
+                mode: 'hidden'
+            }),
+            {
+                depth: 0,
+                strictMode: false
+            }
+        );
+        const panel = requireValue(view.find(Panel));
+
+        scope.assert.deepEqual({ state: panel.state, visibility: panel.visibility }, {
+            state: { activityMode: undefined, reason: 'depth', rendered: false, visible: false },
+            visibility: 'hidden'
+        });
+
+        return scope.assert.collect();
+    }),
     test('updates Activity visibility when mode changes', function (scope) {
         const view = introspect(
             React.createElement(React.Activity, {

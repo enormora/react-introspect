@@ -712,6 +712,8 @@ Values:
 - `'hidden'`
 - `'notRendered'`
 
+Only unsupported nodes are `'notRendered'`. A component below the selected depth reports the visibility of where it sits.
+
 ### `node.findClosest(selector)`
 
 Finds the nearest parent that matches a selector.

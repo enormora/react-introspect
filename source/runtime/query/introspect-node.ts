@@ -245,7 +245,7 @@ function exposeSnapshotNode(
             return node.type;
         },
         get visibility() {
-            return node.renderedReason === undefined ? node.visibility : 'notRendered';
+            return node.renderedReason === 'unsupported' ? 'notRendered' : node.visibility;
         },
         callProp(property: PropertyKey, ...parameters: readonly unknown[]) {
             return reader.act(function callSnapshotProp() {

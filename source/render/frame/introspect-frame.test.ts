@@ -280,7 +280,7 @@ const assertUnexecutedPassThrough = defineCompositeAssertion({
         }, {
             renderedChildTypes: childTypes,
             state: { activityMode: undefined, reason: 'depth', rendered: false, visible: true },
-            visibility: 'notRendered'
+            visibility: 'visible'
         });
     },
     name: 'assertUnexecutedPassThrough'
