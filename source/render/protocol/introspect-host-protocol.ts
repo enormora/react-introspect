@@ -119,6 +119,17 @@ export function createExecutedComponentHost(element: EncodedElement, children: R
     );
 }
 
+export function createActivityComponentHost(
+    element: EncodedElement,
+    activityMode: 'hidden' | 'visible',
+    children: React.ReactNode
+): React.ReactElement {
+    return createComponentHost(
+        createComponentMetadata({ activityMode, caughtError: undefined, element, renderedReason: undefined }),
+        children
+    );
+}
+
 export function createUnexecutedComponentHost(
     element: EncodedElement,
     renderedReason: IntrospectionNotRenderedReason
