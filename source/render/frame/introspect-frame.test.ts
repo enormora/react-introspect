@@ -129,6 +129,22 @@ function ContextRoot(): React.ReactNode {
     );
 }
 
+function StatefulFirst(): React.ReactNode {
+    const [ label ] = React.useState('first state');
+
+    return React.createElement('span', null, label);
+}
+
+function StatefulSecond(): React.ReactNode {
+    const [ label ] = React.useState('second state');
+
+    return React.createElement('span', null, label);
+}
+
+function ignoreProfile(): undefined {
+    return undefined;
+}
+
 function PlainLabel(props: ButtonProps): React.ReactNode {
     return React.createElement('span', null, props.label);
 }
@@ -218,6 +234,73 @@ function createRenderLog(): RenderLog {
             return Array.from(names);
         }
     };
+}
+
+type LoggedLabelProps = ButtonProps & {
+    readonly log: RenderLog;
+};
+
+type RerenderingParentProps = {
+    readonly log: RenderLog;
+};
+
+function LoggedLabel(props: LoggedLabelProps): React.ReactNode {
+    props.log.record(props.label);
+
+    return React.createElement('span', null, props.label);
+}
+
+const ShallowMemoLabel = React.memo(LoggedLabel);
+
+const LabelIgnoringMemoLabel = React.memo(LoggedLabel, function ignoresLabel(previous, next) {
+    return previous.log === next.log;
+});
+
+const LoggedClassLabel = class extends React.Component<LoggedLabelProps> {
+    public override render(): React.ReactNode {
+        this.props.log.record(`class ${this.props.label}`);
+
+        return React.createElement('span', null, this.props.label);
+    }
+};
+
+const MemoClassLabel = React.memo(LoggedClassLabel);
+
+function alwaysEqual(): boolean {
+    return true;
+}
+
+const AlwaysEqualMemoLabel = React.memo(LoggedLabel, alwaysEqual);
+
+const NestedMemoLabel = React.memo(React.memo(LoggedLabel, alwaysEqual));
+
+function createRefLabelProps(log: RenderLog): LoggedLabelProps & React.RefAttributes<unknown> {
+    return {
+        label: 'ref',
+        log,
+        ref() {
+            return undefined;
+        }
+    };
+}
+
+function RerenderingParent(props: RerenderingParentProps): React.ReactNode {
+    const [ renders, setRenders ] = React.useState(0);
+
+    return React.createElement(
+        React.Fragment,
+        null,
+        React.createElement('button', {
+            onClick() {
+                setRenders(renders + 1);
+            }
+        }),
+        React.createElement(ShallowMemoLabel, { label: 'shallow', log: props.log }),
+        React.createElement(LabelIgnoringMemoLabel, { label: `custom ${renders}`, log: props.log }),
+        React.createElement(MemoClassLabel, { label: 'memo', log: props.log }),
+        React.createElement(AlwaysEqualMemoLabel, createRefLabelProps(props.log)),
+        React.createElement(NestedMemoLabel, { label: `nested ${renders}`, log: props.log })
+    );
 }
 
 function createAnchoredComponents(): AnchoredComponents {
@@ -596,6 +679,94 @@ export const testNode = suite('execution shallow function components', [
 
         scope.assert.undefined(view.root);
         scope.assert.equal(view.uncaughtErrors.at(-1)?.cause, failure);
+
+        return scope.assert.collect();
+    }),
+    test('executes components inside StrictMode and Profiler', function (scope) {
+        const view = introspect(
+            React.createElement(
+                React.StrictMode,
+                null,
+                React.createElement(
+                    React.Profiler,
+                    { id: 'labels', onRender: ignoreProfile },
+                    React.createElement(PlainLabel, { label: 'profiled' })
+                )
+            ),
+            {
+                depth: 'full',
+                strictMode: false
+            }
+        );
+
+        scope.assert.equal(view.find('span')?.textContent, 'profiled');
+        scope.assert.equal(view.formatTree(), 'StrictMode\n  Profiler\n    PlainLabel\n      span\n        #text');
+
+        return scope.assert.collect();
+    }),
+    test('marks elements of unknown types unsupported', function (scope) {
+        const unknownType = { unknown: true } as unknown as React.FC<ButtonProps>;
+        const view = introspect(React.createElement(unknownType, { label: 'unknown' }), {
+            depth: 'full',
+            strictMode: false
+        });
+        const root = requireValue(view.root);
+
+        scope.assert.deepEqual({
+            renderedChildren: root.renderedChildren,
+            state: root.state,
+            visibility: root.visibility
+        }, {
+            renderedChildren: { reason: 'unsupported', status: 'notRendered' },
+            state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
+            visibility: 'notRendered'
+        });
+
+        return scope.assert.collect();
+    }),
+    test('skips memo components whose compare reports equal props', function (scope) {
+        const log = createRenderLog();
+        const view = introspect(React.createElement(RerenderingParent, { log }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        requireValue(view.find('button')).sendEvent('click');
+
+        scope.assert.deepEqual(log.rendered(), [ 'shallow', 'custom 0', 'class memo', 'ref', 'nested 0', 'ref' ]);
+        scope.assert.equal(view.find(LabelIgnoringMemoLabel)?.textContent, 'custom 0');
+
+        return scope.assert.collect();
+    }),
+    test('remounts when a different component takes the same position', function (scope) {
+        const view = introspect(React.createElement(StatefulFirst), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        view.update(React.createElement(StatefulSecond));
+
+        scope.assert.equal(view.find('span')?.textContent, 'second state');
+
+        return scope.assert.collect();
+    }),
+    test('remounts when a differently wrapped component takes the same position', function (scope) {
+        const swaps: readonly (readonly [React.ElementType, React.ElementType])[] = [
+            [ React.memo(StatefulFirst), React.memo(StatefulSecond) ],
+            [ React.forwardRef(StatefulFirst), React.forwardRef(StatefulSecond) ],
+            [ createFulfilledLazyType(StatefulFirst), createFulfilledLazyType(StatefulSecond) ]
+        ];
+
+        scope.assert.deepEqual(
+            swaps.map(function readTextAfterSwap([ first, second ]) {
+                const view = introspect(React.createElement(first), { depth: 'full', strictMode: false });
+
+                view.update(React.createElement(second));
+
+                return view.find('span')?.textContent;
+            }),
+            [ 'second state', 'second state', 'second state' ]
+        );
 
         return scope.assert.collect();
     }),

@@ -5,6 +5,7 @@ import type {
     IntrospectionClassInstance,
     IntrospectionClassUpdater
 } from '../../values/introspect-class-component.ts';
+import { shallowEquals } from '../../values/introspect-shallow-equality.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
@@ -67,19 +68,6 @@ type IntrospectionClassRenderPass = {
 function isErrorBoundary(type: IntrospectionClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
         typeof type.prototype.componentDidCatch === 'function';
-}
-
-function shallowEquals(
-    left: Readonly<Record<PropertyKey, unknown>>,
-    right: Readonly<Record<PropertyKey, unknown>>
-): boolean {
-    const leftKeys = Reflect.ownKeys(left);
-    const rightKeys = Reflect.ownKeys(right);
-
-    return leftKeys.length === rightKeys.length &&
-        leftKeys.every(function hasSameValue(key) {
-            return Object.is(left[key], right[key]);
-        });
 }
 
 function shallowStateEquals(left: unknown, right: unknown): boolean {
@@ -386,8 +374,29 @@ const IntrospectionClassBoundaryFrame = class extends IntrospectionClassFrameBas
     }
 };
 
+const classFramesByComponent = new WeakMap<
+    IntrospectionClassComponent,
+    React.ComponentType<IntrospectionClassFrameProps>
+>();
+
+function createClassFrameType(type: IntrospectionClassComponent): React.ComponentType<IntrospectionClassFrameProps> {
+    return isErrorBoundary(type)
+        ? class IntrospectionClassBoundaryFrameForType extends IntrospectionClassBoundaryFrame {}
+        : class IntrospectionClassFrameForType extends IntrospectionClassFrameBase {};
+}
+
 export function readClassFrameType(
     type: IntrospectionClassComponent
 ): React.ComponentType<IntrospectionClassFrameProps> {
-    return isErrorBoundary(type) ? IntrospectionClassBoundaryFrame : IntrospectionClassFrameBase;
+    const cachedFrame = classFramesByComponent.get(type);
+
+    if (cachedFrame !== undefined) {
+        return cachedFrame;
+    }
+
+    const frame = createClassFrameType(type);
+
+    classFramesByComponent.set(type, frame);
+
+    return frame;
 }

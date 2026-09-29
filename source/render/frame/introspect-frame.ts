@@ -1,11 +1,12 @@
 import React from 'react';
-import { classifyElementType, type ReactElementKind } from '../../values/introspect-react-element-kind.ts';
+import { classifyElementType, type ReactElementKindByName } from '../../values/introspect-react-element-kind.ts';
 import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/introspect-value-kinds.ts';
 import {
     createComponentHost,
     createComponentMetadata,
     createEmptyHost,
     createOpaqueHost,
+    createUnexecutedComponentHost,
     elementKeyProps
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
@@ -28,6 +29,8 @@ type IntrospectionFrameProps = {
     readonly depth: IntrospectionFrameDepth;
     readonly element: IntrospectionElement;
 };
+
+type IntrospectionFrameComponent = React.FunctionComponent<IntrospectionFrameProps>;
 
 function isIntrospectionElement(element: React.ReactElement): element is IntrospectionElement {
     return isObjectOrFunction(element.props);
@@ -200,68 +203,149 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
     );
 }
 
-function createFrameElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    const elementKind = classifyElementType(element.type);
+function haveEqualFrameDepth(previous: IntrospectionFrameDepth, next: IntrospectionFrameDepth): boolean {
+    return previous.budget === next.budget && previous.counting === next.counting && previous.policy === next.policy;
+}
 
-    if (elementKind.kind === 'class') {
-        return createClassFrameElement(element, depth, elementKind.component);
+function haveEqualMemoProps(previous: IntrospectionElement, next: IntrospectionElement): boolean {
+    const elementKind = classifyElementType(next.type);
+
+    return elementKind.kind === 'memo' && elementKind.compare(previous.props, next.props);
+}
+
+function areMemoFramePropsEqual(previous: IntrospectionFrameProps, next: IntrospectionFrameProps): boolean {
+    return readElementRef(previous.element) === readElementRef(next.element) &&
+        haveEqualFrameDepth(previous.depth, next.depth) &&
+        haveEqualMemoProps(previous.element, next.element);
+}
+
+function createIntrospectionFrame(): IntrospectionFrameComponent {
+    return IntrospectionFrame.bind(undefined);
+}
+
+function createMemoIntrospectionFrame(): IntrospectionFrameComponent {
+    return React.memo(createIntrospectionFrame(), areMemoFramePropsEqual);
+}
+
+const framesByComponentType = new WeakMap<WeakKey, IntrospectionFrameComponent>();
+
+function readFrameForType(type: WeakKey, createFrame: () => IntrospectionFrameComponent): IntrospectionFrameComponent {
+    const cachedFrame = framesByComponentType.get(type);
+
+    if (cachedFrame !== undefined) {
+        return cachedFrame;
     }
 
-    return React.createElement(IntrospectionFrame, {
-        depth,
-        element,
-        key: element.key ?? undefined
-    });
+    const frame = createFrame();
+
+    framesByComponentType.set(type, frame);
+
+    return frame;
 }
 
-function transformUnrenderedElement(element: IntrospectionElement): React.ReactElement {
-    return createComponentHost(
-        createComponentMetadata({ activityMode: undefined, caughtError: undefined, element, renderedReason: 'depth' }),
-        createEmptyHost(undefined)
-    );
+function transformUnsupportedElement(element: IntrospectionElement): React.ReactElement {
+    return createUnexecutedComponentHost(element, 'unsupported');
 }
 
-function transformComponentElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
+function transformComponentElement(
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    createFrameElement: (componentDepth: IntrospectionFrameDepth) => React.ReactElement
+): React.ReactElement {
     const componentDepth = enterComponentDepth(depth, element.type);
 
     return canExecuteComponent(componentDepth, element.type)
-        ? createFrameElement(element, componentDepth)
-        : transformUnrenderedElement(element);
+        ? createFrameElement(componentDepth)
+        : createUnexecutedComponentHost(element, 'depth');
+}
+
+function transformFunctionFrameElement(
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    frame: IntrospectionFrameComponent
+): React.ReactElement {
+    return transformComponentElement(element, depth, function createFunctionFrameElement(componentDepth) {
+        return React.createElement(frame, { depth: componentDepth, element, key: element.key ?? undefined });
+    });
 }
 
 function transformActivityElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
     return transformWrapperElement(element, depth, readActivityMode(element));
 }
 
-function transformViewTransitionElement(
+function transformNamedWrapperElement(
     element: IntrospectionElement,
     depth: IntrospectionFrameDepth
 ): React.ReactElement {
     return transformWrapperElement(element, depth, undefined);
 }
 
-const elementTransforms: Readonly<
-    Record<
-        ReactElementKind['kind'],
-        (element: IntrospectionElement, depth: IntrospectionFrameDepth) => React.ReactElement
-    >
-> = {
-    activity: transformActivityElement,
-    class: transformComponentElement,
-    context: transformRenderableElement,
-    forwardRef: transformComponentElement,
-    fragment: transformFragmentElement,
-    function: transformComponentElement,
-    host: transformRenderableElement,
-    lazy: transformComponentElement,
-    memo: transformComponentElement,
-    other: transformUnrenderedElement,
-    suspense: transformSuspenseElement,
-    viewTransition: transformViewTransitionElement
+type ElementTransforms = {
+    readonly [Name in keyof ReactElementKindByName]: (
+        element: IntrospectionElement,
+        depth: IntrospectionFrameDepth,
+        elementKind: ReactElementKindByName[Name]
+    ) => React.ReactElement;
 };
 
+const elementTransforms: ElementTransforms = {
+    activity: transformActivityElement,
+    class(element, depth, elementKind) {
+        return transformComponentElement(element, depth, function createClassFrame(componentDepth) {
+            return createClassFrameElement(element, componentDepth, elementKind.component);
+        });
+    },
+    context: transformRenderableElement,
+    forwardRef(element, depth, elementKind) {
+        return transformFunctionFrameElement(
+            element,
+            depth,
+            readFrameForType(elementKind.type, createIntrospectionFrame)
+        );
+    },
+    fragment: transformFragmentElement,
+    function(element, depth, elementKind) {
+        return transformFunctionFrameElement(
+            element,
+            depth,
+            readFrameForType(elementKind.component, createIntrospectionFrame)
+        );
+    },
+    host: transformRenderableElement,
+    lazy(element, depth, elementKind) {
+        return transformFunctionFrameElement(
+            element,
+            depth,
+            readFrameForType(elementKind.type, createIntrospectionFrame)
+        );
+    },
+    memo(element, depth, elementKind) {
+        return transformFunctionFrameElement(
+            element,
+            depth,
+            readFrameForType(elementKind.type, createMemoIntrospectionFrame)
+        );
+    },
+    other: transformUnsupportedElement,
+    profiler: transformNamedWrapperElement,
+    strictMode: transformNamedWrapperElement,
+    suspense: transformSuspenseElement,
+    viewTransition: transformNamedWrapperElement
+};
+
+function transformElementOfKind<Name extends keyof ReactElementKindByName>(
+    name: Name,
+    elementKind: ReactElementKindByName[Name],
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth
+): React.ReactElement {
+    return elementTransforms[name](element, depth, elementKind);
+}
+
 function transformElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    return elementTransforms[classifyElementType(element.type).kind](element, depth);
+    const elementKind = classifyElementType(element.type);
+
+    return transformElementOfKind(elementKind.kind, elementKind, element, depth);
 }
 
 export function createIntrospectionRenderElement(

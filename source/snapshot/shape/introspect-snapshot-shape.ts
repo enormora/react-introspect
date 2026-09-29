@@ -2,6 +2,7 @@ import {
     classifyElementType,
     isReactReservedPropKey,
     type ReactElementKind,
+    type ReactElementKindByName,
     readDisplayName
 } from '../../values/introspect-react-element-kind.ts';
 import type {
@@ -14,15 +15,11 @@ type NamedFunction = {
     readonly name: string;
 };
 
-type ElementKindByName = {
-    readonly [Kind in ReactElementKind as Kind['kind']]: Kind;
-};
-
 export type TypeNaming = 'executed' | 'unexecuted';
 
 type TypeNamers = {
-    readonly [Name in keyof ElementKindByName]: (
-        elementKind: ElementKindByName[Name],
+    readonly [Name in keyof ReactElementKindByName]: (
+        elementKind: ReactElementKindByName[Name],
         naming: TypeNaming
     ) => string | undefined;
 };
@@ -42,7 +39,7 @@ function nameMemoInner(inner: unknown, naming: TypeNaming): string {
     return innerName === undefined || innerName === '' ? 'Memo' : innerName;
 }
 
-function nameLazy(elementKind: ElementKindByName['lazy'], naming: TypeNaming): string | undefined {
+function nameLazy(elementKind: ReactElementKindByName['lazy'], naming: TypeNaming): string | undefined {
     // eslint-disable-next-line @typescript-eslint/no-use-before-define -- lazy names recurse into the resolved type
     return naming === 'executed' ? findTypeName(elementKind.resolved, naming) : undefined;
 }
@@ -76,15 +73,21 @@ const typeNamers: TypeNamers = {
         return elementKind.displayName ?? nameMemoInner(elementKind.inner, naming);
     },
     other: nameNothing,
+    profiler() {
+        return 'Profiler';
+    },
+    strictMode() {
+        return 'StrictMode';
+    },
     suspense: nameNothing,
     viewTransition() {
         return 'ViewTransition';
     }
 };
 
-function nameElementKind<Name extends keyof ElementKindByName>(
+function nameElementKind<Name extends keyof ReactElementKindByName>(
     name: Name,
-    elementKind: ElementKindByName[Name],
+    elementKind: ReactElementKindByName[Name],
     naming: TypeNaming
 ): string | undefined {
     return typeNamers[name](elementKind, naming);
@@ -101,6 +104,8 @@ const snapshotNodeKinds: Readonly<Record<ReactElementKind['kind'], SnapshotNodeK
     lazy: 'component',
     memo: 'component',
     other: 'component',
+    profiler: 'component',
+    strictMode: 'component',
     suspense: 'component',
     viewTransition: 'component'
 };

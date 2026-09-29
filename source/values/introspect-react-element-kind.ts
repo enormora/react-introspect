@@ -1,5 +1,6 @@
 import React from 'react';
 import { type IntrospectionClassComponent, isClassComponent } from './introspect-class-component.ts';
+import { shallowEquals } from './introspect-shallow-equality.ts';
 import { isObjectOrFunction } from './introspect-value-kinds.ts';
 
 type PropsRecord = Readonly<Record<PropertyKey, unknown>>;
@@ -8,10 +9,13 @@ type ForwardRefRender = (props: PropsRecord, ref: unknown) => React.ReactNode;
 
 type FunctionComponentType = ((props: PropsRecord) => React.ReactNode) & { readonly name: string; };
 
-type MarkerKind = { readonly kind: 'activity' | 'context' | 'fragment' | 'other' | 'suspense' | 'viewTransition'; };
+type BuiltInMarkerName = 'activity' | 'fragment' | 'profiler' | 'strictMode' | 'suspense' | 'viewTransition';
+
+type MarkerKind = { readonly kind: BuiltInMarkerName | 'context' | 'other'; };
 
 type ForwardRefKind = {
     readonly kind: 'forwardRef';
+    readonly type: PropsRecord;
     readonly displayName: string | undefined;
     readonly render: ForwardRefRender;
 };
@@ -22,18 +26,41 @@ type FunctionKind = { readonly kind: 'function'; readonly component: FunctionCom
 
 type HostKind = { readonly kind: 'host'; readonly name: string; };
 
-type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; readonly resolved: unknown; };
+type LazyKind = {
+    readonly kind: 'lazy';
+    readonly initialize: () => unknown;
+    readonly resolved: unknown;
+    readonly type: PropsRecord;
+};
 
-type MemoKind = { readonly kind: 'memo'; readonly displayName: string | undefined; readonly inner: unknown; };
+type MemoCompare = (previous: PropsRecord, next: PropsRecord) => boolean;
+
+type MemoKind = {
+    readonly kind: 'memo';
+    readonly type: PropsRecord;
+    readonly compare: MemoCompare;
+    readonly displayName: string | undefined;
+    readonly inner: unknown;
+};
 
 export type ReactElementKind = ClassKind | ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
+
+export type ReactElementKindByName = {
+    readonly [Kind in ReactElementKind as Kind['kind']]: Kind;
+};
 
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
 const lazyType = Symbol.for('react.lazy');
 const contextType = Symbol.for('react.context');
-const activityType: unknown = Symbol.for('react.activity');
-const viewTransitionType: unknown = Symbol.for('react.view_transition');
+const builtInMarkerNames = new Map<unknown, BuiltInMarkerName>([
+    [ React.Fragment, 'fragment' ],
+    [ React.Profiler, 'profiler' ],
+    [ React.StrictMode, 'strictMode' ],
+    [ React.Suspense, 'suspense' ],
+    [ Symbol.for('react.activity'), 'activity' ],
+    [ Symbol.for('react.view_transition'), 'viewTransition' ]
+]);
 const lazyInitializerKey = '_init';
 const lazyPayloadKey = '_payload';
 
@@ -55,10 +82,29 @@ export function readDisplayName(type: PropsRecord): string | undefined {
     return typeof displayName === 'string' && displayName !== '' ? displayName : undefined;
 }
 
+function isMemoCompare(value: unknown): value is MemoCompare {
+    return typeof value === 'function';
+}
+
 function readMemoKind(type: unknown): ReactElementKind | undefined {
-    return hasReactType(type, memoType) && Object.hasOwn(type, 'type')
-        ? { displayName: readDisplayName(type), inner: type.type, kind: 'memo' }
-        : undefined;
+    if (!hasReactType(type, memoType) || !Object.hasOwn(type, 'type')) {
+        return undefined;
+    }
+
+    const ownCompare = isMemoCompare(type.compare) ? type.compare : shallowEquals;
+    const innerKind = readMemoKind(type.type);
+
+    return {
+        compare: innerKind?.kind === 'memo'
+            ? function compareEitherMemoLevel(previous, next) {
+                return ownCompare(previous, next) || innerKind.compare(previous, next);
+            }
+            : ownCompare,
+        displayName: readDisplayName(type),
+        inner: type.type,
+        kind: 'memo',
+        type
+    };
 }
 
 function readForwardRefKind(type: unknown): ReactElementKind | undefined {
@@ -68,7 +114,9 @@ function readForwardRefKind(type: unknown): ReactElementKind | undefined {
 
     const { render } = type;
 
-    return isForwardRefRender(render) ? { displayName: readDisplayName(type), kind: 'forwardRef', render } : undefined;
+    return isForwardRefRender(render)
+        ? { displayName: readDisplayName(type), kind: 'forwardRef', render, type }
+        : undefined;
 }
 
 const lazyStatusKey = '_status';
@@ -84,6 +132,8 @@ function readResolvedLazyType(payload: unknown): unknown {
 
     return isObjectOrFunction(moduleObject) ? moduleObject.default : undefined;
 }
+
+const resolvedLazyTypes = new WeakMap<WeakKey, unknown>();
 
 function readLazyKind(type: unknown): ReactElementKind | undefined {
     const isLazy = hasReactType(type, lazyType) &&
@@ -104,10 +154,13 @@ function readLazyKind(type: unknown): ReactElementKind | undefined {
         initialize() {
             const resolved: unknown = Reflect.apply(initializer, undefined, [ Reflect.get(type, lazyPayloadKey) ]);
 
+            resolvedLazyTypes.set(type, resolved);
+
             return resolved;
         },
         kind: 'lazy',
-        resolved: readResolvedLazyType(Reflect.get(type, lazyPayloadKey))
+        resolved: resolvedLazyTypes.get(type) ?? readResolvedLazyType(Reflect.get(type, lazyPayloadKey)),
+        type
     };
 }
 
@@ -116,19 +169,9 @@ function readBuiltInKind(type: unknown): ReactElementKind | undefined {
         return { kind: 'host', name: type };
     }
 
-    if (type === React.Fragment) {
-        return { kind: 'fragment' };
-    }
+    const markerName = builtInMarkerNames.get(type);
 
-    if (type === React.Suspense) {
-        return { kind: 'suspense' };
-    }
-
-    if (type === activityType) {
-        return { kind: 'activity' };
-    }
-
-    return type === viewTransitionType ? { kind: 'viewTransition' } : undefined;
+    return markerName === undefined ? undefined : { kind: markerName };
 }
 
 function readContextKind(type: unknown): ReactElementKind | undefined {
