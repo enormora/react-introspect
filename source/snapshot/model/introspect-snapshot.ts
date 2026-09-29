@@ -17,6 +17,7 @@ import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kind
 import {
     type IntrospectionSnapshot,
     registerSnapshotNode,
+    type SnapshotHiddenCause,
     type SnapshotNode,
     type SnapshotProps,
     type SnapshotSourceElement,
@@ -35,7 +36,7 @@ type SnapshotBuilder = {
 
 type SnapshotChildPlacement = {
     readonly build: SnapshotBuilder;
-    readonly inheritedVisibility: SnapshotVisibility;
+    readonly inheritedHiddenBy: SnapshotHiddenCause | undefined;
     readonly parentId: number | undefined;
     readonly parentPath: string;
 };
@@ -68,22 +69,30 @@ type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
 
 type PropsSnapshotRequest = {
     readonly build: SnapshotBuilder;
-    readonly inheritedVisibility: SnapshotVisibility;
+    readonly inheritedHiddenBy: SnapshotHiddenCause | undefined;
     readonly ownerId: number;
     readonly ownerPath: string;
     readonly props: SnapshotProps;
 };
 
-function visibilityFromSource(
-    inheritedVisibility: SnapshotVisibility,
+function hiddenByFromSource(
+    inheritedHiddenBy: SnapshotHiddenCause | undefined,
     sourceVisibility: SnapshotVisibility,
     activityMode: 'hidden' | 'visible' | undefined
-): SnapshotVisibility {
-    if (inheritedVisibility === 'hidden' || sourceVisibility === 'hidden' || activityMode === 'hidden') {
-        return 'hidden';
+): SnapshotHiddenCause | undefined {
+    if (inheritedHiddenBy !== undefined) {
+        return inheritedHiddenBy;
     }
 
-    return 'visible';
+    if (sourceVisibility === 'hidden') {
+        return 'suspended';
+    }
+
+    return activityMode === 'hidden' ? 'activity' : undefined;
+}
+
+function visibilityOf(hiddenBy: SnapshotHiddenCause | undefined): SnapshotVisibility {
+    return hiddenBy === undefined ? 'visible' : 'hidden';
 }
 
 function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
@@ -180,8 +189,9 @@ function pushLeafSnapshotNode(request: LeafNodeRequest, leaf: SnapshotLeaf): Sna
             props: Object.freeze({
                 value: normalizeSnapshotValue(request.value, request.build.normalizeIdString)
             }),
+            hiddenBy: request.inheritedHiddenBy,
             renderedChildren: Object.freeze([]),
-            visibility: request.inheritedVisibility
+            visibility: visibilityOf(request.inheritedHiddenBy)
         };
     });
 }
@@ -227,14 +237,14 @@ const snapshotOperations = {
         return request.build.createNode(function describeElementNode(id) {
             const name = getTypeName(request.element.type);
             const path = getIndexedPath(request.parentPath, request.index, name);
-            const visibility = visibilityFromSource(
-                request.inheritedVisibility,
+            const hiddenBy = hiddenByFromSource(
+                request.inheritedHiddenBy,
                 request.element.visibility,
                 request.element.activityMode
             );
             const childPlacement = {
                 build: request.build,
-                inheritedVisibility: visibility,
+                inheritedHiddenBy: hiddenBy,
                 parentId: id,
                 parentPath: path
             };
@@ -250,7 +260,7 @@ const snapshotOperations = {
             const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
             const snapshotProps = snapshotOperations.createPropsSnapshot({
                 build: request.build,
-                inheritedVisibility: visibility,
+                inheritedHiddenBy: hiddenBy,
                 ownerId: id,
                 ownerPath: path,
                 props: request.element.props
@@ -260,6 +270,7 @@ const snapshotOperations = {
                 activityMode: request.element.activityMode,
                 givenChildren,
                 caughtError: request.element.caughtError,
+                hiddenBy,
                 key: request.element.key,
                 kind: getElementKind(request.element.type),
                 name,
@@ -270,7 +281,7 @@ const snapshotOperations = {
                 renderedReason: request.element.renderedReason,
                 textContent: getTextContent(visibleChildren),
                 type: request.element.type,
-                visibility
+                visibility: visibilityOf(hiddenBy)
             };
         });
     },
@@ -280,7 +291,7 @@ const snapshotOperations = {
                 build: request.build,
                 element: toSourceElement(element),
                 index: location,
-                inheritedVisibility: request.inheritedVisibility,
+                inheritedHiddenBy: request.inheritedHiddenBy,
                 parentId: request.ownerId,
                 parentPath: request.ownerPath
             });
@@ -302,7 +313,7 @@ const snapshotOperations = {
         return snapshotOperations.createSourceChildSnapshots({
             build: request.build,
             children: request.element.children,
-            inheritedVisibility: request.inheritedVisibility,
+            inheritedHiddenBy: request.inheritedHiddenBy,
             parentId: request.parentId,
             parentPath: request.parentPath
         });
@@ -323,7 +334,7 @@ const snapshotOperations = {
 
         return sourceLeafSnapshotFactories[node.kind]({
             ...placement,
-            inheritedVisibility: visibilityFromSource(placement.inheritedVisibility, node.visibility, undefined),
+            inheritedHiddenBy: hiddenByFromSource(placement.inheritedHiddenBy, node.visibility, undefined),
             value: node.value
         });
     }
@@ -359,7 +370,7 @@ export function createIntrospectionSnapshotFromSource(
     const rootNodes = snapshotOperations.createSourceChildSnapshots({
         build,
         children,
-        inheritedVisibility: 'visible',
+        inheritedHiddenBy: undefined,
         parentId: undefined,
         parentPath: 'root'
     });

@@ -14,6 +14,7 @@ function createTextNode(textContent: string): SnapshotNode {
         activityMode: undefined,
         caughtError: undefined,
         givenChildren: [],
+        hiddenBy: undefined,
         id: 1,
         key: null,
         kind: 'text',

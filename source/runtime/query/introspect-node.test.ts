@@ -24,6 +24,7 @@ function createSnapshotNode(seed: SnapshotNodeSeed): SnapshotNode {
         activityMode: undefined,
         caughtError: undefined,
         givenChildren: [],
+        hiddenBy: undefined,
         id: seed.id,
         key: null,
         kind: 'host',

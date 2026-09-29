@@ -137,7 +137,7 @@ function formatNode(node: SnapshotNode, depth: number): string {
 function nodeState(node: SnapshotNode): IntrospectionNodeState {
     return Object.freeze({
         activityMode: node.activityMode,
-        reason: node.renderedReason ?? (node.visibility === 'hidden' ? 'activity' : undefined),
+        reason: node.renderedReason ?? node.hiddenBy,
         rendered: node.renderedReason === undefined,
         visible: node.visibility === 'visible'
     });
