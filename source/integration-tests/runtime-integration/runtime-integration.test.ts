@@ -55,6 +55,16 @@ class SuspenseThenableError extends Error {
     }
 }
 
+function Toggle(): React.ReactNode {
+    const [ enabled, setEnabled ] = React.useState(false);
+
+    return React.createElement('button', {
+        onClick() {
+            setEnabled(true);
+        }
+    }, enabled ? 'on' : 'off');
+}
+
 function Loading(): React.ReactNode {
     return React.createElement('em', null, 'loading');
 }
@@ -231,6 +241,33 @@ export const testNode = suite('runtime integration', [
                 }
             ]);
             scope.assert.equal(view.textContent, 'undefined');
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'updates without act warnings while the React act environment flag is set',
+        async function (scope) {
+            const observed = await withActEnvironment(async function updateInActEnvironment() {
+                const view = introspect(React.createElement(Toggle), {
+                    depth: 'full',
+                    strictMode: false,
+                    warningMode: 'capture'
+                });
+
+                view.find('button')?.sendEvent('click');
+                await view.waitForIdle();
+
+                const actEnvironment: unknown = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+
+                return {
+                    actEnvironment,
+                    textContent: view.textContent,
+                    warnings: view.warnings
+                };
+            });
+
+            scope.assert.deepEqual(observed, { actEnvironment: true, textContent: 'on', warnings: [] });
 
             return scope.assert.collect();
         }

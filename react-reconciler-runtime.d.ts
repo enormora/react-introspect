@@ -14,6 +14,7 @@ declare module 'react-reconciler' {
             onRecoverableError: (error: unknown) => void,
             onDefaultTransitionIndicator: null
         ) => ReconcilerRoot;
+        readonly discreteUpdates: <Result>(action: () => Result) => Result;
         readonly flushPassiveEffects: () => boolean;
         readonly flushSyncFromReconciler: <Result>(action: () => Result) => Result;
         readonly flushSyncWork: () => boolean;

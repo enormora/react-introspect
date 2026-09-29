@@ -1,13 +1,13 @@
 import type React from 'react';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
-import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
 import { createHostContainer, type IntrospectionHostContainerControl } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
 import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import { isIntrospectionUsageError } from '../../values/introspect-usage-error.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 import {
-    actAndFlush,
     createReconcilerContainer,
+    dispatchDiscreteUpdate,
     flushPassiveEffects,
     flushScheduledWork,
     reconcilerRuntime,
@@ -55,7 +55,33 @@ type SessionRenderTarget = {
     readonly container: IntrospectionHostContainerControl;
     readonly diagnostics: IntrospectionDiagnostics;
     readonly readRenderCount: () => number;
+    readonly usageErrors: UsageErrorRelay;
 };
+
+type UsageErrorRelay = {
+    readonly hold: (error: TypeError) => void;
+    readonly rethrow: () => void;
+};
+
+function createUsageErrorRelay(): UsageErrorRelay {
+    let heldError: TypeError | null = null;
+
+    return {
+        hold(error) {
+            if (heldError === null) {
+                heldError = error;
+            }
+        },
+        rethrow() {
+            if (heldError !== null) {
+                const error = heldError;
+
+                heldError = null;
+                throw error;
+            }
+        }
+    };
+}
 
 function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
     const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
@@ -63,13 +89,15 @@ function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefor
     target.container.discard(errorRenderCount);
 }
 
-function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
-    if (!isIntrospectionRenderError(error)) {
-        throw error;
+function captureUncaughtError(target: SessionRenderTarget, cause: unknown): void {
+    if (isIntrospectionUsageError(cause)) {
+        target.usageErrors.hold(cause);
+
+        return;
     }
 
-    publishEmptyErrorSnapshot(target, renderCountBefore);
-    target.diagnostics.recordUncaughtError(error);
+    target.container.discard(target.readRenderCount());
+    target.diagnostics.recordUncaughtError(cause);
 }
 
 function captureMissingInitialCommit(target: SessionRenderTarget, renderCountBefore: number): void {
@@ -92,15 +120,8 @@ function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, co
     const renderCountBefore = target.readRenderCount();
 
     target.container.beginCommit(mounted);
-
-    try {
-        commitElement();
-    } catch (error) {
-        captureRenderError(target, error, renderCountBefore);
-
-        return;
-    }
-
+    commitElement();
+    target.usageErrors.rethrow();
     target.container.validateRefs();
     captureMissingInitialCommit(target, renderCountBefore);
 }
@@ -126,25 +147,37 @@ function createIntrospectionReconcilerSession(
         },
         options.refs
     );
-    const root = createReconcilerContainer(runtime, container, options.diagnostics, options.strictMode);
     const target: SessionRenderTarget = {
         container,
         diagnostics: options.diagnostics,
         readRenderCount() {
             return renderCount;
-        }
+        },
+        usageErrors: createUsageErrorRelay()
     };
+    const root = createReconcilerContainer(runtime, container, {
+        recordCaughtError: options.diagnostics.recordCaughtError,
+        recordRecoverableError: options.diagnostics.recordRecoverableError,
+        recordUncaughtError(cause) {
+            captureUncaughtError(target, cause);
+        }
+    }, options.strictMode);
     async function flushUntilIdle(): Promise<void> {
         await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
             await flushScheduledWork(runtime, root);
             flushPassiveEffects(runtime, waiters.settle);
+            target.usageErrors.rethrow();
         });
     }
 
     const session: IntrospectionReconcilerSession = {
         act(action) {
             return options.diagnostics.run(function actWithDiagnostics() {
-                return actAndFlush(runtime, action);
+                const result = dispatchDiscreteUpdate(runtime, action);
+
+                target.usageErrors.rethrow();
+
+                return result;
             });
         },
         readMounted: container.readMounted,

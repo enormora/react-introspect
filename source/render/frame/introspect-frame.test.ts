@@ -3,7 +3,6 @@ import { defineCompositeAssertion } from '@overkill-dev/test/assert';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
-import { isIntrospectionRenderError, throwIntrospectionRenderError } from './introspect-render-error.ts';
 import { createFrameDepth } from './introspect-frame-depth.ts';
 import { createIntrospectionRenderElement } from './introspect-frame.ts';
 
@@ -853,31 +852,6 @@ export const testNode = suite('execution shallow function components', [
 
         return scope.assert.collect();
     }),
-    test(
-        'does not mark functions or thenables as Introspection render errors',
-        function (scope) {
-            const value = function value(): void {
-                return undefined;
-            };
-            const thenable = {
-                then() {
-                    return undefined;
-                }
-            };
-
-            scope.assert.throws(
-                function () {
-                    throwIntrospectionRenderError(thenable);
-                },
-                { exact: thenable }
-            );
-
-            scope.assert.equal(isIntrospectionRenderError(value), false);
-            scope.assert.equal(isIntrospectionRenderError(thenable), false);
-
-            return scope.assert.collect();
-        }
-    ),
     test('normalizes iterable output as rendered children', function (scope) {
         function IterableOutput(): Iterable<React.ReactNode> {
             return new Set([

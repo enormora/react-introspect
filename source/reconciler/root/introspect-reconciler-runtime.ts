@@ -48,7 +48,7 @@ export function createIntrospectionReconcilerRuntime(): IntrospectionReconcilerR
         scheduleMicrotask(action) {
             const runtime = currentRuntime();
 
-            runtime.microtasks.schedule(function runMicrotask() {
+            queueMicrotask(function runMicrotask() {
                 runWithRuntime(runtime, action);
             });
         },

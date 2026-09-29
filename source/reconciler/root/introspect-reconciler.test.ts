@@ -117,6 +117,34 @@ function Page(props: PageProps): React.ReactNode {
     );
 }
 
+type ActEnvironmentCommit = {
+    readonly flagAfterCommit: unknown;
+    readonly textContent: string;
+};
+
+function clickFirstButton(element: React.ReactElement): ActEnvironmentCommit {
+    const view = introspect(element, {
+        depth: 'full',
+        strictMode: false
+    });
+
+    view.find('button')?.sendEvent('click');
+
+    const flagAfterCommit: unknown = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+
+    return { flagAfterCommit, textContent: view.textContent };
+}
+
+function clickInReactActEnvironment(element: React.ReactElement): ActEnvironmentCommit {
+    Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
+
+    try {
+        return clickFirstButton(element);
+    } finally {
+        Reflect.deleteProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+    }
+}
+
 function Clicker(): React.ReactNode {
     const [ label, setLabel ] = React.useState('off');
 
@@ -435,7 +463,7 @@ export const testNode = suite('custom reconciler host layer', [
 
         return scope.assert.collect();
     }),
-    test('wraps event props in React act', function (scope) {
+    test('commits event prop updates before sendEvent returns', function (scope) {
         const view = introspect(React.createElement(Clicker), {
             depth: 'full',
             strictMode: false
@@ -447,6 +475,31 @@ export const testNode = suite('custom reconciler host layer', [
         scope.assert.equal(button.isStale, true);
         scope.assert.equal(view.textContent, 'on');
         scope.assert.equal(view.renderCount, 2);
+
+        return scope.assert.collect();
+    }),
+    test('clears a set React act environment flag only while committing', function (scope) {
+        const observedFlags: unknown[] = [];
+
+        function ActEnvironmentReader(): React.ReactNode {
+            const [ label, setLabel ] = React.useState('off');
+            const flag: unknown = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+
+            observedFlags.push(flag);
+
+            return React.createElement('button', {
+                onClick() {
+                    setLabel('on');
+                }
+            }, label);
+        }
+
+        const committed = clickInReactActEnvironment(React.createElement(ActEnvironmentReader));
+
+        scope.assert.deepEqual(
+            { ...committed, observedFlags },
+            { flagAfterCommit: true, observedFlags: [ false, false ], textContent: 'on' }
+        );
 
         return scope.assert.collect();
     }),
@@ -675,7 +728,7 @@ export const testNode = suite('custom reconciler host layer', [
     ),
     test(
         'marks a hidden Activity that Suspense hides behind its fallback as suspended',
-        function (scope) {
+        async function (scope) {
             const hiddenActivity = React.createElement(React.Activity, {
                 children: React.createElement(ReadyPanel),
                 mode: 'hidden'
@@ -688,6 +741,7 @@ export const testNode = suite('custom reconciler host layer', [
                 }
             );
 
+            await view.waitForIdle();
             view.update(React.createElement(
                 React.Suspense,
                 { fallback: React.createElement(Loading) },
@@ -799,7 +853,7 @@ export const testNode = suite('custom reconciler host layer', [
             });
             reconcilerRuntime.cancelTimeout(timeoutIdentifier);
         });
-        await runtime.microtasks.flush();
+        await runtime.macrotasks.waitForNext();
 
         scope.assert.deepEqual({
             eventTimestamp: reconcilerRuntime.run(runtime, function readEventTimestamp() {
@@ -850,7 +904,7 @@ export const testNode = suite('custom reconciler host layer', [
         reconcilerRuntime.scheduleMicrotask(function recordMicrotask() {
             microtaskEvents.push('microtask');
         });
-        await runtime.microtasks.flush();
+        await runtime.macrotasks.waitForNext();
 
         scope.assert.deepEqual(microtaskEvents, [ 'microtask' ]);
 

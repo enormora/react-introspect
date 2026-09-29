@@ -1,11 +1,12 @@
 import React from 'react';
+import { createIntrospectionUsageError } from './introspect-usage-error.ts';
 import { isObjectOrFunction } from './introspect-value-kinds.ts';
 
 const reactPortalType = Symbol.for('react.portal');
 
 export function assertNotPortal(value: unknown): void {
     if (isObjectOrFunction(value) && value.$$typeof === reactPortalType) {
-        throw new TypeError('React Introspect cannot represent portal output yet.');
+        throw createIntrospectionUsageError('React Introspect cannot represent portal output yet.');
     }
 }
 

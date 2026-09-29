@@ -144,7 +144,7 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('marks hidden Activity output and descendants invisible', function (scope) {
+    test('marks hidden Activity output and descendants invisible once idle', async function (scope) {
         const view = introspect(
             React.createElement(React.Activity, {
                 children: React.createElement(Panel),
@@ -155,6 +155,9 @@ export const testNode = suite('React 19 special surfaces', [
                 strictMode: false
             }
         );
+
+        await view.waitForIdle();
+
         const activity = requireValue(view.find(React.Activity));
         const panel = requireValue(view.find(Panel));
         const section = requireValue(view.find('section'));
@@ -179,7 +182,29 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('marks components below the depth inside hidden Activity as hidden', function (scope) {
+    test('defers hidden Activity content until the view is idle', async function (scope) {
+        const view = introspect(
+            React.createElement(React.Activity, {
+                children: React.createElement(Panel),
+                mode: 'hidden'
+            }),
+            {
+                depth: 'full',
+                strictMode: false
+            }
+        );
+        const panelBeforeIdle = view.find(Panel);
+
+        await view.waitForIdle();
+
+        scope.assert.deepEqual(
+            { panelAfterIdle: view.find(Panel)?.name, panelBeforeIdle },
+            { panelAfterIdle: 'Panel', panelBeforeIdle: undefined }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('marks components below the depth inside hidden Activity as hidden once idle', async function (scope) {
         const view = introspect(
             React.createElement(React.Activity, {
                 children: React.createElement(Panel),
@@ -190,6 +215,9 @@ export const testNode = suite('React 19 special surfaces', [
                 strictMode: false
             }
         );
+
+        await view.waitForIdle();
+
         const panel = requireValue(view.find(Panel));
 
         scope.assert.deepEqual({ state: panel.state, visibility: panel.visibility }, {
@@ -237,7 +265,7 @@ export const testNode = suite('React 19 special surfaces', [
 
         return scope.assert.collect();
     }),
-    test('updates Activity text visibility when mode changes', function (scope) {
+    test('updates Activity text visibility when mode changes', async function (scope) {
         const view = introspect(
             React.createElement(React.Activity, {
                 children: 'loading',
@@ -248,6 +276,9 @@ export const testNode = suite('React 19 special surfaces', [
                 strictMode: false
             }
         );
+
+        await view.waitForIdle();
+
         const hiddenText = requireValue(view.find('#text'));
 
         view.update(React.createElement(React.Activity, {

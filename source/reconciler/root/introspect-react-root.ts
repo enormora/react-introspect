@@ -2,11 +2,18 @@ import type React from 'react';
 import createReconciler, { type ReconcilerRoot } from 'react-reconciler';
 // eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
 import { ConcurrentRoot } from 'react-reconciler/constants.js';
-import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { createIntrospectionHostConfig, type IntrospectionHostContainer } from '../host/introspect-host-tree.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 import { createIntrospectionReconcilerRuntime } from './introspect-reconciler-runtime.ts';
+
+export type ReconcilerRootErrorRecorders = {
+    readonly recordCaughtError: (cause: unknown) => void;
+    readonly recordRecoverableError: (cause: unknown) => void;
+    readonly recordUncaughtError: (cause: unknown) => void;
+};
+
+const reactActEnvironmentKey = 'IS_REACT_ACT_ENVIRONMENT';
 
 export const reconcilerRuntime = createIntrospectionReconcilerRuntime();
 const renderer = createReconciler(createIntrospectionHostConfig(reconcilerRuntime));
@@ -14,7 +21,7 @@ const renderer = createReconciler(createIntrospectionHostConfig(reconcilerRuntim
 export function createReconcilerContainer(
     runtime: IntrospectionRuntimeDependencies,
     container: IntrospectionHostContainer,
-    diagnostics: IntrospectionDiagnostics,
+    errorRecorders: ReconcilerRootErrorRecorders,
     strictMode: boolean
 ): ReconcilerRoot {
     return reconcilerRuntime.run(runtime, function createContainerWithRuntime() {
@@ -25,9 +32,9 @@ export function createReconcilerContainer(
             strictMode,
             null,
             container.idNormalization.prefix,
-            diagnostics.recordUncaughtError,
-            diagnostics.recordCaughtError,
-            diagnostics.recordRecoverableError,
+            errorRecorders.recordUncaughtError,
+            errorRecorders.recordCaughtError,
+            errorRecorders.recordRecoverableError,
             null
         );
     });
@@ -43,9 +50,23 @@ function hasScheduledRootTask(root: ReconcilerRoot): boolean {
     return isObject(task) && typeof task.callback === 'function';
 }
 
-export function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => unknown): unknown {
-    return reconcilerRuntime.run(runtime, function actWithRuntime() {
-        return runtime.actEnvironment.act(function runAction() {
+function runOutsideReactActEnvironment<Result>(action: () => Result): Result {
+    if (Reflect.get(globalThis, reactActEnvironmentKey) !== true) {
+        return action();
+    }
+
+    Reflect.set(globalThis, reactActEnvironmentKey, false);
+
+    try {
+        return action();
+    } finally {
+        Reflect.set(globalThis, reactActEnvironmentKey, true);
+    }
+}
+
+function commitSynchronously<Result>(runtime: IntrospectionRuntimeDependencies, action: () => Result): Result {
+    return reconcilerRuntime.run(runtime, function commitWithRuntime() {
+        return runOutsideReactActEnvironment(function commitOutsideActEnvironment() {
             const result = action();
 
             renderer.flushSyncWork();
@@ -56,9 +77,12 @@ export function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: (
     });
 }
 
-async function flushMicrotasks(runtime: IntrospectionRuntimeDependencies): Promise<void> {
-    await reconcilerRuntime.run(runtime, async function flushMicrotasksWithRuntime() {
-        await runtime.microtasks.flush();
+export function dispatchDiscreteUpdate<Result>(
+    runtime: IntrospectionRuntimeDependencies,
+    action: () => Result
+): Result {
+    return commitSynchronously(runtime, function dispatchAtDiscretePriority() {
+        return renderer.discreteUpdates(action);
     });
 }
 
@@ -66,11 +90,8 @@ export async function flushScheduledWork(
     runtime: IntrospectionRuntimeDependencies,
     root: ReconcilerRoot
 ): Promise<void> {
-    await flushMicrotasks(runtime);
-
     do {
         await runtime.macrotasks.waitForNext();
-        await flushMicrotasks(runtime);
     } while (hasScheduledRootTask(root));
 }
 
@@ -79,7 +100,7 @@ export function renderRootElement(
     root: ReconcilerRoot,
     element: Readonly<React.ReactElement> | null
 ): void {
-    actAndFlush(runtime, function renderElement() {
+    commitSynchronously(runtime, function renderElement() {
         renderer.flushSyncFromReconciler(function updateContainer() {
             renderer.updateContainer(element, root, null, null);
         });

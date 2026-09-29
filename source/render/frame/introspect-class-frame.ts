@@ -18,7 +18,6 @@ import {
     type IntrospectionTransformedNode,
     readElementRef
 } from './introspect-frame-contract.ts';
-import { throwIntrospectionRenderError } from './introspect-render-error.ts';
 import { type IntrospectionFrameDepth, nextDepth } from './introspect-frame-depth.ts';
 
 export type IntrospectionClassFrameProps = {
@@ -176,14 +175,6 @@ function applyElementRef(ref: unknown, value: IntrospectionClassInstance | null)
     }
 }
 
-function executeIntrospectionClassRender(instance: IntrospectionClassInstance): React.ReactNode {
-    try {
-        return instance.render();
-    } catch (error) {
-        return throwIntrospectionRenderError(error);
-    }
-}
-
 const IntrospectionClassFrameBase = class
     extends React.Component<IntrospectionClassFrameProps, IntrospectionClassFrameState> {
     protected committedRender: IntrospectionClassRender | undefined;
@@ -334,7 +325,7 @@ const IntrospectionClassFrameBase = class
         }
 
         return this.props.renderChildren(
-            executeIntrospectionClassRender(this.userInstance),
+            this.userInstance.render(),
             nextDepth(this.props.depth, this.props.element.type)
         );
     }

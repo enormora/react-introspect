@@ -2,8 +2,6 @@ import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
-import type { IntrospectionRuntimeDependencies } from '../../reconciler/scheduling/introspect-runtime-dependencies-types.ts';
-import { createUnitRuntimeDependencies } from '../../reconciler/scheduling/introspect-runtime-dependencies.test.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
 
@@ -21,25 +19,7 @@ type LeafProps = {
     };
 };
 
-type ActObservation = {
-    readonly actCalls: number;
-    readonly active: boolean;
-    readonly componentObservedAct: boolean;
-    readonly restored: boolean;
-};
-
-type ObservedActRuntime = {
-    readonly component: () => React.ReactNode;
-    readonly readObservation: () => ActObservation;
-    readonly runtime: IntrospectionRuntimeDependencies;
-};
-
 type BrowserGlobalDescriptors = ReadonlyMap<string, PropertyDescriptor | undefined>;
-
-type FailingActRuntime = {
-    readonly readObservation: () => Pick<ActObservation, 'active' | 'restored'>;
-    readonly runtime: IntrospectionRuntimeDependencies;
-};
 
 const reactPortalType = Symbol.for('react.portal');
 const noConsoleDiagnostics: IntrospectionConsoleDiagnostics = {
@@ -120,83 +100,6 @@ function readElementProp(node: IntrospectionNode): ElementProp {
     }
 
     return icon as ElementProp;
-}
-
-function createObservedActRuntime(): ObservedActRuntime {
-    const unitRuntime = createUnitRuntimeDependencies();
-    let actCalls = 0;
-    let active = false;
-    let componentObservedAct = false;
-    let restored = false;
-
-    function ActProbe(): React.ReactNode {
-        componentObservedAct = active;
-
-        return React.createElement('main', null, 'clean');
-    }
-
-    const runtime: IntrospectionRuntimeDependencies = {
-        ...unitRuntime,
-        actEnvironment: {
-            act(action: () => unknown) {
-                actCalls += 1;
-                active = true;
-
-                try {
-                    return unitRuntime.actEnvironment.act(action);
-                } finally {
-                    active = false;
-                    restored = true;
-                }
-            }
-        }
-    };
-
-    return {
-        component: ActProbe,
-        readObservation() {
-            return {
-                actCalls,
-                active,
-                componentObservedAct,
-                restored
-            };
-        },
-        runtime
-    };
-}
-
-function createFailingActRuntime(): FailingActRuntime {
-    const unitRuntime = createUnitRuntimeDependencies();
-    let active = false;
-    let restored = false;
-    const runtime: IntrospectionRuntimeDependencies = {
-        ...unitRuntime,
-        actEnvironment: {
-            act(action: () => unknown) {
-                active = true;
-
-                try {
-                    unitRuntime.actEnvironment.act(action);
-
-                    throw new Error('Injected act failed.');
-                } finally {
-                    active = false;
-                    restored = true;
-                }
-            }
-        }
-    };
-
-    return {
-        readObservation() {
-            return {
-                active,
-                restored
-            };
-        },
-        runtime
-    };
 }
 
 function readBrowserGlobalDescriptors(): BrowserGlobalDescriptors {
@@ -301,36 +204,6 @@ export const testNode = suite('unsupported React concepts and hardening', [
             reactStore: false,
             reactTypeMarker: false,
             reflectMarker: false
-        });
-
-        return scope.assert.collect();
-    }),
-    test('uses injected React act environment', function (scope) {
-        const observed = createObservedActRuntime();
-        const view = introspect(React.createElement(observed.component), {}, noConsoleDiagnostics, observed.runtime);
-
-        scope.assert.deepEqual(observed.readObservation(), {
-            actCalls: 1,
-            active: false,
-            componentObservedAct: true,
-            restored: true
-        });
-        scope.assert.equal(view.textContent, 'clean');
-
-        return scope.assert.collect();
-    }),
-    test('restores injected React act environment after failure', function (scope) {
-        const failingAct = createFailingActRuntime();
-
-        scope.assert.throws(
-            function () {
-                introspect(React.createElement('main'), {}, noConsoleDiagnostics, failingAct.runtime);
-            },
-            { message: 'Injected act failed.' }
-        );
-        scope.assert.deepEqual(failingAct.readObservation(), {
-            active: false,
-            restored: true
         });
 
         return scope.assert.collect();
