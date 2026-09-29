@@ -43,16 +43,8 @@ type SnapshotNodeRequest = SnapshotChildPlacement & {
     readonly node: unknown;
 };
 
-type ElementNodeRequest = SnapshotNodeRequest & {
-    readonly element: React.ReactElement<SnapshotProps>;
-};
-
 type SourceElementNodeRequest = SnapshotNodeRequest & {
     readonly element: SnapshotSourceElement;
-};
-
-type ChildSnapshotsRequest = SnapshotChildPlacement & {
-    readonly children: unknown;
 };
 
 type SourceChildSnapshotsRequest = SnapshotChildPlacement & {
@@ -93,7 +85,7 @@ function visibilityFromSource(
 }
 
 function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
-    return element.givenChildrenKind === 'source' && element.givenChildren === element.children;
+    return element.givenChildren === element.children;
 }
 
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
@@ -137,14 +129,13 @@ function flattenReactNodes(children: unknown): readonly unknown[] {
 
 function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSourceElement {
     // eslint-disable-next-line @typescript-eslint/no-use-before-define -- React values map to source nodes recursively
-    const children = toSourceNodes(element.props.children);
+    const children = toSnapshotSourceNodes(element.props.children);
 
     return {
         activityMode: undefined,
         caughtError: undefined,
         children,
         givenChildren: children,
-        givenChildrenKind: 'source',
         key: element.key ?? null,
         kind: 'element',
         props: freezePropsWithoutChildren(element.props),
@@ -168,7 +159,7 @@ function toSourceNode(node: unknown): SnapshotSourceNode {
         : { kind: 'opaque', value: node, visibility: 'visible' };
 }
 
-function toSourceNodes(children: unknown): readonly SnapshotSourceNode[] {
+export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourceNode[] {
     return Object.freeze(flattenReactNodes(children).map(toSourceNode));
 }
 
@@ -239,17 +230,6 @@ function createSiblingSnapshots<Child>(
 }
 
 const snapshotOperations = {
-    createChildSnapshots(request: ChildSnapshotsRequest): readonly SnapshotNode[] {
-        const { children, ...placement } = request;
-
-        return snapshotOperations.createSourceChildSnapshots({ ...placement, children: toSourceNodes(children) });
-    },
-    createElementSnapshotNode(request: ElementNodeRequest): SnapshotNode {
-        return snapshotOperations.createSourceElementSnapshotNode({
-            ...request,
-            element: toSourceElement(request.element)
-        });
-    },
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
         const id = request.build.allocateId();
         const name = getTypeName(request.element.type);
@@ -302,9 +282,9 @@ const snapshotOperations = {
         return normalizeSnapshotProps(request.props, {
             ancestors: request.build.valueAncestors,
             describeElement(element, location) {
-                return snapshotOperations.createElementSnapshotNode({
+                return snapshotOperations.createSourceElementSnapshotNode({
                     build: request.build,
-                    element,
+                    element: toSourceElement(element),
                     index: location,
                     inheritedVisibility: request.inheritedVisibility,
                     node: element,
@@ -318,9 +298,7 @@ const snapshotOperations = {
     createSourceElementGivenChildren(request: SourceElementChildrenRequest): readonly SnapshotNode[] {
         const { element, ...placement } = request;
 
-        return element.givenChildrenKind === 'source'
-            ? snapshotOperations.createSourceChildSnapshots({ ...placement, children: element.givenChildren })
-            : snapshotOperations.createChildSnapshots({ ...placement, children: element.givenChildren });
+        return snapshotOperations.createSourceChildSnapshots({ ...placement, children: element.givenChildren });
     },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): readonly SnapshotNode[] {
         if (request.element.renderedReason === 'depth') {
@@ -377,7 +355,6 @@ export function createIntrospectionSnapshotFromSource(
                     children,
                     caughtError: undefined,
                     givenChildren: [],
-                    givenChildrenKind: 'source',
                     kind: 'element',
                     key: null,
                     props: {},

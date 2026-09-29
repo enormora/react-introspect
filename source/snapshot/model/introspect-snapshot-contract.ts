@@ -20,7 +20,7 @@ type SnapshotSourceVisibleNode = SnapshotSourceElement | SnapshotSourceEmpty;
 
 export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | SnapshotSourceVisibleNode;
 
-type SnapshotSourceElementBase = {
+export type SnapshotSourceElement = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly kind: 'element';
     readonly children: readonly SnapshotSourceNode[];
@@ -30,19 +30,8 @@ type SnapshotSourceElementBase = {
     readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly type: unknown;
     readonly visibility: SnapshotVisibility;
-};
-
-type SnapshotSourceReactElement = SnapshotSourceElementBase & {
-    readonly givenChildren: unknown;
-    readonly givenChildrenKind: 'react';
-};
-
-type SnapshotSourceOwnedElement = SnapshotSourceElementBase & {
     readonly givenChildren: readonly SnapshotSourceNode[];
-    readonly givenChildrenKind: 'source';
 };
-
-export type SnapshotSourceElement = SnapshotSourceOwnedElement | SnapshotSourceReactElement;
 
 type SnapshotSourceEmpty = {
     readonly kind: 'empty';

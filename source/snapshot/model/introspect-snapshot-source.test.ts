@@ -1,7 +1,7 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import { isObject } from '../../values/introspect-value-kinds.ts';
-import { createIntrospectionSnapshotFromSource } from './introspect-snapshot.ts';
+import { createIntrospectionSnapshotFromSource, toSnapshotSourceNodes } from './introspect-snapshot.ts';
 import { isSnapshotNode, type SnapshotNode } from './introspect-snapshot-contract.ts';
 
 function Icon(): React.ReactNode {
@@ -76,8 +76,7 @@ export const testNode = suite('snapshots of given children and elements in props
                     activityMode: 'hidden',
                     children: [],
                     caughtError: undefined,
-                    givenChildren: createGivenChildren(),
-                    givenChildrenKind: 'react',
+                    givenChildren: toSnapshotSourceNodes(createGivenChildren()),
                     kind: 'element',
                     key: 'panel',
                     props: {
