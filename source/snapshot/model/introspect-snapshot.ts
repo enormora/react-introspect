@@ -26,6 +26,7 @@ import {
     type SnapshotRender,
     type SnapshotSourceElement,
     type SnapshotSourceNode,
+    type SnapshotSourceOutput,
     type SnapshotVisibility
 } from './introspect-snapshot-contract.ts';
 import { toSourceElement } from './introspect-snapshot-source-mapping.ts';
@@ -110,6 +111,10 @@ const notRenderedFromSource: Readonly<
         return { reason: 'unsupported', status: 'notRendered' };
     }
 };
+
+function readNotRenderedReason(output: SnapshotSourceOutput): IntrospectionNotRenderedReason | undefined {
+    return output.status === 'notRendered' ? output.reason : undefined;
+}
 
 function renderFromSource(
     renderedReason: IntrospectionNotRenderedReason | undefined,
@@ -251,7 +256,7 @@ const snapshotOperations = {
                 parentId: request.parentId,
                 path,
                 props: snapshotProps,
-                render: renderFromSource(request.element.renderedReason, hiddenBy),
+                render: renderFromSource(readNotRenderedReason(request.element.output), hiddenBy),
                 renderedChildren,
                 textContent: getTextContent(visibleChildren),
                 type: request.element.type
@@ -271,23 +276,19 @@ const snapshotOperations = {
         });
     },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): readonly SnapshotNode[] {
-        if (request.element.renderedReason === 'depth') {
-            return request.givenChildren;
+        const { output } = request.element;
+
+        if (output.status === 'notRendered') {
+            return output.reason === 'depth' ? request.givenChildren : Object.freeze([]);
         }
 
-        if (request.element.renderedReason !== undefined) {
-            return Object.freeze([]);
-        }
-
-        const { renderedChildren } = request.element;
-
-        if (renderedChildren === 'given') {
+        if (output.children === 'given') {
             return request.givenChildren;
         }
 
         return snapshotOperations.createSourceChildSnapshots({
             build: request.build,
-            children: renderedChildren,
+            children: output.children,
             inheritedHiddenBy: request.inheritedHiddenBy,
             parentId: request.parentId,
             parentPath: request.parentPath
@@ -330,8 +331,7 @@ export function createIntrospectionSnapshotFromSource(
                     kind: 'element',
                     key: null,
                     props: {},
-                    renderedChildren: children,
-                    renderedReason: undefined,
+                    output: { children, status: 'rendered' },
                     type: React.Fragment,
                     hostVisibility: 'visible'
                 }

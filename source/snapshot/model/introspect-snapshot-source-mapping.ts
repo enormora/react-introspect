@@ -1,7 +1,13 @@
 import React from 'react';
 import { freezePublicElementProps, getElementKind } from '../shape/introspect-snapshot-shape.ts';
 import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kinds.ts';
-import type { SnapshotProps, SnapshotSourceElement, SnapshotSourceNode } from './introspect-snapshot-contract.ts';
+import type { IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
+import type {
+    SnapshotProps,
+    SnapshotSourceElement,
+    SnapshotSourceNode,
+    SnapshotSourceOutput
+} from './introspect-snapshot-contract.ts';
 
 function flattenReactNodes(children: unknown): readonly unknown[] {
     if (Array.isArray(children)) {
@@ -26,8 +32,9 @@ export function toSourceElement(element: React.ReactElement<SnapshotProps>): Sna
         key: element.key ?? null,
         kind: 'element',
         props: freezePublicElementProps(element.props),
-        renderedChildren: 'given',
-        renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
+        output: getElementKind(element.type) === 'component'
+            ? { reason: 'depth', status: 'notRendered' }
+            : { children: 'given', status: 'rendered' },
         type: element.type,
         hostVisibility: 'visible'
     };
@@ -49,4 +56,13 @@ function toSourceNode(node: unknown): SnapshotSourceNode {
 
 export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourceNode[] {
     return Object.freeze(flattenReactNodes(children).map(toSourceNode));
+}
+
+export function toSourceOutput(
+    renderedReason: IntrospectionNotRenderedReason | undefined,
+    children: readonly SnapshotSourceNode[]
+): SnapshotSourceOutput {
+    return renderedReason === undefined
+        ? { children, status: 'rendered' }
+        : { reason: renderedReason, status: 'notRendered' };
 }
