@@ -779,6 +779,18 @@ assert.equal(view.root, undefined);
 const nextView = introspect(<ProfileCard user={user} />);
 ```
 
+A view is disposable. Declare it with `using` to unmount it when the scope ends.
+
+```tsx
+test('focuses the search box', () => {
+    using view = introspect(<SearchBox autoFocus={true} />);
+
+    assert.ok(view.find('input'));
+});
+```
+
+Unmounting an unmounted view does nothing. See [Cleanup](#cleanup) for when this matters.
+
 ### `view.uncaughtErrors` and `view.caughtErrors`
 
 `uncaughtErrors` returns render errors no error boundary caught. They unmount the root.
@@ -1384,6 +1396,24 @@ assert.ok(secondInput);
 assert.equal(firstInput.props.id, 'field-a');
 assert.equal(secondInput.props.id, 'field-b');
 ```
+
+### Cleanup
+
+Cleanup is optional. React Introspect keeps no global registry of views, so a view that goes out of scope is garbage collected together with its React tree.
+
+A view survives a test only when something outside the test keeps a reference into the tree. Typical cases are a component that subscribes to a module-level store in an effect, or one that starts an interval. The subscription or timer holds the component's state setter, and through it the whole tree.
+
+Only the effect cleanups release those references, and only unmounting runs them. Call `view.unmount()` or declare the view with `using` in such tests.
+
+```tsx
+test('renders the cart badge', () => {
+    using view = introspect(<CartBadge store={cartStore} />);
+
+    assert.equal(view.find(Badge)?.props.count, 0);
+});
+```
+
+Consider the same when a large suite grows in memory.
 
 ### Use without JSX
 
