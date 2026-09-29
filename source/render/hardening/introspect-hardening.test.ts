@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
+import type { IntrospectionError, IntrospectionNode } from '../../public/introspect-public-types.ts';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
@@ -17,6 +17,10 @@ type LeafProps = {
         readonly label: string;
         readonly self: unknown;
     };
+};
+
+type FailingLeafProps = {
+    readonly message: string;
 };
 
 type BrowserGlobalDescriptors = ReadonlyMap<string, PropertyDescriptor | undefined>;
@@ -90,6 +94,20 @@ function PortalArrayChildRoot(): React.ReactNode {
             self: undefined
         }
     }, createPortalArray());
+}
+
+function FailingLeaf(props: FailingLeafProps): React.ReactNode {
+    throw new Error(props.message);
+}
+
+const FailingClassLeaf = class extends React.Component<FailingLeafProps> {
+    public override render(): React.ReactNode {
+        throw new Error(this.props.message);
+    }
+};
+
+function readErrorMessage(error: IntrospectionError): string {
+    return error.message;
 }
 
 function readElementProp(node: IntrospectionNode): ElementProp {
@@ -172,6 +190,24 @@ export const testNode = suite('unsupported React concepts and hardening', [
                 });
             },
             { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('runs function and class components before checking their given children for portals', function (scope) {
+        const leafProps: FailingLeafProps = { message: 'Leaf failed.' };
+        const functionView = introspect(React.createElement(FailingLeaf, leafProps, createPortalArray()), {
+            errorMode: 'capture',
+            strictMode: false
+        });
+        const classView = introspect(React.createElement(FailingClassLeaf, leafProps, createPortalArray()), {
+            errorMode: 'capture',
+            strictMode: false
+        });
+
+        scope.assert.deepEqual(
+            [ functionView.uncaughtErrors.map(readErrorMessage), classView.uncaughtErrors.map(readErrorMessage) ],
+            [ [ 'Leaf failed.' ], [ 'Leaf failed.' ] ]
         );
 
         return scope.assert.collect();

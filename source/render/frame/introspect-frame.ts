@@ -177,6 +177,11 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
         return createClassFrameElement(props.element, props.depth, executableKind.component);
     }
 
+    const output = transformNode(
+        executeIntrospectionFrameElement(executableType, props.element),
+        nextDepth(props.depth, props.element.type)
+    );
+
     return createComponentHost(
         createComponentMetadata({
             activityMode: undefined,
@@ -184,10 +189,7 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
             element: props.element,
             renderedReason: undefined
         }),
-        transformNode(
-            executeIntrospectionFrameElement(executableType, props.element),
-            nextDepth(props.depth, props.element.type)
-        )
+        output
     );
 }
 
