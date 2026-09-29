@@ -60,6 +60,7 @@ const view = introspect(React.createElement(Button, {
 const button = view.find(Button);
 
 expect(view).type.toBeAssignableTo<IntrospectionView>();
+expect(view).type.toBeAssignableTo<Disposable>();
 expect({ depth: 1, warningMode: 'throw' } as const).type.toBeAssignableTo<IntrospectionOptions>();
 expect({
     refs: {

@@ -70,7 +70,7 @@ export type RuntimeIntrospectionLocator = {
     readonly sendEvent: IntrospectionSendEvent;
 };
 
-export type RuntimeIntrospectionView = IntrospectionRenderControl & {
+export type RuntimeIntrospectionView = Disposable & IntrospectionRenderControl & {
     readonly caughtErrors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
     readonly renderCount: number;

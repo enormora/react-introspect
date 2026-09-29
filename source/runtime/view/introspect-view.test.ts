@@ -73,6 +73,20 @@ function createEventForm(record: (event: RecordedEvent) => void): React.ReactEle
     );
 }
 
+function createSubscriber(recordEffect: (effect: string) => void): React.FC {
+    return function Subscriber(): React.ReactNode {
+        React.useEffect(function subscribe() {
+            recordEffect('subscribed');
+
+            return function unsubscribe() {
+                recordEffect('unsubscribed');
+            };
+        }, []);
+
+        return React.createElement('span', null, 'subscribed');
+    };
+}
+
 function IdLabel(): React.ReactNode {
     return React.createElement('span', { id: React.useId() }, 'label');
 }
@@ -239,6 +253,30 @@ export const testNode = suite('introspection view', [
         scope.assert.equal(view.hasWarnings, false);
         scope.assert.equal(view.renderedChildren.length, 0);
         scope.assert.equal(view.root, undefined);
+
+        return scope.assert.collect();
+    }),
+    test('unmounts a view declared with using when its scope ends', function (scope) {
+        const effects: string[] = [];
+        const escapedViews: RuntimeIntrospectionView[] = [];
+
+        {
+            using view = createUnitIntrospectionView(
+                React.createElement(createSubscriber(function recordEffect(effect) {
+                    effects.push(effect);
+                })),
+                {
+                    strictMode: false,
+                    warningMode: 'capture'
+                }
+            );
+
+            escapedViews.push(view);
+            scope.assert.deepEqual(Array.from(effects), [ 'subscribed' ]);
+        }
+
+        scope.assert.deepEqual(Array.from(effects), [ 'subscribed', 'unsubscribed' ]);
+        scope.assert.equal(escapedViews[0]?.root, undefined);
 
         return scope.assert.collect();
     })

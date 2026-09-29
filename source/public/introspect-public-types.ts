@@ -329,7 +329,7 @@ export type IntrospectionListLocator<
     HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema
 > = IntrospectionNodeSequence<Props, Type, HostSchema>;
 
-export type IntrospectionView<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema> = {
+export type IntrospectionView<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema> = Disposable & {
     readonly caughtErrors: readonly IntrospectionError[];
     readonly hasWarnings: boolean;
     readonly renderCount: number;
