@@ -177,6 +177,11 @@ type IntrospectionNestedPropValue<
 type IntrospectionCollectionPropValue<
     Value,
     HostSchema extends IntrospectionHostSchema
+> = true extends IntrospectionHoldsReactElement<Value> ? IntrospectionRebuiltPropValue<Value, HostSchema> : Value;
+
+type IntrospectionRebuiltPropValue<
+    Value,
+    HostSchema extends IntrospectionHostSchema
 > = Value extends readonly (infer Item)[] ? readonly IntrospectionPropValue<Item, HostSchema>[]
     : IntrospectionObjectPropValue<Value, HostSchema>;
 
@@ -185,6 +190,20 @@ type IntrospectionObjectPropValue<
     HostSchema extends IntrospectionHostSchema
 > = Value extends Readonly<Record<PropertyKey, unknown>> ? IntrospectionPropValues<Value, HostSchema>
     : Value;
+
+type IntrospectionHoldsReactElement<Value> = Value extends React.ReactElement ? true
+    : IntrospectionNestedValueHoldsReactElement<Value>;
+
+type IntrospectionNestedValueHoldsReactElement<Value> = Value extends IntrospectionCallable ? false
+    : IntrospectionCollectionHoldsReactElement<Value>;
+
+type IntrospectionCollectionHoldsReactElement<Value> = Value extends readonly (infer Item)[]
+    ? IntrospectionHoldsReactElement<Item>
+    : IntrospectionRecordHoldsReactElement<Value>;
+
+type IntrospectionRecordHoldsReactElement<Value> = Value extends Readonly<Record<PropertyKey, unknown>>
+    ? { readonly [Key in keyof Value]: IntrospectionHoldsReactElement<Value[Key]>; }[keyof Value]
+    : false;
 
 type IntrospectionPropValues<Props, HostSchema extends IntrospectionHostSchema> = {
     readonly [Key in keyof Props]: IntrospectionPropValue<Props[Key], HostSchema>;

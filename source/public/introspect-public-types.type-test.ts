@@ -36,13 +36,21 @@ expect({ depthFrom: 'main' }).type.not.toBeAssignableTo<IntrospectionOptions>();
 expect({ transparent: [ 'section' ] }).type.not.toBeAssignableTo<IntrospectionOptions>();
 
 type IconProps = { readonly name: string; };
+type TabSettings = {
+    readonly icon: React.ReactElement<IconProps>;
+    readonly theme: { readonly name: string; };
+};
 type TabProps = {
     readonly actions: readonly React.ReactNode[];
     readonly badge: React.ReactNode;
     readonly config: { readonly icon: React.ReactElement<IconProps>; };
     readonly icon: React.ReactElement<IconProps>;
     readonly label: string;
+    readonly lookup: ReadonlyMap<string, number>;
     readonly onSelect: (id: string) => void;
+    readonly settings: TabSettings;
+    readonly tags: readonly string[];
+    readonly user: { readonly name: string; readonly roles: readonly string[]; };
 };
 
 declare const Tab: React.FC<TabProps>;
@@ -67,4 +75,11 @@ if (tab !== undefined) {
     }
 
     expect(tab.props.actions).type.toBeAssignableTo<readonly (typeof tab.props.badge)[]>();
+    expect(tab.props.user).type.toBe<TabProps['user']>();
+    expect(tab.props.tags).type.toBe<readonly string[]>();
+    expect(tab.props.lookup).type.toBe<ReadonlyMap<string, number>>();
+    expect(tab.props.settings).type.not.toBe<TabSettings>();
+    expect(tab.props.settings.icon.props.name).type.toBe<string>();
+    expect(tab.props.settings.theme).type.toBe<TabSettings['theme']>();
+    expect(tab.props.config).type.not.toBe<TabProps['config']>();
 }
