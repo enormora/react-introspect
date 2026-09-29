@@ -153,10 +153,12 @@ type IntrospectionNodeProps<
 type IntrospectionHostProps<
     HostSchema extends IntrospectionHostSchema,
     Type extends string
-> = Type extends keyof HostSchema ? IntrospectionWithoutKeys<HostSchema[Type], 'children'> : unknown;
+> = Type extends keyof HostSchema ? IntrospectionWithoutKeys<HostSchema[Type], ReactReservedPropKey> : unknown;
 
 type IntrospectionElementProps<Type> = Type extends React.JSXElementConstructor<infer Props> ? Props
     : IntrospectionComponentProps<Type>;
+
+type ReactReservedPropKey = 'children' | 'key' | 'ref';
 
 type IntrospectionWithoutKeys<Value, Keys extends PropertyKey> = {
     readonly [Key in keyof Value as Key extends Keys ? never : Key]: Value[Key];
@@ -210,7 +212,7 @@ type IntrospectionPropValues<Props, HostSchema extends IntrospectionHostSchema> 
 };
 
 type IntrospectionPublicProps<Props, HostSchema extends IntrospectionHostSchema> = unknown extends Props ? unknown
-    : IntrospectionPropValues<IntrospectionWithoutKeys<Props, 'children'>, HostSchema>;
+    : IntrospectionPropValues<IntrospectionWithoutKeys<Props, ReactReservedPropKey>, HostSchema>;
 
 type IntrospectionTypedSelector<
     HostSchema extends IntrospectionHostSchema,
