@@ -58,14 +58,13 @@ type IntrospectionReconcilerSession = {
 type SessionRenderTarget = {
     readonly container: IntrospectionHostContainer;
     readonly diagnostics: IntrospectionDiagnostics;
-    readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readRenderCount: () => number;
 };
 
 function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
     const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
 
-    target.publish(target.container.discard(errorRenderCount));
+    target.container.discard(errorRenderCount);
 }
 
 function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
@@ -135,7 +134,6 @@ function createIntrospectionReconcilerSession(
     const target: SessionRenderTarget = {
         container,
         diagnostics: options.diagnostics,
-        publish: options.publish,
         readRenderCount() {
             return renderCount;
         }

@@ -38,7 +38,7 @@ export type IntrospectionHostContainer = {
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
     readonly beginCommit: (mounted: boolean) => void;
-    readonly discard: (renderCount: number) => IntrospectionSnapshot;
+    readonly discard: (renderCount: number) => void;
     readonly readMounted: () => boolean;
 } & IntrospectionChildStore;
 
@@ -222,8 +222,7 @@ export function createHostContainer(
         discard(renderCount: number) {
             mounted = false;
             childStore.writeChildren([]);
-
-            return createEmptyIntrospectionSnapshot(renderCount);
+            publish(createEmptyIntrospectionSnapshot(renderCount));
         },
         idNormalization,
         publish,
