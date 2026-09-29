@@ -19,21 +19,13 @@ import {
     reconcilerRuntime,
     renderer
 } from './introspect-react-root.ts';
-
-type WaiterFailure = { readonly error: unknown; readonly kind: 'failed'; };
-
-type WaiterSatisfied = { readonly kind: 'satisfied'; };
-
-type PredicateOutcome = WaiterFailure | WaiterSatisfied | { readonly kind: 'pending'; };
-
-type WaiterOutcome = WaiterFailure | WaiterSatisfied | { readonly kind: 'cancelled'; };
-
-type DeadlineOutcome<Result> = { readonly kind: 'completed'; readonly value: Result; } | { readonly kind: 'expired'; };
-
-type Waiter = {
-    readonly predicate: () => boolean;
-    readonly resolve: (outcome: WaiterOutcome) => void;
-};
+import {
+    awaitWaiter,
+    createWaiterQueue,
+    type WaitOperation,
+    waitForOutcome,
+    withDeadline
+} from './introspect-wait.ts';
 
 type IntrospectionReconcilerRootOptions = {
     readonly diagnostics: IntrospectionDiagnostics;
@@ -58,18 +50,6 @@ export type IntrospectionReconcilerModuleDependencies = {
     readonly runtime: IntrospectionRuntimeDependencies;
 };
 
-type WaitOperation = 'waitForIdle' | 'waitForNextRender' | 'waitForRenderCount' | 'waitUntil';
-
-type WaiterHandle = {
-    readonly cancel: () => void;
-    readonly settled: Promise<WaiterOutcome>;
-};
-
-type WaiterQueue = {
-    readonly settle: () => void;
-    readonly wait: (predicate: () => boolean) => WaiterHandle;
-};
-
 type IntrospectionReconcilerSession = {
     readonly act: (action: () => unknown) => unknown;
     readonly readRenderCount: () => number;
@@ -84,105 +64,6 @@ type SessionRenderTarget = {
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readRenderCount: () => number;
 };
-
-function outcomeOfSatisfaction(satisfied: boolean): PredicateOutcome {
-    return satisfied ? { kind: 'satisfied' } : { kind: 'pending' };
-}
-
-function evaluatePredicate(predicate: () => boolean): PredicateOutcome {
-    try {
-        return outcomeOfSatisfaction(predicate());
-    } catch (error) {
-        return { error, kind: 'failed' };
-    }
-}
-
-function createWaiterQueue(): WaiterQueue {
-    const waiters = new Set<Waiter>();
-
-    return {
-        settle() {
-            for (const waiter of Array.from(waiters)) {
-                const outcome = evaluatePredicate(waiter.predicate);
-
-                if (outcome.kind !== 'pending') {
-                    waiters.delete(waiter);
-                    waiter.resolve(outcome);
-                }
-            }
-        },
-        wait(predicate) {
-            const { promise, resolve } = Promise.withResolvers<WaiterOutcome>();
-            const waiter = { predicate, resolve };
-
-            waiters.add(waiter);
-
-            return {
-                cancel() {
-                    waiters.delete(waiter);
-                    resolve({ kind: 'cancelled' });
-                },
-                settled: promise
-            };
-        }
-    };
-}
-
-async function completionOf<Result>(pending: Promise<Result>): Promise<DeadlineOutcome<Result>> {
-    return { kind: 'completed', value: await pending };
-}
-
-function valueBeforeDeadline<Result>(
-    outcome: DeadlineOutcome<Result>,
-    operation: WaitOperation,
-    timeoutInMilliseconds: number
-): Result {
-    if (outcome.kind === 'expired') {
-        throw new Error(`${operation} timed out after ${timeoutInMilliseconds} ms.`);
-    }
-
-    return outcome.value;
-}
-
-async function withDeadline<Result>(
-    clock: IntrospectionRuntimeDependencies['clock'],
-    timeoutInMilliseconds: number,
-    operation: WaitOperation,
-    pending: Promise<Result>
-): Promise<Result> {
-    const { promise: expiry, resolve: expire } = Promise.withResolvers<DeadlineOutcome<Result>>();
-    const expired: DeadlineOutcome<Result> = { kind: 'expired' };
-    const timeoutIdentifier = clock.setTimeout(expire, timeoutInMilliseconds, expired);
-
-    try {
-        const outcome = await Promise.race([ completionOf(pending), expiry ]);
-
-        return valueBeforeDeadline(outcome, operation, timeoutInMilliseconds);
-    } finally {
-        clock.clearTimeout(timeoutIdentifier);
-        expire(expired);
-    }
-}
-
-async function waitForOutcome(waiter: WaiterHandle, flushUntilIdle: () => Promise<void>): Promise<WaiterOutcome> {
-    await flushUntilIdle();
-
-    return waiter.settled;
-}
-
-function throwFailure(outcome: WaiterOutcome): void {
-    if (outcome.kind === 'failed') {
-        throw outcome.error;
-    }
-}
-
-async function awaitWaiter(waiter: WaiterHandle, pending: Promise<WaiterOutcome>): Promise<void> {
-    try {
-        throwFailure(await pending);
-    } finally {
-        waiter.cancel();
-    }
-}
 
 function actAndFlush(runtime: IntrospectionRuntimeDependencies, action: () => unknown): unknown {
     return reconcilerRuntime.run(runtime, function actWithRuntime() {
