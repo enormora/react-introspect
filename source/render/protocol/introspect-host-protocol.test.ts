@@ -7,13 +7,15 @@ import {
     createExecutedComponentHost,
     createOpaqueHost,
     createUnexecutedComponentHost,
-    type IntrospectionComponentMetadata,
+    type InternalHost,
     readInternalHost
 } from './introspect-host-protocol.ts';
 
 type HostElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>, string>;
 
-function readComponentMetadata(componentHost: React.ReactElement): IntrospectionComponentMetadata {
+type ComponentMetadata = Extract<InternalHost, { readonly kind: 'component'; }>['metadata'];
+
+function readComponentMetadata(componentHost: React.ReactElement): ComponentMetadata {
     const { props, type } = componentHost as HostElement;
     const decoded = readInternalHost(type, props);
 
