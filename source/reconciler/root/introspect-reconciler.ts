@@ -3,24 +3,9 @@ import createReconciler, { type ReconcilerInstance, type ReconcilerRoot } from '
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { isIntrospectionRenderError } from '../../render/frame/introspect-render-error.ts';
 import {
-    appendChild,
-    clearContainer,
     createHostContainer,
-    createHostInstance,
-    createTextInstance,
-    getChildHostContext,
-    getRootHostContext,
-    hideInstance,
-    hideTextInstance,
-    insertBefore,
+    createIntrospectionHostConfig,
     type IntrospectionHostContainer,
-    type IntrospectionHostInstance,
-    type IntrospectionHostProps,
-    type IntrospectionTextInstance,
-    removeChild as removeHostChild,
-    toSnapshot,
-    unhideInstance,
-    unhideTextInstance,
     validateContainerRefs
 } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
@@ -30,10 +15,7 @@ import {
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
-import {
-    createIntrospectionReconcilerRuntime,
-    type IntrospectionReconcilerRuntime
-} from './introspect-reconciler-runtime.ts';
+import { createIntrospectionReconcilerRuntime } from './introspect-reconciler-runtime.ts';
 
 type WaiterFailure = { readonly error: unknown; readonly kind: 'failed'; };
 
@@ -73,119 +55,8 @@ export type IntrospectionReconcilerModuleDependencies = {
     readonly runtime: IntrospectionRuntimeDependencies;
 };
 
-const defaultEventPriority = 32;
-
-function noop(): void {
-    return undefined;
-}
-
-function alwaysFalse(): boolean {
-    return false;
-}
-
-function returnNull(): null {
-    return null;
-}
-
-function getDefaultEventPriority(): number {
-    return defaultEventPriority;
-}
-
-function publishContainerSnapshot(container: IntrospectionHostContainer): void {
-    container.publish(toSnapshot(container));
-}
-
-function prepareForCommit(): null {
-    return null;
-}
-
-function createIntrospectionReconcilerHostConfig(reconcilerRuntime: IntrospectionReconcilerRuntime): unknown {
-    return {
-        NotPendingTransition: null,
-        HostTransitionContext: {
-            _currentValue: null,
-            _currentValue2: null
-        },
-        appendChild,
-        appendChildToContainer: appendChild,
-        appendInitialChild: appendChild,
-        applyViewTransitionName: noop,
-        beforeActiveInstanceBlur: noop,
-        cancelTimeout: reconcilerRuntime.cancelTimeout,
-        cancelRootViewTransitionName: noop,
-        cancelViewTransitionName: noop,
-        clearActivityBoundary: noop,
-        clearActivityBoundaryFromContainer: noop,
-        clearContainer,
-        clearSuspenseBoundary: noop,
-        commitMount: noop,
-        commitTextUpdate(instance: IntrospectionTextInstance, _oldText: string, newText: string) {
-            instance.writeText(newText);
-        },
-        commitUpdate(
-            instance: IntrospectionHostInstance,
-            _type: string,
-            _oldProps: IntrospectionHostProps,
-            newProps: IntrospectionHostProps
-        ) {
-            instance.writeProps(newProps);
-            instance.refreshPublicInstance(newProps);
-        },
-        createInstance: createHostInstance,
-        createTextInstance,
-        detachDeletedInstance: noop,
-        finalizeInitialChildren: alwaysFalse,
-        getChildHostContext,
-        getCurrentUpdatePriority: getDefaultEventPriority,
-        getPublicInstance(instance: IntrospectionHostInstance) {
-            return instance.readPublicInstance();
-        },
-        getRootHostContext,
-        hideInstance,
-        hideTextInstance,
-        insertBefore,
-        insertInContainerBefore: insertBefore,
-        isPrimaryRenderer: false,
-        isSuspenseInstanceFallback: alwaysFalse,
-        isSuspenseInstancePending: alwaysFalse,
-        maySuspendCommit: alwaysFalse,
-        maySuspendCommitInSyncRender: alwaysFalse,
-        maySuspendCommitOnUpdate: alwaysFalse,
-        noTimeout: -1,
-        prepareForCommit,
-        preparePortalMount: noop,
-        removeChild: removeHostChild.bind(undefined),
-        removeChildFromContainer: removeHostChild.bind(undefined),
-        resetAfterCommit: publishContainerSnapshot,
-        resetFormInstance: noop,
-        resolveEventTimeStamp: reconcilerRuntime.readEventTimestamp,
-        resolveEventType: returnNull,
-        resolveUpdatePriority: getDefaultEventPriority,
-        restoreRootViewTransitionName: noop,
-        restoreViewTransitionName: noop,
-        scheduleMicrotask: reconcilerRuntime.scheduleMicrotask,
-        scheduleTimeout: reconcilerRuntime.scheduleTimeout,
-        setCurrentUpdatePriority: noop,
-        shouldAttemptEagerTransition: alwaysFalse,
-        shouldSetTextContent: alwaysFalse,
-        startSuspendingCommit: noop,
-        stopViewTransition: noop,
-        supportsHydration: false,
-        supportsMicrotasks: true,
-        supportsMutation: true,
-        supportsPersistence: false,
-        supportsTestSelectors: false,
-        suspendInstance: noop,
-        suspendOnActiveViewTransition: alwaysFalse,
-        trackSchedulerEvent: noop,
-        unhideInstance,
-        unhideTextInstance,
-        waitForCommitToBeReady: returnNull
-    };
-}
-
 const reconcilerRuntime = createIntrospectionReconcilerRuntime();
-const renderer = createReconciler(createIntrospectionReconcilerHostConfig(reconcilerRuntime));
+const renderer = createReconciler(createIntrospectionHostConfig(reconcilerRuntime));
 
 function createReconcilerContainer(
     rendererInstance: ReconcilerInstance,
