@@ -347,7 +347,7 @@ const IntrospectionClassFrameBase = class
 
         return this.props.renderChildren(
             executeIntrospectionClassRender(this.userInstance),
-            nextDepth(this.props.depth, this.props.type)
+            nextDepth(this.props.depth, this.props.element.type)
         );
     }
 

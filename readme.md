@@ -1086,7 +1086,7 @@ assert.equal(view.findAll(Row).length, 2);
 
 ### Class components
 
-Class components execute at the selected depth.
+Class components execute at the selected depth, also when wrapped in `memo` or `lazy`.
 
 ```tsx
 class Counter extends React.Component<{ label: string; }, { count: number; }> {

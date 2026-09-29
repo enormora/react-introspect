@@ -265,6 +265,23 @@ const RefPanel = class extends React.Component<RefPanelProps> {
 
 type RefPanelInstance = InstanceType<typeof RefPanel>;
 
+function createRefPanelProps(
+    label: string,
+    ref: React.RefObject<RefPanelInstance | null>
+): React.ClassAttributes<RefPanelInstance> & RefPanelProps {
+    return { label, ref };
+}
+
+function createLazyRefPanel(): typeof RefPanel {
+    return {
+        $$typeof: Symbol.for('react.lazy'),
+        _init() {
+            return RefPanel;
+        },
+        _payload: {}
+    } as unknown as typeof RefPanel;
+}
+
 const PrimitivePureCounter = class extends React.PureComponent<EmptyProps, unknown> {
     public constructor(props: EmptyProps) {
         super(props);
@@ -653,6 +670,33 @@ export const testNode = suite('class components and error boundaries', [
 
         scope.assert.deepEqual(recorder.entries.slice(rendersAfterCapture), [ 'shouldComponentUpdate' ]);
         scope.assert.equal(view.find('span')?.textContent, 'fallback');
+
+        return scope.assert.collect();
+    }),
+    test('executes class components wrapped in memo or lazy', function (scope) {
+        const MemoPanel = React.memo(RefPanel);
+        const LazyPanel = createLazyRefPanel();
+        const memoRef = React.createRef<RefPanelInstance>();
+        const lazyRef = React.createRef<RefPanelInstance>();
+        const view = introspect(
+            React.createElement(
+                React.Fragment,
+                null,
+                React.createElement(MemoPanel, createRefPanelProps('memo', memoRef)),
+                React.createElement(LazyPanel, createRefPanelProps('lazy', lazyRef))
+            ),
+            {
+                depth: 'full',
+                strictMode: false
+            }
+        );
+
+        scope.assert.equal(view.textContent, 'memolazy');
+        scope.assert.deepEqual([ memoRef.current?.props.label, lazyRef.current?.props.label ], [ 'memo', 'lazy' ]);
+        scope.assert.equal(
+            view.formatTree(),
+            'Fragment\n  RefPanel\n    output\n      #text\n  Component\n    output\n      #text'
+        );
 
         return scope.assert.collect();
     }),
