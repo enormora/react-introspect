@@ -19,7 +19,7 @@ type FunctionKind = { readonly kind: 'function'; readonly component: FunctionCom
 
 type HostKind = { readonly kind: 'host'; readonly name: string; };
 
-type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; };
+type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; readonly resolved: unknown; };
 
 type MemoKind = { readonly kind: 'memo'; readonly displayName: string | undefined; readonly inner: unknown; };
 
@@ -68,6 +68,20 @@ function readForwardRefKind(type: unknown): ReactElementKind | undefined {
     return isForwardRefRender(render) ? { displayName: readDisplayName(type), kind: 'forwardRef', render } : undefined;
 }
 
+const lazyStatusKey = '_status';
+const lazyResultKey = '_result';
+const resolvedLazyStatus = 1;
+
+function readResolvedLazyType(payload: unknown): unknown {
+    if (!isObjectOrFunction(payload) || payload[lazyStatusKey] !== resolvedLazyStatus) {
+        return undefined;
+    }
+
+    const moduleObject = payload[lazyResultKey];
+
+    return isObjectOrFunction(moduleObject) ? moduleObject.default : undefined;
+}
+
 function readLazyKind(type: unknown): ReactElementKind | undefined {
     const isLazy = hasReactType(type, lazyType) &&
         Object.hasOwn(type, lazyInitializerKey) &&
@@ -89,7 +103,8 @@ function readLazyKind(type: unknown): ReactElementKind | undefined {
 
             return resolved;
         },
-        kind: 'lazy'
+        kind: 'lazy',
+        resolved: readResolvedLazyType(Reflect.get(type, lazyPayloadKey))
     };
 }
 
