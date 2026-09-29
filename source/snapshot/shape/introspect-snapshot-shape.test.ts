@@ -3,7 +3,6 @@ import React from 'react';
 import type { SnapshotNode } from '../model/introspect-snapshot-contract.ts';
 import {
     freezePropsWithoutChildren,
-    getElementChildrenState,
     getElementKind,
     getIndexedPath,
     getTextContent,
@@ -53,25 +52,9 @@ export const testNode = suite('introspection snapshot shape', [
 
         return scope.assert.collect();
     }),
-    test('passes component children through at shallow depth', function (scope) {
+    test('names components by their display name', function (scope) {
         const shownComponent = createShownComponent();
-        const child = createTextNode('child');
-        const hostState = getElementChildrenState('button', [ child ]);
-        const componentState = getElementChildrenState(shownComponent, [ child ]);
 
-        scope.assert.deepEqual({
-            componentRenderedChildren: componentState.renderedChildren.length,
-            componentRenderedReason: componentState.renderedReason,
-            componentTextContent: componentState.textContent,
-            hostRenderedChildren: hostState.renderedChildren.length,
-            hostRenderedReason: hostState.renderedReason
-        }, {
-            componentRenderedChildren: 1,
-            componentRenderedReason: 'depth',
-            componentTextContent: 'child',
-            hostRenderedChildren: 1,
-            hostRenderedReason: undefined
-        });
         scope.assert.equal(getTypeName(shownComponent), 'ShownComponent');
 
         return scope.assert.collect();

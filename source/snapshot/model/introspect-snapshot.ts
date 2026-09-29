@@ -3,11 +3,11 @@ import {
     createIdNormalizer,
     normalizeSnapshotProps,
     normalizeSnapshotValue,
-    type IntrospectionIdNormalization
+    type IntrospectionIdNormalization,
+    type SnapshotElementDescriber
 } from '../normalization/introspect-id-normalization.ts';
 import {
     freezePropsWithoutChildren,
-    getElementChildrenState,
     getElementKind,
     getIndexedPath,
     getTextContent,
@@ -24,11 +24,12 @@ import {
     type SnapshotVisibility
 } from './introspect-snapshot-contract.ts';
 
+type SnapshotNodeDescription = Pick<SnapshotNode, Exclude<keyof SnapshotNode, 'id'>>;
+
 type SnapshotBuilder = {
     readonly normalizeIdString: (value: string) => string;
-    readonly valueAncestors: WeakSet<WeakKey>;
-    readonly allocateId: () => number;
-    readonly push: (node: SnapshotNode) => SnapshotNode;
+    readonly normalizeProps: (props: SnapshotProps, describeElement: SnapshotElementDescriber) => SnapshotProps;
+    readonly createNode: (describe: (id: number) => SnapshotNodeDescription) => SnapshotNode;
     readonly readNodes: () => readonly SnapshotNode[];
 };
 
@@ -39,38 +40,30 @@ type SnapshotChildPlacement = {
     readonly parentPath: string;
 };
 
-type SnapshotNodeRequest = SnapshotChildPlacement & {
+type SnapshotSiblingPlacement = SnapshotChildPlacement & {
     readonly index: number | string;
-    readonly node: unknown;
 };
 
-type ElementNodeRequest = SnapshotNodeRequest & {
-    readonly element: React.ReactElement<SnapshotProps>;
+type LeafNodeRequest = SnapshotSiblingPlacement & {
+    readonly value: unknown;
 };
 
-type SourceElementNodeRequest = SnapshotNodeRequest & {
+type SourceElementNodeRequest = SnapshotSiblingPlacement & {
     readonly element: SnapshotSourceElement;
-};
-
-type ChildSnapshotsRequest = SnapshotChildPlacement & {
-    readonly children: unknown;
 };
 
 type SourceChildSnapshotsRequest = SnapshotChildPlacement & {
     readonly children: readonly SnapshotSourceNode[];
 };
 
-type SourceSnapshotNodeRequest = SnapshotNodeRequest & {
+type SourceSnapshotNodeRequest = SnapshotSiblingPlacement & {
     readonly node: SnapshotSourceNode;
 };
 
-type SourceElementChildrenRequest = SnapshotChildPlacement & {
+type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
     readonly element: SnapshotSourceElement;
-    readonly parentId: number;
-};
-
-type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest & {
     readonly givenChildren: readonly SnapshotNode[];
+    readonly parentId: number;
 };
 
 type PropsSnapshotRequest = {
@@ -93,38 +86,34 @@ function visibilityFromSource(
     return 'visible';
 }
 
-function isSourceElementNode(node: SnapshotSourceNode): node is SnapshotSourceElement {
-    return Object.hasOwn(node, 'type');
-}
-
 function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
-    return element.givenChildrenKind === 'source' && element.givenChildren === element.children;
+    return element.givenChildren === element.children;
 }
 
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
     const nodes: SnapshotNode[] = [];
+    const valueAncestors = new WeakSet();
     let nextId = 0;
 
     return {
-        allocateId() {
+        createNode(describe) {
             const id = nextId;
 
             nextId += 1;
 
-            return id;
-        },
-        normalizeIdString,
-        push(input) {
-            const node = registerSnapshotNode(Object.freeze(input));
+            const node = registerSnapshotNode(Object.freeze({ ...describe(id), id }));
 
             nodes.push(node);
 
             return node;
         },
+        normalizeIdString,
         readNodes() {
             return Object.freeze(nodes.slice());
         },
-        valueAncestors: new WeakSet()
+        normalizeProps(props, describeElement) {
+            return normalizeSnapshotProps(props, { ancestors: valueAncestors, describeElement, normalizeIdString });
+        }
     };
 }
 
@@ -140,27 +129,64 @@ function flattenReactNodes(children: unknown): readonly unknown[] {
     return [ children ];
 }
 
-type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
+function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSourceElement {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- React values map to source nodes recursively
+    const children = toSnapshotSourceNodes(element.props.children);
 
-function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
-    return request.build.push({
-        ...leaf,
+    return {
         activityMode: undefined,
         caughtError: undefined,
-        givenChildren: Object.freeze([]),
-        id: request.build.allocateId(),
-        key: null,
-        parentId: request.parentId,
-        path: getIndexedPath(request.parentPath, request.index, leaf.name),
-        props: Object.freeze({
-            value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
-        }),
-        renderedChildren: Object.freeze([]),
-        visibility: request.inheritedVisibility
+        children,
+        givenChildren: children,
+        key: element.key ?? null,
+        kind: 'element',
+        props: freezePropsWithoutChildren(element.props),
+        renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
+        type: element.type,
+        visibility: 'visible'
+    };
+}
+
+function toSourceNode(node: unknown): SnapshotSourceNode {
+    if (isEmptyReactNode(node)) {
+        return { kind: 'empty', value: node, visibility: 'visible' };
+    }
+
+    if (typeof node === 'string' || typeof node === 'number' || typeof node === 'bigint') {
+        return { kind: 'text', value: node, visibility: 'visible' };
+    }
+
+    return React.isValidElement<SnapshotProps>(node)
+        ? toSourceElement(node)
+        : { kind: 'opaque', value: node, visibility: 'visible' };
+}
+
+export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourceNode[] {
+    return Object.freeze(flattenReactNodes(children).map(toSourceNode));
+}
+
+type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
+
+function pushLeafSnapshotNode(request: LeafNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
+    return request.build.createNode(function describeLeafNode() {
+        return {
+            ...leaf,
+            activityMode: undefined,
+            caughtError: undefined,
+            givenChildren: Object.freeze([]),
+            key: null,
+            parentId: request.parentId,
+            path: getIndexedPath(request.parentPath, request.index, leaf.name),
+            props: Object.freeze({
+                value: normalizeSnapshotValue(request.value, request.build.normalizeIdString)
+            }),
+            renderedChildren: Object.freeze([]),
+            visibility: request.inheritedVisibility
+        };
     });
 }
 
-function createEmptySnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
+function createEmptySnapshotNode(request: LeafNodeRequest): SnapshotNode {
     return pushLeafSnapshotNode(request, {
         kind: 'empty',
         name: '#empty',
@@ -170,7 +196,7 @@ function createEmptySnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
     });
 }
 
-function createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
+function createOpaqueSnapshotNode(request: LeafNodeRequest): SnapshotNode {
     return pushLeafSnapshotNode(request, {
         kind: 'opaque',
         name: 'Opaque',
@@ -180,12 +206,12 @@ function createOpaqueSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
     });
 }
 
-function createTextSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
+function createTextSnapshotNode(request: LeafNodeRequest): SnapshotNode {
     return pushLeafSnapshotNode(request, {
         kind: 'text',
         name: '#text',
         renderedReason: undefined,
-        textContent: request.build.normalizeIdString(String(request.node)),
+        textContent: request.build.normalizeIdString(String(request.value)),
         type: '#text'
     });
 }
@@ -196,133 +222,69 @@ const sourceLeafSnapshotFactories = {
     text: createTextSnapshotNode
 };
 
-function createSiblingSnapshots<Child>(
-    placement: SnapshotChildPlacement,
-    children: readonly Child[],
-    createNode: (request: SnapshotNodeRequest & { readonly node: Child; }) => SnapshotNode
-): readonly SnapshotNode[] {
-    return Object.freeze(children.map(function createSibling(child, index) {
-        return createNode({ ...placement, index, node: child });
-    }));
-}
-
 const snapshotOperations = {
-    createChildSnapshots(request: ChildSnapshotsRequest): readonly SnapshotNode[] {
-        const { children, ...placement } = request;
-
-        return createSiblingSnapshots(placement, flattenReactNodes(children), snapshotOperations.createSnapshotNode);
-    },
-    createElementSnapshotNode(request: ElementNodeRequest): SnapshotNode {
-        const { props } = request.element;
-        const { type } = request.element;
-        const id = request.build.allocateId();
-        const name = getTypeName(type);
-        const path = getIndexedPath(request.parentPath, request.index, name);
-        const givenChildren = snapshotOperations.createChildSnapshots({
-            build: request.build,
-            children: props.children,
-            inheritedVisibility: request.inheritedVisibility,
-            parentId: id,
-            parentPath: path
-        });
-        const childrenState = getElementChildrenState(type, givenChildren);
-        const snapshotProps = snapshotOperations.createPropsSnapshot({
-            build: request.build,
-            inheritedVisibility: request.inheritedVisibility,
-            ownerId: id,
-            ownerPath: path,
-            props: freezePropsWithoutChildren(props)
-        });
-
-        return request.build.push({
-            activityMode: undefined,
-            givenChildren,
-            caughtError: undefined,
-            id,
-            key: request.element.key ?? null,
-            kind: getElementKind(type),
-            name,
-            parentId: request.parentId,
-            path,
-            props: snapshotProps,
-            renderedChildren: childrenState.renderedChildren,
-            renderedReason: childrenState.renderedReason,
-            textContent: childrenState.textContent,
-            type,
-            visibility: request.inheritedVisibility
-        });
-    },
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
-        const id = request.build.allocateId();
-        const name = getTypeName(request.element.type);
-        const path = getIndexedPath(request.parentPath, request.index, name);
-        const visibility = visibilityFromSource(
-            request.inheritedVisibility,
-            request.element.visibility,
-            request.element.activityMode
-        );
-        const childrenRequest = {
-            build: request.build,
-            element: request.element,
-            inheritedVisibility: visibility,
-            parentId: id,
-            parentPath: path
-        };
-        const givenChildren = snapshotOperations.createSourceElementGivenChildren(childrenRequest);
-        const renderedChildren = snapshotOperations.createSourceElementRenderedChildren({
-            ...childrenRequest,
-            givenChildren
-        });
-        const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
-        const snapshotProps = snapshotOperations.createPropsSnapshot({
-            build: request.build,
-            inheritedVisibility: visibility,
-            ownerId: id,
-            ownerPath: path,
-            props: request.element.props
-        });
+        return request.build.createNode(function describeElementNode(id) {
+            const name = getTypeName(request.element.type);
+            const path = getIndexedPath(request.parentPath, request.index, name);
+            const visibility = visibilityFromSource(
+                request.inheritedVisibility,
+                request.element.visibility,
+                request.element.activityMode
+            );
+            const childPlacement = {
+                build: request.build,
+                inheritedVisibility: visibility,
+                parentId: id,
+                parentPath: path
+            };
+            const givenChildren = snapshotOperations.createSourceChildSnapshots({
+                ...childPlacement,
+                children: request.element.givenChildren
+            });
+            const renderedChildren = snapshotOperations.createSourceElementRenderedChildren({
+                ...childPlacement,
+                element: request.element,
+                givenChildren
+            });
+            const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
+            const snapshotProps = snapshotOperations.createPropsSnapshot({
+                build: request.build,
+                inheritedVisibility: visibility,
+                ownerId: id,
+                ownerPath: path,
+                props: request.element.props
+            });
 
-        return request.build.push({
-            activityMode: request.element.activityMode,
-            givenChildren,
-            caughtError: request.element.caughtError,
-            id,
-            key: request.element.key,
-            kind: getElementKind(request.element.type),
-            name,
-            parentId: request.parentId,
-            path,
-            props: snapshotProps,
-            renderedChildren,
-            renderedReason: request.element.renderedReason,
-            textContent: getTextContent(visibleChildren),
-            type: request.element.type,
-            visibility
+            return {
+                activityMode: request.element.activityMode,
+                givenChildren,
+                caughtError: request.element.caughtError,
+                key: request.element.key,
+                kind: getElementKind(request.element.type),
+                name,
+                parentId: request.parentId,
+                path,
+                props: snapshotProps,
+                renderedChildren,
+                renderedReason: request.element.renderedReason,
+                textContent: getTextContent(visibleChildren),
+                type: request.element.type,
+                visibility
+            };
         });
     },
     createPropsSnapshot(request: PropsSnapshotRequest): SnapshotProps {
-        return normalizeSnapshotProps(request.props, {
-            ancestors: request.build.valueAncestors,
-            describeElement(element, location) {
-                return snapshotOperations.createElementSnapshotNode({
-                    build: request.build,
-                    element,
-                    index: location,
-                    inheritedVisibility: request.inheritedVisibility,
-                    node: element,
-                    parentId: request.ownerId,
-                    parentPath: request.ownerPath
-                });
-            },
-            normalizeIdString: request.build.normalizeIdString
+        return request.build.normalizeProps(request.props, function describeElement(element, location) {
+            return snapshotOperations.createSourceElementSnapshotNode({
+                build: request.build,
+                element: toSourceElement(element),
+                index: location,
+                inheritedVisibility: request.inheritedVisibility,
+                parentId: request.ownerId,
+                parentPath: request.ownerPath
+            });
         });
-    },
-    createSourceElementGivenChildren(request: SourceElementChildrenRequest): readonly SnapshotNode[] {
-        const { element, ...placement } = request;
-
-        return element.givenChildrenKind === 'source'
-            ? snapshotOperations.createSourceChildSnapshots({ ...placement, children: element.givenChildren })
-            : snapshotOperations.createChildSnapshots({ ...placement, children: element.givenChildren });
     },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): readonly SnapshotNode[] {
         if (request.element.renderedReason === 'depth') {
@@ -345,41 +307,24 @@ const snapshotOperations = {
             parentPath: request.parentPath
         });
     },
-    createSnapshotNode(request: SnapshotNodeRequest): SnapshotNode {
-        if (isEmptyReactNode(request.node)) {
-            return createEmptySnapshotNode(request);
-        }
-
-        if (typeof request.node === 'string' || typeof request.node === 'number' || typeof request.node === 'bigint') {
-            return createTextSnapshotNode(request);
-        }
-
-        if (React.isValidElement<SnapshotProps>(request.node)) {
-            return snapshotOperations.createElementSnapshotNode({
-                ...request,
-                element: request.node
-            });
-        }
-
-        return createOpaqueSnapshotNode(request);
-    },
     createSourceChildSnapshots(request: SourceChildSnapshotsRequest): readonly SnapshotNode[] {
         const { children, ...placement } = request;
 
-        return createSiblingSnapshots(placement, children, snapshotOperations.createSourceSnapshotNode);
+        return Object.freeze(children.map(function createSibling(child, index) {
+            return snapshotOperations.createSourceSnapshotNode({ ...placement, index, node: child });
+        }));
     },
     createSourceSnapshotNode(request: SourceSnapshotNodeRequest): SnapshotNode {
-        if (isSourceElementNode(request.node)) {
-            return snapshotOperations.createSourceElementSnapshotNode({
-                ...request,
-                element: request.node
-            });
+        const { node, ...placement } = request;
+
+        if (node.kind === 'element') {
+            return snapshotOperations.createSourceElementSnapshotNode({ ...placement, element: node });
         }
 
-        return sourceLeafSnapshotFactories[request.node.kind]({
-            ...request,
-            inheritedVisibility: visibilityFromSource(request.inheritedVisibility, request.node.visibility, undefined),
-            node: request.node.value
+        return sourceLeafSnapshotFactories[node.kind]({
+            ...placement,
+            inheritedVisibility: visibilityFromSource(placement.inheritedVisibility, node.visibility, undefined),
+            value: node.value
         });
     }
 };
@@ -397,7 +342,7 @@ export function createIntrospectionSnapshotFromSource(
                     children,
                     caughtError: undefined,
                     givenChildren: [],
-                    givenChildrenKind: 'source',
+                    kind: 'element',
                     key: null,
                     props: {},
                     renderedReason: undefined,

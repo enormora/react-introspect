@@ -1,16 +1,9 @@
 import { classifyElementType, type ReactElementKind } from '../../values/introspect-react-element-kind.ts';
-import type { IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import type {
     SnapshotNode,
     SnapshotNodeKind,
     SnapshotProps
 } from '../model/introspect-snapshot-contract.ts';
-
-export type ElementChildrenState = {
-    readonly renderedChildren: readonly SnapshotNode[];
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
-    readonly textContent: string;
-};
 
 type NamedFunction = {
     readonly name: string;
@@ -52,14 +45,6 @@ export function freezePropsWithoutChildren(props: SnapshotProps): SnapshotProps 
     }
 
     return Object.freeze(publicProps);
-}
-
-export function getElementChildrenState(type: unknown, children: readonly SnapshotNode[]): ElementChildrenState {
-    return {
-        renderedChildren: children,
-        renderedReason: getElementKind(type) === 'component' ? 'depth' : undefined,
-        textContent: getTextContent(children)
-    };
 }
 
 export function getIndexedPath(parentPath: string, index: number | string, name: string): string {
