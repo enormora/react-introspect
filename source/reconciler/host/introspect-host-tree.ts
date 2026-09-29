@@ -165,12 +165,12 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
 
         return {
             activityMode: metadata.activityMode,
-            children: child.readChildren().map(toSourceNode),
             caughtError: metadata.caughtError,
             givenChildren: toSnapshotSourceNodes(metadata.givenChildren),
             kind: 'element',
             key: metadata.key,
             props: metadata.props,
+            renderedChildren: child.readChildren().map(toSourceNode),
             renderedReason: metadata.renderedReason,
             type: metadata.type,
             hostVisibility: child.readVisibility()
@@ -181,12 +181,12 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
 
     return {
         activityMode: undefined,
-        children,
         caughtError: undefined,
         givenChildren: children,
         kind: 'element',
         key: readHostKey(child.readProps()),
         props: readPublicHostProps(child.readProps()),
+        renderedChildren: children,
         renderedReason: undefined,
         type: child.type,
         hostVisibility: child.readVisibility()

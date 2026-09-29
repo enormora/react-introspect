@@ -122,7 +122,7 @@ function renderFromSource(
 }
 
 function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
-    return element.givenChildren === element.children;
+    return element.givenChildren === element.renderedChildren;
 }
 
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
@@ -171,11 +171,11 @@ function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSo
     return {
         activityMode: undefined,
         caughtError: undefined,
-        children,
         givenChildren: children,
         key: element.key ?? null,
         kind: 'element',
         props: freezePublicElementProps(element.props),
+        renderedChildren: children,
         renderedReason: getElementKind(element.type) === 'component' ? 'depth' : undefined,
         type: element.type,
         hostVisibility: 'visible'
@@ -338,7 +338,7 @@ const snapshotOperations = {
 
         return snapshotOperations.createSourceChildSnapshots({
             build: request.build,
-            children: request.element.children,
+            children: request.element.renderedChildren,
             inheritedHiddenBy: request.inheritedHiddenBy,
             parentId: request.parentId,
             parentPath: request.parentPath
@@ -376,12 +376,12 @@ export function createIntrospectionSnapshotFromSource(
             [
                 {
                     activityMode: undefined,
-                    children,
                     caughtError: undefined,
                     givenChildren: [],
                     kind: 'element',
                     key: null,
                     props: {},
+                    renderedChildren: children,
                     renderedReason: undefined,
                     type: React.Fragment,
                     hostVisibility: 'visible'

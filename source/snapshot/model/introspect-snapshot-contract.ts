@@ -24,7 +24,7 @@ export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | Sna
 export type SnapshotSourceElement = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly kind: 'element';
-    readonly children: readonly SnapshotSourceNode[];
+    readonly renderedChildren: readonly SnapshotSourceNode[];
     readonly caughtError: IntrospectionError | undefined;
     readonly key: string | null;
     readonly props: SnapshotProps;

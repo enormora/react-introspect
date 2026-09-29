@@ -80,7 +80,6 @@ export const testNode = suite('snapshots of given children and elements in props
             [
                 {
                     activityMode: 'hidden',
-                    children: [],
                     caughtError: undefined,
                     givenChildren: toSnapshotSourceNodes(createGivenChildren()),
                     hostVisibility: 'visible',
@@ -90,6 +89,7 @@ export const testNode = suite('snapshots of given children and elements in props
                         icon: React.createElement(Icon, { key: 'icon', label: 'prop' }, 'label text'),
                         list: [ React.createElement('li', { key: 'first' }, 1) ]
                     },
+                    renderedChildren: [],
                     renderedReason: 'depth',
                     type: Icon
                 }
