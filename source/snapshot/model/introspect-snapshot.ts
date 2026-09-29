@@ -93,10 +93,6 @@ function visibilityFromSource(
     return 'visible';
 }
 
-function isSourceElementNode(node: SnapshotSourceNode): node is SnapshotSourceElement {
-    return Object.hasOwn(node, 'type');
-}
-
 function sourceElementSharesGivenChildren(element: SnapshotSourceElement): boolean {
     return element.givenChildrenKind === 'source' && element.givenChildren === element.children;
 }
@@ -369,7 +365,7 @@ const snapshotOperations = {
         return createSiblingSnapshots(placement, children, snapshotOperations.createSourceSnapshotNode);
     },
     createSourceSnapshotNode(request: SourceSnapshotNodeRequest): SnapshotNode {
-        if (isSourceElementNode(request.node)) {
+        if (request.node.kind === 'element') {
             return snapshotOperations.createSourceElementSnapshotNode({
                 ...request,
                 element: request.node
@@ -398,6 +394,7 @@ export function createIntrospectionSnapshotFromSource(
                     caughtError: undefined,
                     givenChildren: [],
                     givenChildrenKind: 'source',
+                    kind: 'element',
                     key: null,
                     props: {},
                     renderedReason: undefined,

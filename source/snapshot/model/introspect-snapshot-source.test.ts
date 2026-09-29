@@ -78,6 +78,7 @@ export const testNode = suite('snapshots of given children and elements in props
                     caughtError: undefined,
                     givenChildren: createGivenChildren(),
                     givenChildrenKind: 'react',
+                    kind: 'element',
                     key: 'panel',
                     props: {
                         icon: React.createElement(Icon, { key: 'icon', label: 'prop' }, 'label text'),
