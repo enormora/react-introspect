@@ -137,6 +137,13 @@ export const testNode = suite('introspection host tree', [
 
         return scope.assert.collect();
     }),
+    test('exposes a text instance as its own public instance', function (scope) {
+        const text = createText(createContainer(), 'label');
+
+        scope.assert.equal(hostConfig.getPublicInstance(text), text);
+
+        return scope.assert.collect();
+    }),
     test('removes children from parents', function (scope) {
         const host = createContainer();
         const text = createText(host, 'removed');

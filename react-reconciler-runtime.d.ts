@@ -58,7 +58,7 @@ declare module 'react-reconciler' {
             hostContext: HostContext
         ) => boolean;
         readonly getChildHostContext: (parentHostContext: HostContext, type: string) => HostContext;
-        readonly getPublicInstance: (instance: Instance) => unknown;
+        readonly getPublicInstance: (instance: Instance | TextInstance) => unknown;
         readonly getRootHostContext: (rootContainer: Container) => HostContext;
         readonly hideInstance: (instance: Instance) => void;
         readonly hideTextInstance: (textInstance: TextInstance) => void;

@@ -390,7 +390,7 @@ export type IntrospectionHostConfig = {
         context: IntrospectionHostContext
     ) => boolean;
     readonly getChildHostContext: (context: IntrospectionHostContext) => IntrospectionHostContext;
-    readonly getPublicInstance: (instance: IntrospectionHostInstance) => unknown;
+    readonly getPublicInstance: (instance: IntrospectionHostChild) => unknown;
     readonly getRootHostContext: (container: IntrospectionHostContainer) => IntrospectionHostContext;
     readonly hideInstance: (instance: IntrospectionHostInstance) => void;
     readonly insertBefore: (
@@ -463,8 +463,8 @@ export function createIntrospectionHostConfig(scheduling: IntrospectionHostSched
         finalizeInitialChildren: alwaysFalse,
         getChildHostContext,
         getCurrentUpdatePriority: getDefaultEventPriority,
-        getPublicInstance(instance: IntrospectionHostInstance) {
-            return instance.readPublicInstance();
+        getPublicInstance(instance: IntrospectionHostChild) {
+            return instance.kind === 'host' ? instance.readPublicInstance() : instance;
         },
         getRootHostContext,
         hideInstance: hideHostChild,
