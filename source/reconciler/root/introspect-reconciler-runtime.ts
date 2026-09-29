@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { TimeoutIdentifier } from '@enormora/clock';
-import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
+import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 
 export type IntrospectionReconcilerRuntime = {
     readonly cancelTimeout: (timeoutIdentifier: TimeoutIdentifier) => void;

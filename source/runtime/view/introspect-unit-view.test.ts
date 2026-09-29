@@ -4,8 +4,8 @@ import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspe
 import type { IntrospectionOptions } from '../../public/introspect-public-types.ts';
 import { createIntrospectionReconcilerModule } from '../../reconciler/root/introspect-reconciler.ts';
 import type { RuntimeIntrospectionView } from '../types/introspect-runtime-types.ts';
-import type { IntrospectionRuntimeDependencies } from './introspect-runtime-dependencies-types.ts';
-import { createUnitRuntimeDependencies } from './introspect-runtime-dependencies.test.ts';
+import type { IntrospectionRuntimeDependencies } from '../../reconciler/scheduling/introspect-runtime-dependencies-types.ts';
+import { createUnitRuntimeDependencies } from '../../reconciler/scheduling/introspect-runtime-dependencies.test.ts';
 import { createIntrospectionViewModule, type IntrospectionViewModule } from './introspect-view.ts';
 
 const isolatedConsoleDiagnostics: IntrospectionConsoleDiagnostics = {

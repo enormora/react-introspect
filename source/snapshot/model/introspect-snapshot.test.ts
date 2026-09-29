@@ -9,7 +9,7 @@ import { createIntrospectionDiagnostics } from '../../diagnostics/introspect-dia
 import { createIntrospectionReconcilerModule } from '../../reconciler/root/introspect-reconciler.ts';
 import { createIntrospectionRenderElement } from '../../render/frame/introspect-frame.ts';
 import { createFrameDepth } from '../../render/frame/introspect-frame-depth.ts';
-import { createUnitRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.test.ts';
+import { createUnitRuntimeDependencies } from '../../reconciler/scheduling/introspect-runtime-dependencies.test.ts';
 import { createUnitIntrospectionView } from '../../runtime/view/introspect-unit-view.test.ts';
 import {
     createEmptyIntrospectionSnapshot,

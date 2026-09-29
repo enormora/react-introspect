@@ -2,8 +2,8 @@ import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionNode } from '../../public/introspect-public-types.ts';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
-import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
-import { createUnitRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.test.ts';
+import type { IntrospectionRuntimeDependencies } from '../../reconciler/scheduling/introspect-runtime-dependencies-types.ts';
+import { createUnitRuntimeDependencies } from '../../reconciler/scheduling/introspect-runtime-dependencies.test.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
 import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
 

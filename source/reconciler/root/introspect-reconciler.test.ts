@@ -6,8 +6,8 @@ import type {
     IntrospectionOptions,
     IntrospectionView
 } from '../../public/introspect-public-types.ts';
-import type { IntrospectionRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies-types.ts';
-import { createUnitRuntimeDependencies } from '../../runtime/view/introspect-runtime-dependencies.test.ts';
+import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
+import { createUnitRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies.test.ts';
 import { createUnitIntrospectionView } from '../../runtime/view/introspect-unit-view.test.ts';
 import {
     createIntrospectionReconcilerRuntime
