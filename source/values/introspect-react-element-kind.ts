@@ -1,4 +1,5 @@
 import React from 'react';
+import { type IntrospectionClassComponent, isClassComponent } from './introspect-class-component.ts';
 import { isObjectOrFunction } from './introspect-value-kinds.ts';
 
 type PropsRecord = Readonly<Record<PropertyKey, unknown>>;
@@ -15,6 +16,8 @@ type ForwardRefKind = {
     readonly render: ForwardRefRender;
 };
 
+type ClassKind = { readonly kind: 'class'; readonly component: IntrospectionClassComponent; };
+
 type FunctionKind = { readonly kind: 'function'; readonly component: FunctionComponentType; };
 
 type HostKind = { readonly kind: 'host'; readonly name: string; };
@@ -23,7 +26,7 @@ type LazyKind = { readonly kind: 'lazy'; readonly initialize: () => unknown; rea
 
 type MemoKind = { readonly kind: 'memo'; readonly displayName: string | undefined; readonly inner: unknown; };
 
-export type ReactElementKind = ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
+export type ReactElementKind = ClassKind | ForwardRefKind | FunctionKind | HostKind | LazyKind | MarkerKind | MemoKind;
 
 const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
@@ -133,6 +136,10 @@ function readContextKind(type: unknown): ReactElementKind | undefined {
 }
 
 function readComponentKind(type: unknown): ReactElementKind {
+    if (isClassComponent(type)) {
+        return { component: type, kind: 'class' };
+    }
+
     return isFunctionComponentType(type) ? { component: type, kind: 'function' } : { kind: 'other' };
 }
 

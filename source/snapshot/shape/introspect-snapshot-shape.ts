@@ -50,6 +50,9 @@ const typeNamers: TypeNamers = {
     activity() {
         return 'Activity';
     },
+    class(elementKind) {
+        return getFunctionTypeName(elementKind.component);
+    },
     context: nameNothing,
     forwardRef(elementKind) {
         return elementKind.displayName ?? nameWrapper('ForwardRef', getFunctionTypeName(elementKind.render));
@@ -83,6 +86,7 @@ function nameElementKind<Name extends keyof ElementKindByName>(
 
 const snapshotNodeKinds: Readonly<Record<ReactElementKind['kind'], SnapshotNodeKind>> = {
     activity: 'component',
+    class: 'component',
     context: 'component',
     forwardRef: 'component',
     fragment: 'fragment',
