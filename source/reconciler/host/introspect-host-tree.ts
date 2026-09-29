@@ -1,3 +1,5 @@
+// eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
+import { DefaultEventPriority } from 'react-reconciler/constants.js';
 import type { TimeoutIdentifier } from '@enormora/clock';
 import {
     readHostKey,
@@ -331,8 +333,6 @@ export function validateContainerRefs(container: IntrospectionHostContainer): vo
     );
 }
 
-const defaultEventPriority = 32;
-
 function noop(): void {
     return undefined;
 }
@@ -346,7 +346,7 @@ function returnNull(): null {
 }
 
 function getDefaultEventPriority(): number {
-    return defaultEventPriority;
+    return DefaultEventPriority;
 }
 
 function publishContainerSnapshot(container: IntrospectionHostContainer): void {

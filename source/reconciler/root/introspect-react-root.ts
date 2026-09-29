@@ -1,4 +1,6 @@
 import createReconciler, { type ReconcilerRoot } from 'react-reconciler';
+// eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
+import { ConcurrentRoot } from 'react-reconciler/constants.js';
 import type { IntrospectionDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { createIntrospectionHostConfig, type IntrospectionHostContainer } from '../host/introspect-host-tree.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
@@ -14,7 +16,7 @@ export function createReconcilerContainer(
 ): ReconcilerRoot {
     return renderer.createContainer(
         container,
-        1,
+        ConcurrentRoot,
         null,
         strictMode,
         null,
