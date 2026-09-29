@@ -318,20 +318,12 @@ function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapsho
     );
 }
 
-function hideInstance(instance: IntrospectionHostInstance): void {
-    instance.writeVisibility('hidden');
+function hideHostChild(child: IntrospectionHostChild): void {
+    child.writeVisibility('hidden');
 }
 
-function hideTextInstance(instance: IntrospectionTextInstance): void {
-    instance.writeVisibility('hidden');
-}
-
-function unhideInstance(instance: IntrospectionHostInstance): void {
-    instance.writeVisibility('visible');
-}
-
-function unhideTextInstance(instance: IntrospectionTextInstance): void {
-    instance.writeVisibility('visible');
+function unhideHostChild(child: IntrospectionHostChild): void {
+    child.writeVisibility('visible');
 }
 
 export function validateContainerRefs(container: IntrospectionHostContainer): void {
@@ -457,8 +449,8 @@ export function createIntrospectionHostConfig(scheduling: HostConfigScheduling):
             return instance.readPublicInstance();
         },
         getRootHostContext,
-        hideInstance,
-        hideTextInstance,
+        hideInstance: hideHostChild,
+        hideTextInstance: hideHostChild,
         insertBefore,
         insertInContainerBefore: insertBefore,
         isPrimaryRenderer: false,
@@ -494,8 +486,8 @@ export function createIntrospectionHostConfig(scheduling: HostConfigScheduling):
         suspendInstance: noop,
         suspendOnActiveViewTransition: alwaysFalse,
         trackSchedulerEvent: noop,
-        unhideInstance,
-        unhideTextInstance,
+        unhideInstance: unhideHostChild,
+        unhideTextInstance: unhideHostChild,
         waitForCommitToBeReady: returnNull
     };
 }
