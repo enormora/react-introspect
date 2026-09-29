@@ -367,6 +367,8 @@ assert.equal(button.name, 'Button');
 assert.equal(button.key, 'primary');
 ```
 
+Names follow React's warnings: a `displayName` wins, `memo` components take the wrapped component's name, and `forwardRef` components are named `ForwardRef(Render)`.
+
 ### `node.kind`
 
 Tells you what a node models, without matching on `'#empty'` or `'#text'`.

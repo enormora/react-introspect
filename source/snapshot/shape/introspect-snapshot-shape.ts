@@ -1,7 +1,8 @@
 import {
     classifyElementType,
     isReactReservedPropKey,
-    type ReactElementKind
+    type ReactElementKind,
+    readDisplayName
 } from '../../values/introspect-react-element-kind.ts';
 import type {
     SnapshotNode,
@@ -22,9 +23,18 @@ type TypeNamers = {
 };
 
 function getFunctionTypeName(type: NamedFunction): string {
-    const displayName: unknown = Reflect.get(type, 'displayName');
+    return readDisplayName(type) ?? type.name;
+}
 
-    return typeof displayName === 'string' ? displayName : type.name;
+function nameWrapper(wrapperName: string, innerName: string): string {
+    return innerName === '' ? wrapperName : `${wrapperName}(${innerName})`;
+}
+
+function nameMemoInner(inner: unknown): string {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- memo names recurse into the wrapped type
+    const innerName = getTypeName(inner);
+
+    return innerName === '' ? 'Memo' : innerName;
 }
 
 function nameComponent(): string {
@@ -36,7 +46,9 @@ const typeNamers: TypeNamers = {
         return 'Activity';
     },
     context: nameComponent,
-    forwardRef: nameComponent,
+    forwardRef(elementKind) {
+        return elementKind.displayName ?? nameWrapper('ForwardRef', getFunctionTypeName(elementKind.render));
+    },
     fragment() {
         return 'Fragment';
     },
@@ -47,7 +59,9 @@ const typeNamers: TypeNamers = {
         return elementKind.name;
     },
     lazy: nameComponent,
-    memo: nameComponent,
+    memo(elementKind) {
+        return elementKind.displayName ?? nameMemoInner(elementKind.inner);
+    },
     other: nameComponent,
     suspense: nameComponent,
     viewTransition() {

@@ -37,6 +37,14 @@ function createShownComponent(): () => React.ReactNode {
     });
 }
 
+function Label(): React.ReactNode {
+    return null;
+}
+
+function InputComponent(): React.ReactNode {
+    return null;
+}
+
 export const testNode = suite('introspection snapshot shape', [
     test('derives text, public props, paths, and element kinds', function (scope) {
         const children = [ createTextNode('Save'), createTextNode(' now') ];
@@ -56,6 +64,39 @@ export const testNode = suite('introspection snapshot shape', [
         const shownComponent = createShownComponent();
 
         scope.assert.equal(getTypeName(shownComponent), 'ShownComponent');
+
+        return scope.assert.collect();
+    }),
+    test('names memo components after the component they wrap', function (scope) {
+        scope.assert.equal(getTypeName(React.memo(Label)), 'Label');
+        scope.assert.equal(getTypeName(React.memo(React.forwardRef(InputComponent))), 'ForwardRef(InputComponent)');
+        scope.assert.equal(
+            getTypeName(React.memo(function () {
+                return null;
+            })),
+            'Memo'
+        );
+
+        return scope.assert.collect();
+    }),
+    test('names forwardRef components after their render function', function (scope) {
+        scope.assert.equal(getTypeName(React.forwardRef(InputComponent)), 'ForwardRef(InputComponent)');
+        scope.assert.equal(
+            getTypeName(React.forwardRef(function () {
+                return null;
+            })),
+            'ForwardRef'
+        );
+
+        return scope.assert.collect();
+    }),
+    test('prefers the display name of memo and forwardRef wrappers', function (scope) {
+        scope.assert.equal(getTypeName(Object.assign(React.memo(Label), { displayName: 'ShownMemo' })), 'ShownMemo');
+        scope.assert.equal(
+            getTypeName(Object.assign(React.forwardRef(InputComponent), { displayName: 'ShownInput' })),
+            'ShownInput'
+        );
+        scope.assert.equal(getTypeName(Object.assign(React.memo(Label), { displayName: '' })), 'Label');
 
         return scope.assert.collect();
     })
