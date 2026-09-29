@@ -57,13 +57,10 @@ type SourceSnapshotNodeRequest = SnapshotNodeRequest & {
     readonly node: SnapshotSourceNode;
 };
 
-type SourceElementChildrenRequest = SnapshotChildPlacement & {
+type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
     readonly element: SnapshotSourceElement;
-    readonly parentId: number;
-};
-
-type SourceElementRenderedChildrenRequest = SourceElementChildrenRequest & {
     readonly givenChildren: readonly SnapshotNode[];
+    readonly parentId: number;
 };
 
 type PropsSnapshotRequest = {
@@ -222,16 +219,6 @@ const sourceLeafSnapshotFactories = {
     text: createTextSnapshotNode
 };
 
-function createSiblingSnapshots<Child>(
-    placement: SnapshotChildPlacement,
-    children: readonly Child[],
-    createNode: (request: SnapshotNodeRequest & { readonly node: Child; }) => SnapshotNode
-): readonly SnapshotNode[] {
-    return Object.freeze(children.map(function createSibling(child, index) {
-        return createNode({ ...placement, index, node: child });
-    }));
-}
-
 const snapshotOperations = {
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
         return request.build.createNode(function describeElementNode(id) {
@@ -242,16 +229,19 @@ const snapshotOperations = {
                 request.element.visibility,
                 request.element.activityMode
             );
-            const childrenRequest = {
+            const childPlacement = {
                 build: request.build,
-                element: request.element,
                 inheritedVisibility: visibility,
                 parentId: id,
                 parentPath: path
             };
-            const givenChildren = snapshotOperations.createSourceElementGivenChildren(childrenRequest);
+            const givenChildren = snapshotOperations.createSourceChildSnapshots({
+                ...childPlacement,
+                children: request.element.givenChildren
+            });
             const renderedChildren = snapshotOperations.createSourceElementRenderedChildren({
-                ...childrenRequest,
+                ...childPlacement,
+                element: request.element,
                 givenChildren
             });
             const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
@@ -294,11 +284,6 @@ const snapshotOperations = {
             });
         });
     },
-    createSourceElementGivenChildren(request: SourceElementChildrenRequest): readonly SnapshotNode[] {
-        const { element, ...placement } = request;
-
-        return snapshotOperations.createSourceChildSnapshots({ ...placement, children: element.givenChildren });
-    },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): readonly SnapshotNode[] {
         if (request.element.renderedReason === 'depth') {
             return request.givenChildren;
@@ -323,7 +308,9 @@ const snapshotOperations = {
     createSourceChildSnapshots(request: SourceChildSnapshotsRequest): readonly SnapshotNode[] {
         const { children, ...placement } = request;
 
-        return createSiblingSnapshots(placement, children, snapshotOperations.createSourceSnapshotNode);
+        return Object.freeze(children.map(function createSibling(child, index) {
+            return snapshotOperations.createSourceSnapshotNode({ ...placement, index, node: child });
+        }));
     },
     createSourceSnapshotNode(request: SourceSnapshotNodeRequest): SnapshotNode {
         if (request.node.kind === 'element') {
