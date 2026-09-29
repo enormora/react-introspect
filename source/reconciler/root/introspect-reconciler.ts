@@ -8,10 +8,7 @@ import {
     validateContainerRefs
 } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/introspect-public-types.ts';
-import {
-    createEmptyIntrospectionSnapshot,
-    type IntrospectionSnapshot
-} from '../../snapshot/model/introspect-snapshot-contract.ts';
+import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 import {
     createReconcilerContainer,
@@ -96,9 +93,7 @@ async function flushScheduledWork(runtime: IntrospectionRuntimeDependencies, roo
 function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
     const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
 
-    target.container.writeMounted(false);
-    target.container.writeChildren([]);
-    target.publish(createEmptyIntrospectionSnapshot(errorRenderCount));
+    target.publish(target.container.discard(errorRenderCount));
 }
 
 function captureRenderError(target: SessionRenderTarget, error: unknown, renderCountBefore: number): void {
@@ -141,7 +136,7 @@ function renderRootElement(
 function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, commitElement: () => void): void {
     const renderCountBefore = target.readRenderCount();
 
-    target.container.writeMounted(mounted);
+    target.container.beginCommit(mounted);
 
     try {
         commitElement();
