@@ -23,11 +23,12 @@ import {
     type SnapshotVisibility
 } from './introspect-snapshot-contract.ts';
 
+type SnapshotNodeDescription = Pick<SnapshotNode, Exclude<keyof SnapshotNode, 'id'>>;
+
 type SnapshotBuilder = {
     readonly normalizeIdString: (value: string) => string;
     readonly valueAncestors: WeakSet<WeakKey>;
-    readonly allocateId: () => number;
-    readonly push: (node: SnapshotNode) => SnapshotNode;
+    readonly createNode: (describe: (id: number) => SnapshotNodeDescription) => SnapshotNode;
     readonly readNodes: () => readonly SnapshotNode[];
 };
 
@@ -93,21 +94,18 @@ function createSnapshotBuilder(normalizeIdString: (value: string) => string): Sn
     let nextId = 0;
 
     return {
-        allocateId() {
+        createNode(describe) {
             const id = nextId;
 
             nextId += 1;
 
-            return id;
-        },
-        normalizeIdString,
-        push(input) {
-            const node = registerSnapshotNode(Object.freeze(input));
+            const node = registerSnapshotNode(Object.freeze({ ...describe(id), id }));
 
             nodes.push(node);
 
             return node;
         },
+        normalizeIdString,
         readNodes() {
             return Object.freeze(nodes.slice());
         },
@@ -166,20 +164,21 @@ export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourc
 type SnapshotLeaf = Pick<SnapshotNode, 'kind' | 'name' | 'renderedReason' | 'textContent' | 'type'>;
 
 function pushLeafSnapshotNode(request: SnapshotNodeRequest, leaf: SnapshotLeaf): SnapshotNode {
-    return request.build.push({
-        ...leaf,
-        activityMode: undefined,
-        caughtError: undefined,
-        givenChildren: Object.freeze([]),
-        id: request.build.allocateId(),
-        key: null,
-        parentId: request.parentId,
-        path: getIndexedPath(request.parentPath, request.index, leaf.name),
-        props: Object.freeze({
-            value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
-        }),
-        renderedChildren: Object.freeze([]),
-        visibility: request.inheritedVisibility
+    return request.build.createNode(function describeLeafNode() {
+        return {
+            ...leaf,
+            activityMode: undefined,
+            caughtError: undefined,
+            givenChildren: Object.freeze([]),
+            key: null,
+            parentId: request.parentId,
+            path: getIndexedPath(request.parentPath, request.index, leaf.name),
+            props: Object.freeze({
+                value: normalizeSnapshotValue(request.node, request.build.normalizeIdString)
+            }),
+            renderedChildren: Object.freeze([]),
+            visibility: request.inheritedVisibility
+        };
     });
 }
 
@@ -231,51 +230,51 @@ function createSiblingSnapshots<Child>(
 
 const snapshotOperations = {
     createSourceElementSnapshotNode(request: SourceElementNodeRequest): SnapshotNode {
-        const id = request.build.allocateId();
-        const name = getTypeName(request.element.type);
-        const path = getIndexedPath(request.parentPath, request.index, name);
-        const visibility = visibilityFromSource(
-            request.inheritedVisibility,
-            request.element.visibility,
-            request.element.activityMode
-        );
-        const childrenRequest = {
-            build: request.build,
-            element: request.element,
-            inheritedVisibility: visibility,
-            parentId: id,
-            parentPath: path
-        };
-        const givenChildren = snapshotOperations.createSourceElementGivenChildren(childrenRequest);
-        const renderedChildren = snapshotOperations.createSourceElementRenderedChildren({
-            ...childrenRequest,
-            givenChildren
-        });
-        const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
-        const snapshotProps = snapshotOperations.createPropsSnapshot({
-            build: request.build,
-            inheritedVisibility: visibility,
-            ownerId: id,
-            ownerPath: path,
-            props: request.element.props
-        });
+        return request.build.createNode(function describeElementNode(id) {
+            const name = getTypeName(request.element.type);
+            const path = getIndexedPath(request.parentPath, request.index, name);
+            const visibility = visibilityFromSource(
+                request.inheritedVisibility,
+                request.element.visibility,
+                request.element.activityMode
+            );
+            const childrenRequest = {
+                build: request.build,
+                element: request.element,
+                inheritedVisibility: visibility,
+                parentId: id,
+                parentPath: path
+            };
+            const givenChildren = snapshotOperations.createSourceElementGivenChildren(childrenRequest);
+            const renderedChildren = snapshotOperations.createSourceElementRenderedChildren({
+                ...childrenRequest,
+                givenChildren
+            });
+            const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
+            const snapshotProps = snapshotOperations.createPropsSnapshot({
+                build: request.build,
+                inheritedVisibility: visibility,
+                ownerId: id,
+                ownerPath: path,
+                props: request.element.props
+            });
 
-        return request.build.push({
-            activityMode: request.element.activityMode,
-            givenChildren,
-            caughtError: request.element.caughtError,
-            id,
-            key: request.element.key,
-            kind: getElementKind(request.element.type),
-            name,
-            parentId: request.parentId,
-            path,
-            props: snapshotProps,
-            renderedChildren,
-            renderedReason: request.element.renderedReason,
-            textContent: getTextContent(visibleChildren),
-            type: request.element.type,
-            visibility
+            return {
+                activityMode: request.element.activityMode,
+                givenChildren,
+                caughtError: request.element.caughtError,
+                key: request.element.key,
+                kind: getElementKind(request.element.type),
+                name,
+                parentId: request.parentId,
+                path,
+                props: snapshotProps,
+                renderedChildren,
+                renderedReason: request.element.renderedReason,
+                textContent: getTextContent(visibleChildren),
+                type: request.element.type,
+                visibility
+            };
         });
     },
     createPropsSnapshot(request: PropsSnapshotRequest): SnapshotProps {
