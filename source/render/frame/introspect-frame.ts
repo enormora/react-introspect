@@ -233,7 +233,7 @@ function transformActivityElement(element: IntrospectionElement, depth: Introspe
     return transformWrapperElement(element, depth, readActivityMode(element));
 }
 
-function transformViewTransitionElement(
+function transformNamedWrapperElement(
     element: IntrospectionElement,
     depth: IntrospectionFrameDepth
 ): React.ReactElement {
@@ -256,8 +256,10 @@ const elementTransforms: Readonly<
     lazy: transformComponentElement,
     memo: transformComponentElement,
     other: transformUnrenderedElement,
+    profiler: transformNamedWrapperElement,
+    strictMode: transformNamedWrapperElement,
     suspense: transformSuspenseElement,
-    viewTransition: transformViewTransitionElement
+    viewTransition: transformNamedWrapperElement
 };
 
 function transformElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {

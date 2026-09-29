@@ -129,6 +129,10 @@ function ContextRoot(): React.ReactNode {
     );
 }
 
+function ignoreProfile(): undefined {
+    return undefined;
+}
+
 function PlainLabel(props: ButtonProps): React.ReactNode {
     return React.createElement('span', null, props.label);
 }
@@ -596,6 +600,28 @@ export const testNode = suite('execution shallow function components', [
 
         scope.assert.undefined(view.root);
         scope.assert.equal(view.uncaughtErrors.at(-1)?.cause, failure);
+
+        return scope.assert.collect();
+    }),
+    test('executes components inside StrictMode and Profiler', function (scope) {
+        const view = introspect(
+            React.createElement(
+                React.StrictMode,
+                null,
+                React.createElement(
+                    React.Profiler,
+                    { id: 'labels', onRender: ignoreProfile },
+                    React.createElement(PlainLabel, { label: 'profiled' })
+                )
+            ),
+            {
+                depth: 'full',
+                strictMode: false
+            }
+        );
+
+        scope.assert.equal(view.find('span')?.textContent, 'profiled');
+        scope.assert.equal(view.formatTree(), 'StrictMode\n  Profiler\n    PlainLabel\n      span\n        #text');
 
         return scope.assert.collect();
     }),

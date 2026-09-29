@@ -76,6 +76,12 @@ const typeNamers: TypeNamers = {
         return elementKind.displayName ?? nameMemoInner(elementKind.inner, naming);
     },
     other: nameNothing,
+    profiler() {
+        return 'Profiler';
+    },
+    strictMode() {
+        return 'StrictMode';
+    },
     suspense: nameNothing,
     viewTransition() {
         return 'ViewTransition';
@@ -101,6 +107,8 @@ const snapshotNodeKinds: Readonly<Record<ReactElementKind['kind'], SnapshotNodeK
     lazy: 'component',
     memo: 'component',
     other: 'component',
+    profiler: 'component',
+    strictMode: 'component',
     suspense: 'component',
     viewTransition: 'component'
 };

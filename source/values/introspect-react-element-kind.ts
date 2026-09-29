@@ -8,7 +8,9 @@ type ForwardRefRender = (props: PropsRecord, ref: unknown) => React.ReactNode;
 
 type FunctionComponentType = ((props: PropsRecord) => React.ReactNode) & { readonly name: string; };
 
-type MarkerKind = { readonly kind: 'activity' | 'context' | 'fragment' | 'other' | 'suspense' | 'viewTransition'; };
+type BuiltInMarkerName = 'activity' | 'fragment' | 'profiler' | 'strictMode' | 'suspense' | 'viewTransition';
+
+type MarkerKind = { readonly kind: BuiltInMarkerName | 'context' | 'other'; };
 
 type ForwardRefKind = {
     readonly kind: 'forwardRef';
@@ -32,8 +34,14 @@ const memoType = Symbol.for('react.memo');
 const forwardRefType = Symbol.for('react.forward_ref');
 const lazyType = Symbol.for('react.lazy');
 const contextType = Symbol.for('react.context');
-const activityType: unknown = Symbol.for('react.activity');
-const viewTransitionType: unknown = Symbol.for('react.view_transition');
+const builtInMarkerNames = new Map<unknown, BuiltInMarkerName>([
+    [ React.Fragment, 'fragment' ],
+    [ React.Profiler, 'profiler' ],
+    [ React.StrictMode, 'strictMode' ],
+    [ React.Suspense, 'suspense' ],
+    [ Symbol.for('react.activity'), 'activity' ],
+    [ Symbol.for('react.view_transition'), 'viewTransition' ]
+]);
 const lazyInitializerKey = '_init';
 const lazyPayloadKey = '_payload';
 
@@ -116,19 +124,9 @@ function readBuiltInKind(type: unknown): ReactElementKind | undefined {
         return { kind: 'host', name: type };
     }
 
-    if (type === React.Fragment) {
-        return { kind: 'fragment' };
-    }
+    const markerName = builtInMarkerNames.get(type);
 
-    if (type === React.Suspense) {
-        return { kind: 'suspense' };
-    }
-
-    if (type === activityType) {
-        return { kind: 'activity' };
-    }
-
-    return type === viewTransitionType ? { kind: 'viewTransition' } : undefined;
+    return markerName === undefined ? undefined : { kind: markerName };
 }
 
 function readContextKind(type: unknown): ReactElementKind | undefined {
