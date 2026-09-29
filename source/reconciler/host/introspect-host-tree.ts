@@ -19,7 +19,7 @@ import {
     type SnapshotSourceNode
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
-import { toSnapshotSourceNodes } from '../../snapshot/model/introspect-snapshot-source-mapping.ts';
+import { toSnapshotSourceNodes, toSourceOutput } from '../../snapshot/model/introspect-snapshot-source-mapping.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -174,8 +174,7 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
             kind: 'element',
             key: metadata.key,
             props: metadata.props,
-            renderedChildren: child.readChildren().map(toSourceNode),
-            renderedReason: metadata.renderedReason,
+            output: toSourceOutput(metadata.renderedReason, child.readChildren().map(toSourceNode)),
             type: metadata.type,
             hostVisibility: child.readVisibility()
         };
@@ -188,8 +187,7 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
         kind: 'element',
         key: readHostKey(child.readProps()),
         props: readPublicHostProps(child.readProps()),
-        renderedChildren: 'given',
-        renderedReason: undefined,
+        output: { children: 'given', status: 'rendered' },
         type: child.type,
         hostVisibility: child.readVisibility()
     };

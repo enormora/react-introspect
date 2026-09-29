@@ -265,6 +265,23 @@ const RefPanel = class extends React.Component<RefPanelProps> {
 
 type RefPanelInstance = InstanceType<typeof RefPanel>;
 
+function createRefPanelProps(
+    label: string,
+    ref: React.RefObject<RefPanelInstance | null>
+): React.ClassAttributes<RefPanelInstance> & RefPanelProps {
+    return { label, ref };
+}
+
+function createLazyRefPanel(): typeof RefPanel {
+    return {
+        $$typeof: Symbol.for('react.lazy'),
+        _init() {
+            return RefPanel;
+        },
+        _payload: {}
+    } as unknown as typeof RefPanel;
+}
+
 const PrimitivePureCounter = class extends React.PureComponent<EmptyProps, unknown> {
     public constructor(props: EmptyProps) {
         super(props);
@@ -334,6 +351,12 @@ const PropsGatedBoundary = class extends Boundary {
 
     public override componentDidUpdate(): void {
         this.props.recorder.push('componentDidUpdate');
+    }
+
+    public override render(): React.ReactNode {
+        this.props.recorder.push('render');
+
+        return super.render();
     }
 };
 
@@ -626,6 +649,54 @@ export const testNode = suite('class components and error boundaries', [
             caught: true,
             ranComponentDidUpdate: false
         });
+
+        return scope.assert.collect();
+    }),
+    test('lets shouldComponentUpdate gate boundary renders again after the capture render', function (scope) {
+        const recorder = createRecorder();
+        const child = React.createElement(ThrowsOnClick);
+        const view = introspect(React.createElement(PropsGatedBoundary, { recorder }, child), {
+            depth: 'full',
+            errorMode: 'capture',
+            strictMode: false,
+            warningMode: 'capture'
+        });
+
+        requireValue(view.find('button')).sendEvent('click');
+
+        const rendersAfterCapture = recorder.entries.length;
+
+        view.update(React.createElement(PropsGatedBoundary, { recorder }, child));
+
+        scope.assert.deepEqual(recorder.entries.slice(rendersAfterCapture), [ 'shouldComponentUpdate' ]);
+        scope.assert.equal(view.find('span')?.textContent, 'fallback');
+
+        return scope.assert.collect();
+    }),
+    test('executes class components wrapped in memo or lazy', function (scope) {
+        const MemoPanel = React.memo(RefPanel);
+        const LazyPanel = createLazyRefPanel();
+        const memoRef = React.createRef<RefPanelInstance>();
+        const lazyRef = React.createRef<RefPanelInstance>();
+        const view = introspect(
+            React.createElement(
+                React.Fragment,
+                null,
+                React.createElement(MemoPanel, createRefPanelProps('memo', memoRef)),
+                React.createElement(LazyPanel, createRefPanelProps('lazy', lazyRef))
+            ),
+            {
+                depth: 'full',
+                strictMode: false
+            }
+        );
+
+        scope.assert.equal(view.textContent, 'memolazy');
+        scope.assert.deepEqual([ memoRef.current?.props.label, lazyRef.current?.props.label ], [ 'memo', 'lazy' ]);
+        scope.assert.equal(
+            view.formatTree(),
+            'Fragment\n  RefPanel\n    output\n      #text\n  Component\n    output\n      #text'
+        );
 
         return scope.assert.collect();
     }),

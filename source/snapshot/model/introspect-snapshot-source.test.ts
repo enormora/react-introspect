@@ -90,8 +90,7 @@ export const testNode = suite('snapshots of given children and elements in props
                         icon: React.createElement(Icon, { key: 'icon', label: 'prop' }, 'label text'),
                         list: [ React.createElement('li', { key: 'first' }, 1) ]
                     },
-                    renderedChildren: [],
-                    renderedReason: 'depth',
+                    output: { reason: 'depth', status: 'notRendered' },
                     type: Icon
                 }
             ],

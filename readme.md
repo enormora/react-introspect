@@ -367,7 +367,7 @@ assert.equal(button.name, 'Button');
 assert.equal(button.key, 'primary');
 ```
 
-Names follow React's warnings: a `displayName` wins, `memo` components take the wrapped component's name (or `Memo`), `lazy` components take the name of the component they resolved to (or `Component` until it has loaded), and `forwardRef` components are named `ForwardRef(Render)`.
+Names follow React's warnings: a `displayName` wins, `memo` components take the wrapped component's name (or `Memo`), `lazy` components that executed take the name of the component they resolved to (unexecuted ones, below the depth or in props, read `Component`), and `forwardRef` components are named `ForwardRef(Render)`.
 
 ### `node.kind`
 
@@ -1086,7 +1086,7 @@ assert.equal(view.findAll(Row).length, 2);
 
 ### Class components
 
-Class components execute at the selected depth.
+Class components execute at the selected depth, also when wrapped in `memo` or `lazy`.
 
 ```tsx
 class Counter extends React.Component<{ label: string; }, { count: number; }> {

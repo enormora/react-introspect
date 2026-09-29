@@ -579,6 +579,26 @@ export const testNode = suite('execution shallow function components', [
             return scope.assert.collect();
         }
     ),
+    test('captures a lazy component that fails to load as an uncaught render error', function (scope) {
+        const failure = new Error('lazy component failed to load');
+        const BrokenLazy = {
+            $$typeof: Symbol.for('react.lazy'),
+            [lazyInitializerKey]() {
+                throw failure;
+            },
+            [lazyPayloadKey]: {}
+        } as unknown as React.FC;
+        const view = introspect(React.createElement(BrokenLazy), {
+            depth: 'full',
+            errorMode: 'capture',
+            strictMode: false
+        });
+
+        scope.assert.undefined(view.root);
+        scope.assert.equal(view.uncaughtErrors.at(-1)?.cause, failure);
+
+        return scope.assert.collect();
+    }),
     test('records unsupported memo payloads as opaque output', function (scope) {
         const view = introspect(React.createElement(OpaqueMemo as never), {
             strictMode: false

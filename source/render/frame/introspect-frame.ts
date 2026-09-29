@@ -9,6 +9,7 @@ import {
     elementKeyProps
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
+import type { IntrospectionClassComponent } from '../../values/introspect-class-component.ts';
 import { readClassFrameType } from './introspect-class-frame.ts';
 import {
     type IntrospectionElement,
@@ -48,20 +49,30 @@ function unwrapThenableNode(node: React.ReactNode): React.ReactNode {
     return isThenable(node) ? React.use(node) as React.ReactNode : node;
 }
 
-function executeWrappedElement(
+function unwrapExecutableType(type: unknown): unknown {
+    const elementKind = classifyElementType(type);
+
+    if (elementKind.kind === 'lazy') {
+        return unwrapExecutableType(elementKind.initialize());
+    }
+
+    return elementKind.kind === 'memo' ? unwrapExecutableType(elementKind.inner) : type;
+}
+
+function resolveExecutableType(element: IntrospectionElement): unknown {
+    try {
+        return unwrapExecutableType(element.type);
+    } catch (error) {
+        return throwIntrospectionRenderError(error);
+    }
+}
+
+function executeType(
     type: unknown,
     props: Readonly<Record<PropertyKey, unknown>>,
     ref: unknown
 ): React.ReactNode {
     const elementKind = classifyElementType(type);
-
-    if (elementKind.kind === 'lazy') {
-        return executeWrappedElement(elementKind.initialize(), props, ref);
-    }
-
-    if (elementKind.kind === 'memo') {
-        return executeWrappedElement(elementKind.inner, props, ref);
-    }
 
     if (elementKind.kind === 'function') {
         return elementKind.component(props);
@@ -70,11 +81,9 @@ function executeWrappedElement(
     return elementKind.kind === 'forwardRef' ? elementKind.render(props, ref) : createOpaqueHost(type);
 }
 
-function executeIntrospectionFrameElement(element: IntrospectionElement): React.ReactNode {
+function executeIntrospectionFrameElement(type: unknown, element: IntrospectionElement): React.ReactNode {
     try {
-        return unwrapThenableNode(
-            executeWrappedElement(element.type, element.props, readElementRef(element))
-        );
+        return unwrapThenableNode(executeType(type, element.props, readElementRef(element)));
     } catch (error) {
         return throwIntrospectionRenderError(error);
     }
@@ -155,7 +164,28 @@ function transformWrapperElement(
     );
 }
 
+function createClassFrameElement(
+    element: IntrospectionElement,
+    depth: IntrospectionFrameDepth,
+    type: IntrospectionClassComponent
+): React.ReactElement {
+    return React.createElement(readClassFrameType(type), {
+        depth,
+        element,
+        key: element.key ?? undefined,
+        renderChildren: transformNode,
+        type
+    });
+}
+
 function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement {
+    const executableType = resolveExecutableType(props.element);
+    const executableKind = classifyElementType(executableType);
+
+    if (executableKind.kind === 'class') {
+        return createClassFrameElement(props.element, props.depth, executableKind.component);
+    }
+
     return createComponentHost(
         createComponentMetadata({
             activityMode: undefined,
@@ -163,7 +193,10 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
             element: props.element,
             renderedReason: undefined
         }),
-        transformNode(executeIntrospectionFrameElement(props.element), nextDepth(props.depth, props.element.type))
+        transformNode(
+            executeIntrospectionFrameElement(executableType, props.element),
+            nextDepth(props.depth, props.element.type)
+        )
     );
 }
 
@@ -171,13 +204,7 @@ function createFrameElement(element: IntrospectionElement, depth: IntrospectionF
     const elementKind = classifyElementType(element.type);
 
     if (elementKind.kind === 'class') {
-        return React.createElement(readClassFrameType(elementKind.component), {
-            depth,
-            element,
-            key: element.key ?? undefined,
-            renderChildren: transformNode,
-            type: elementKind.component
-        });
+        return createClassFrameElement(element, depth, elementKind.component);
     }
 
     return React.createElement(IntrospectionFrame, {

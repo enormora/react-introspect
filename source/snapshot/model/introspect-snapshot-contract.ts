@@ -21,14 +21,25 @@ type SnapshotSourceVisibleNode = SnapshotSourceElement | SnapshotSourceEmpty;
 
 export type SnapshotSourceNode = SnapshotSourceOpaque | SnapshotSourceText | SnapshotSourceVisibleNode;
 
+type SnapshotSourceRenderedOutput = {
+    readonly status: 'rendered';
+    readonly children: readonly SnapshotSourceNode[] | 'given';
+};
+
+type SnapshotSourceNotRenderedOutput = {
+    readonly status: 'notRendered';
+    readonly reason: IntrospectionNotRenderedReason;
+};
+
+export type SnapshotSourceOutput = SnapshotSourceNotRenderedOutput | SnapshotSourceRenderedOutput;
+
 export type SnapshotSourceElement = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly kind: 'element';
-    readonly renderedChildren: readonly SnapshotSourceNode[] | 'given';
+    readonly output: SnapshotSourceOutput;
     readonly caughtError: IntrospectionError | undefined;
     readonly key: string | null;
     readonly props: SnapshotProps;
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
     readonly type: unknown;
     readonly hostVisibility: SnapshotVisibility;
     readonly givenChildren: readonly SnapshotSourceNode[];
