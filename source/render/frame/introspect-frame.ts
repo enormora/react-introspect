@@ -227,20 +227,6 @@ function createMemoIntrospectionFrame(): IntrospectionFrameComponent {
 
 const framesByComponentType = new WeakMap<WeakKey, IntrospectionFrameComponent>();
 
-function readFrameForType(type: WeakKey, createFrame: () => IntrospectionFrameComponent): IntrospectionFrameComponent {
-    const cachedFrame = framesByComponentType.get(type);
-
-    if (cachedFrame !== undefined) {
-        return cachedFrame;
-    }
-
-    const frame = createFrame();
-
-    framesByComponentType.set(type, frame);
-
-    return frame;
-}
-
 function transformUnsupportedElement(element: IntrospectionElement): React.ReactElement {
     return createUnexecutedComponentHost(element, 'unsupported');
 }
@@ -306,7 +292,7 @@ const elementTransforms: ElementTransforms = {
         return transformFunctionFrameElement(
             element,
             depth,
-            readFrameForType(elementKind.type, createIntrospectionFrame)
+            framesByComponentType.getOrInsertComputed(elementKind.type, createIntrospectionFrame)
         );
     },
     fragment: transformFragmentElement,
@@ -314,7 +300,7 @@ const elementTransforms: ElementTransforms = {
         return transformFunctionFrameElement(
             element,
             depth,
-            readFrameForType(elementKind.component, createIntrospectionFrame)
+            framesByComponentType.getOrInsertComputed(elementKind.component, createIntrospectionFrame)
         );
     },
     host: transformRenderableElement,
@@ -322,14 +308,14 @@ const elementTransforms: ElementTransforms = {
         return transformFunctionFrameElement(
             element,
             depth,
-            readFrameForType(elementKind.type, createMemoIntrospectionFrame)
+            framesByComponentType.getOrInsertComputed(elementKind.type, createMemoIntrospectionFrame)
         );
     },
     memo(element, depth, elementKind) {
         return transformFunctionFrameElement(
             element,
             depth,
-            readFrameForType(elementKind.type, createMemoIntrospectionFrame)
+            framesByComponentType.getOrInsertComputed(elementKind.type, createMemoIntrospectionFrame)
         );
     },
     other: transformUnsupportedElement,

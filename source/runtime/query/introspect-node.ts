@@ -197,17 +197,9 @@ function exposeSnapshotNode(
     node: SnapshotNode
 ): RuntimeIntrospectionNode {
     function readProps(): SnapshotProps {
-        const cachedProps = exposedPropsBySnapshotNode.get(node);
-
-        if (cachedProps !== undefined) {
-            return cachedProps;
-        }
-
-        const exposedProps = exposePropElements(node.props, query.node);
-
-        exposedPropsBySnapshotNode.set(node, exposedProps);
-
-        return exposedProps;
+        return exposedPropsBySnapshotNode.getOrInsertComputed(node, function exposeProps(snapshotNode) {
+            return exposePropElements(snapshotNode.props, query.node);
+        });
     }
 
     function readRenderedChildren(): RuntimeRenderedChildren {

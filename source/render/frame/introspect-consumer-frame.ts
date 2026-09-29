@@ -57,15 +57,5 @@ const consumerFramesByContext = new WeakMap<
 export function readConsumerFrame(
     context: React.Context<unknown>
 ): React.ComponentClass<IntrospectionConsumerFrameProps> {
-    const cachedFrame = consumerFramesByContext.get(context);
-
-    if (cachedFrame !== undefined) {
-        return cachedFrame;
-    }
-
-    const frame = createConsumerFrame(context);
-
-    consumerFramesByContext.set(context, frame);
-
-    return frame;
+    return consumerFramesByContext.getOrInsertComputed(context, createConsumerFrame);
 }

@@ -20,6 +20,23 @@ export const testNode = suite('introspection id normalization', [
 
         return scope.assert.collect();
     }),
+    test('asks the generator once per generated id', function (scope) {
+        const requestedIds: string[] = [];
+        const normalizeId = createIdNormalizer({
+            generator(generatedId) {
+                requestedIds.push(generatedId);
+
+                return `id-${requestedIds.length}`;
+            },
+            prefix: 'test-'
+        });
+
+        scope.assert.equal(normalizeId('_test-r_a_ _test-r_b_ _test-r_a_'), 'id-1 id-2 id-1');
+        scope.assert.equal(normalizeId('_test-r_b_'), 'id-2');
+        scope.assert.deepEqual(requestedIds, [ '_test-r_a_', '_test-r_b_' ]);
+
+        return scope.assert.collect();
+    }),
     test('matches an id prefix containing regular expression syntax literally', function (scope) {
         const normalizeId = createIdNormalizer({
             generator() {
