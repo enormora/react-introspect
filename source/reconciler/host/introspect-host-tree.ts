@@ -46,10 +46,9 @@ type IntrospectionHostInstance = {
     readonly readProps: () => IntrospectionHostProps;
     readonly readPublicInstance: () => unknown;
     readonly readVisibility: () => 'hidden' | 'visible';
-    readonly refreshPublicInstance: (props: IntrospectionHostProps) => void;
     readonly type: string;
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
-    readonly writeProps: (props: IntrospectionHostProps) => void;
+    readonly update: (props: IntrospectionHostProps) => void;
 } & IntrospectionChildStore;
 
 type IntrospectionTextInstance = {
@@ -252,15 +251,13 @@ function createHostInstance(
         readVisibility() {
             return currentVisibility;
         },
-        refreshPublicInstance(nextProps: IntrospectionHostProps) {
+        type,
+        update(nextProps: IntrospectionHostProps) {
+            currentProps = nextProps;
             currentPublicInstance = resolvePublicInstance(context.refs, type, nextProps);
         },
-        type,
         writeVisibility(visibility: 'hidden' | 'visible') {
             currentVisibility = visibility;
-        },
-        writeProps(nextProps: IntrospectionHostProps) {
-            currentProps = nextProps;
         }
     };
 }
@@ -436,8 +433,7 @@ export function createIntrospectionHostConfig(scheduling: HostConfigScheduling):
             _oldProps: IntrospectionHostProps,
             newProps: IntrospectionHostProps
         ) {
-            instance.writeProps(newProps);
-            instance.refreshPublicInstance(newProps);
+            instance.update(newProps);
         },
         createInstance: createHostInstance,
         createTextInstance,
