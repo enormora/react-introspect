@@ -84,7 +84,11 @@ function hiddenByFromSource(
         return inheritedHiddenBy;
     }
 
-    return sourceVisibility === 'hidden' || activityMode === 'hidden' ? 'activity' : undefined;
+    if (sourceVisibility === 'hidden') {
+        return 'suspended';
+    }
+
+    return activityMode === 'hidden' ? 'activity' : undefined;
 }
 
 function visibilityOf(hiddenBy: SnapshotHiddenCause | undefined): SnapshotVisibility {

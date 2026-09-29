@@ -675,6 +675,8 @@ type IntrospectionNodeState = {
 };
 ```
 
+A hidden node reports why it is hidden: `'activity'` below a hidden `<Activity>`, `'suspended'` when Suspense keeps it behind a fallback after an update suspended. The outermost cause wins.
+
 ### `node.caughtError`
 
 Returns the latest error this error boundary caught, or `undefined`.

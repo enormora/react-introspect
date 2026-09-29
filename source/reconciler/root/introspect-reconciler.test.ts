@@ -3,6 +3,7 @@ import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import type {
+    IntrospectionNodeState,
     IntrospectionOptions,
     IntrospectionView
 } from '../../public/introspect-public-types.ts';
@@ -614,6 +615,69 @@ export const testNode = suite('custom reconciler host layer', [
             scope.assert.undefined(view.find(Loading));
             scope.assert.equal(view.find(ReadyPanel)?.renderedChildren.status, 'rendered');
             scope.assert.equal(view.find('span')?.textContent, 'ready');
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'marks content that Suspense hides behind its fallback as suspended',
+        function (scope) {
+            const view = introspect(
+                React.createElement(
+                    React.Suspense,
+                    { fallback: React.createElement(Loading) },
+                    React.createElement(ReadyPanel)
+                ),
+                {
+                    depth: 'full',
+                    strictMode: false
+                }
+            );
+
+            view.update(React.createElement(
+                React.Suspense,
+                { fallback: React.createElement(Loading) },
+                React.createElement(Suspends)
+            ));
+
+            const hiddenState: IntrospectionNodeState = {
+                activityMode: undefined,
+                reason: 'suspended',
+                rendered: true,
+                visible: false
+            };
+
+            scope.assert.deepEqual(requireValue(view.find(ReadyPanel)).state, hiddenState);
+            scope.assert.deepEqual(requireValue(view.find('span')).state, hiddenState);
+            scope.assert.equal(view.find(Loading)?.visibility, 'visible');
+
+            return scope.assert.collect();
+        }
+    ),
+    test(
+        'marks a hidden Activity that Suspense hides behind its fallback as suspended',
+        function (scope) {
+            const hiddenActivity = React.createElement(React.Activity, {
+                children: React.createElement(ReadyPanel),
+                mode: 'hidden'
+            });
+            const view = introspect(
+                React.createElement(React.Suspense, { fallback: React.createElement(Loading) }, hiddenActivity),
+                {
+                    depth: 'full',
+                    strictMode: false
+                }
+            );
+
+            view.update(React.createElement(
+                React.Suspense,
+                { fallback: React.createElement(Loading) },
+                hiddenActivity,
+                React.createElement(Suspends)
+            ));
+
+            scope.assert.equal(requireValue(view.find(React.Activity)).state.reason, 'suspended');
+            scope.assert.equal(requireValue(view.find(ReadyPanel)).state.reason, 'suspended');
 
             return scope.assert.collect();
         }
