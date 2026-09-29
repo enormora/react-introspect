@@ -1,17 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { TimeoutIdentifier } from '@enormora/clock';
+import type { IntrospectionHostScheduling } from '../host/introspect-host-tree.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 
-export type IntrospectionReconcilerRuntime = {
-    readonly cancelTimeout: (timeoutIdentifier: TimeoutIdentifier) => void;
-    readonly readEventTimestamp: () => number;
+export type IntrospectionReconcilerRuntime = IntrospectionHostScheduling & {
     readonly run: <Result>(runtime: IntrospectionRuntimeDependencies, action: () => Result) => Result;
-    readonly scheduleMicrotask: (action: () => void) => void;
-    readonly scheduleTimeout: <HandlerArguments extends readonly unknown[]>(
-        handler: (...handlerArguments: HandlerArguments) => void,
-        delayInMilliseconds: number,
-        ...handlerArguments: HandlerArguments
-    ) => TimeoutIdentifier;
     readonly makeDefault: (runtime: IntrospectionRuntimeDependencies) => void;
 };
 

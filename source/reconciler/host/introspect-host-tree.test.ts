@@ -1,30 +1,23 @@
 import { suite, test } from '@overkill-dev/test';
 import type { IntrospectionSnapshot } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import { createIntrospectionReconcilerRuntime } from '../root/introspect-reconciler-runtime.ts';
 import {
-    appendChild,
     createHostContainer,
-    createHostInstance,
-    createTextInstance,
-    hideTextInstance,
-    insertBefore,
-    type IntrospectionHostContainer,
-    removeChild,
-    toSnapshot,
-    unhideTextInstance
+    createIntrospectionHostConfig,
+    type IntrospectionHostConfig,
+    type IntrospectionHostContainer
 } from './introspect-host-tree.ts';
 
-function createContainer(): IntrospectionHostContainer {
-    return createHostContainer(
-        function ignoreSnapshot() {
-            return undefined;
-        },
-        function readNextRenderCount() {
-            return 1;
-        },
-        { generator: undefined, prefix: 'test-' },
-        undefined
-    );
-}
+type HostInstance = ReturnType<IntrospectionHostConfig['createInstance']>;
+
+type TextInstance = ReturnType<IntrospectionHostConfig['createTextInstance']>;
+
+type PublishingContainer = {
+    readonly container: IntrospectionHostContainer;
+    readonly commit: () => IntrospectionSnapshot;
+};
+
+const hostConfig = createIntrospectionHostConfig(createIntrospectionReconcilerRuntime());
 
 function requireValue<Value>(value: Value | undefined): Value {
     if (value === undefined) {
@@ -34,17 +27,50 @@ function requireValue<Value>(value: Value | undefined): Value {
     return value;
 }
 
+function createContainer(): PublishingContainer {
+    const published: IntrospectionSnapshot[] = [];
+    const container = createHostContainer(
+        function recordSnapshot(snapshot) {
+            published.push(snapshot);
+        },
+        function readNextRenderCount() {
+            return 1;
+        },
+        { generator: undefined, prefix: 'test-' },
+        undefined
+    );
+
+    return {
+        commit() {
+            hostConfig.resetAfterCommit(container);
+
+            return requireValue(published.at(-1));
+        },
+        container
+    };
+}
+
+function createInstance(
+    host: PublishingContainer,
+    type: string,
+    props: Readonly<Record<PropertyKey, unknown>>
+): HostInstance {
+    return hostConfig.createInstance(type, props, host.container, { refs: undefined });
+}
+
+function createText(host: PublishingContainer, text: string): TextInstance {
+    return hostConfig.createTextInstance(text, host.container, { refs: undefined });
+}
+
 function createButtonSnapshot(): IntrospectionSnapshot {
-    const container = createContainer();
-    const button = createHostInstance('button', { children: 'ignored', title: 'Save' }, undefined, {
-        refs: undefined
-    });
-    const text = createTextInstance('Save');
+    const host = createContainer();
+    const button = createInstance(host, 'button', { children: 'ignored', title: 'Save' });
+    const text = createText(host, 'Save');
 
-    appendChild(button, text);
-    appendChild(container, button);
+    hostConfig.appendInitialChild(button, text);
+    hostConfig.appendChildToContainer(host.container, button);
 
-    return toSnapshot(container);
+    return host.commit();
 }
 
 export const testNode = suite('introspection host tree', [
@@ -60,15 +86,14 @@ export const testNode = suite('introspection host tree', [
         return scope.assert.collect();
     }),
     test('maintains parent child order', function (scope) {
-        const container = createContainer();
-        const first = createHostInstance('span', { title: 'first' }, undefined, { refs: undefined });
-        const second = createHostInstance('strong', { title: 'second' }, undefined, { refs: undefined });
+        const host = createContainer();
+        const first = createInstance(host, 'span', { title: 'first' });
+        const second = createInstance(host, 'strong', { title: 'second' });
 
-        appendChild(container, second);
-        insertBefore(container, first, second);
+        hostConfig.appendChildToContainer(host.container, second);
+        hostConfig.insertInContainerBefore(host.container, first, second);
 
-        const snapshot = toSnapshot(container);
-        const root = requireValue(snapshot.root);
+        const root = requireValue(host.commit().root);
 
         scope.assert.deepEqual(
             root.renderedChildren.map(function readName(node) {
@@ -80,12 +105,13 @@ export const testNode = suite('introspection host tree', [
         return scope.assert.collect();
     }),
     test('detaches moved children from their previous parent', function (scope) {
-        const firstParent = createHostInstance('section', {}, undefined, { refs: undefined });
-        const secondParent = createHostInstance('article', {}, undefined, { refs: undefined });
-        const child = createTextInstance('moved');
+        const host = createContainer();
+        const firstParent = createInstance(host, 'section', {});
+        const secondParent = createInstance(host, 'article', {});
+        const child = createText(host, 'moved');
 
-        appendChild(firstParent, child);
-        appendChild(secondParent, child);
+        hostConfig.appendChild(firstParent, child);
+        hostConfig.appendChild(secondParent, child);
 
         scope.assert.equal(firstParent.readChildren().length, 0);
         scope.assert.equal(secondParent.readChildren()[0], child);
@@ -93,28 +119,28 @@ export const testNode = suite('introspection host tree', [
         return scope.assert.collect();
     }),
     test('updates text visibility in snapshots', function (scope) {
-        const container = createContainer();
-        const text = createTextInstance('status');
+        const host = createContainer();
+        const text = createText(host, 'status');
 
-        hideTextInstance(text);
-        appendChild(container, text);
+        hostConfig.hideTextInstance(text);
+        hostConfig.appendChildToContainer(host.container, text);
 
-        scope.assert.equal(toSnapshot(container).root?.visibility, 'hidden');
+        scope.assert.equal(host.commit().root?.visibility, 'hidden');
 
-        unhideTextInstance(text);
+        hostConfig.unhideTextInstance(text, 'status');
 
-        scope.assert.equal(toSnapshot(container).root?.visibility, 'visible');
+        scope.assert.equal(host.commit().root?.visibility, 'visible');
 
         return scope.assert.collect();
     }),
     test('removes children from parents', function (scope) {
-        const container = createContainer();
-        const text = createTextInstance('removed');
+        const host = createContainer();
+        const text = createText(host, 'removed');
 
-        appendChild(container, text);
-        removeChild(container, text);
+        hostConfig.appendChildToContainer(host.container, text);
+        hostConfig.removeChildFromContainer(host.container, text);
 
-        const root = requireValue(toSnapshot(container).root);
+        const root = requireValue(host.commit().root);
 
         scope.assert.equal(root.name, 'Fragment');
         scope.assert.equal(root.renderedChildren.length, 0);

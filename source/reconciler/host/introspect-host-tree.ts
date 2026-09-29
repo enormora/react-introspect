@@ -1,5 +1,5 @@
+import type { TimeoutIdentifier } from '@enormora/clock';
 import {
-    isInternalHostType,
     readHostKey,
     readInternalHost,
     readPublicHostProps
@@ -21,11 +21,11 @@ import {
     toSnapshotSourceNodes
 } from '../../snapshot/model/introspect-snapshot.ts';
 
-export type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
+type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
-export type IntrospectionHostParent = IntrospectionHostContainer | IntrospectionHostInstance;
+type IntrospectionHostParent = IntrospectionHostContainer | IntrospectionHostInstance;
 
-export type IntrospectionHostChild = IntrospectionHostInstance | IntrospectionTextInstance;
+type IntrospectionHostChild = IntrospectionHostInstance | IntrospectionTextInstance;
 
 type IntrospectionChildStore = {
     readonly readChildren: () => readonly IntrospectionHostChild[];
@@ -33,32 +33,44 @@ type IntrospectionChildStore = {
 };
 
 export type IntrospectionHostContainer = {
-    readonly readIdNormalization: () => IntrospectionIdNormalization;
-    readonly readRefs: () => IntrospectionRefs | undefined;
+    readonly idNormalization: IntrospectionIdNormalization;
+    readonly refs: IntrospectionRefs | undefined;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
     readonly readMounted: () => boolean;
     readonly writeMounted: (mounted: boolean) => void;
 } & IntrospectionChildStore;
 
-export type IntrospectionHostInstance = {
+type IntrospectionHostInstance = {
+    readonly kind: 'host';
     readonly readProps: () => IntrospectionHostProps;
     readonly readPublicInstance: () => unknown;
     readonly readVisibility: () => 'hidden' | 'visible';
-    readonly refreshPublicInstance: (props: IntrospectionHostProps) => void;
     readonly type: string;
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
-    readonly writeProps: (props: IntrospectionHostProps) => void;
+    readonly update: (props: IntrospectionHostProps) => void;
 } & IntrospectionChildStore;
 
-export type IntrospectionTextInstance = {
+type IntrospectionTextInstance = {
+    readonly kind: 'text';
     readonly readText: () => string;
     readonly readVisibility: () => 'hidden' | 'visible';
     readonly writeVisibility: (visibility: 'hidden' | 'visible') => void;
     readonly writeText: (text: string) => void;
 };
 
-export type IntrospectionHostContext = {
+export type IntrospectionHostScheduling = {
+    readonly cancelTimeout: (timeoutIdentifier: TimeoutIdentifier) => void;
+    readonly readEventTimestamp: () => number;
+    readonly scheduleMicrotask: (action: () => void) => void;
+    readonly scheduleTimeout: <HandlerArguments extends readonly unknown[]>(
+        handler: (...handlerArguments: HandlerArguments) => void,
+        delayInMilliseconds: number,
+        ...handlerArguments: HandlerArguments
+    ) => TimeoutIdentifier;
+};
+
+type IntrospectionHostContext = {
     readonly refs: IntrospectionRefs | undefined;
 };
 
@@ -77,10 +89,6 @@ function createChildStore(): IntrospectionChildStore {
     };
 }
 
-function isTextInstance(child: IntrospectionHostChild): child is IntrospectionTextInstance {
-    return !Reflect.has(child, 'type');
-}
-
 function toRefTarget(type: string, props: IntrospectionHostProps): IntrospectionRefHostTarget {
     return Object.freeze({
         key: readHostKey(props),
@@ -95,7 +103,7 @@ function resolvePublicInstance(
     type: string,
     props: IntrospectionHostProps
 ): unknown {
-    if (isInternalHostType(type)) {
+    if (readInternalHost(type, props).kind !== 'host') {
         return null;
     }
 
@@ -103,13 +111,13 @@ function resolvePublicInstance(
 }
 
 function collectRefTargets(child: IntrospectionHostChild): readonly IntrospectionRefHostTarget[] {
-    if (isTextInstance(child)) {
+    if (child.kind === 'text') {
         return [];
     }
 
     const childTargets = child.readChildren().flatMap(collectRefTargets);
 
-    if (isInternalHostType(child.type)) {
+    if (readInternalHost(child.type, child.readProps()).kind !== 'host') {
         return childTargets;
     }
 
@@ -119,7 +127,7 @@ function collectRefTargets(child: IntrospectionHostChild): readonly Introspectio
     ];
 }
 
-export function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
+function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
     const children = parent.readChildren();
     const index = children.indexOf(child);
 
@@ -139,7 +147,7 @@ function detachChild(child: IntrospectionHostChild): void {
 }
 
 function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
-    if (isTextInstance(child)) {
+    if (child.kind === 'text') {
         return { kind: 'text', value: child.readText(), visibility: child.readVisibility() };
     }
 
@@ -182,7 +190,7 @@ function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
     };
 }
 
-export function appendChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
+function appendChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
     detachChild(child);
 
     const children = parent.readChildren();
@@ -194,7 +202,7 @@ export function appendChild(parent: IntrospectionHostParent, child: Introspectio
     parentByChild.set(child, parent);
 }
 
-export function clearContainer(container: IntrospectionHostContainer): void {
+function clearContainer(container: IntrospectionHostContainer): void {
     container.writeChildren([]);
 }
 
@@ -208,24 +216,20 @@ export function createHostContainer(
 
     return {
         ...createChildStore(),
+        idNormalization,
         publish,
-        readIdNormalization() {
-            return idNormalization;
-        },
         readMounted() {
             return mounted;
         },
         readNextRenderCount,
-        readRefs() {
-            return refs;
-        },
+        refs,
         writeMounted(nextMounted: boolean) {
             mounted = nextMounted;
         }
     };
 }
 
-export function createHostInstance(
+function createHostInstance(
     type: string,
     props: IntrospectionHostProps,
     _root: unknown,
@@ -237,6 +241,7 @@ export function createHostInstance(
 
     return {
         ...createChildStore(),
+        kind: 'host',
         readProps() {
             return currentProps;
         },
@@ -246,24 +251,23 @@ export function createHostInstance(
         readVisibility() {
             return currentVisibility;
         },
-        refreshPublicInstance(nextProps: IntrospectionHostProps) {
+        type,
+        update(nextProps: IntrospectionHostProps) {
+            currentProps = nextProps;
             currentPublicInstance = resolvePublicInstance(context.refs, type, nextProps);
         },
-        type,
         writeVisibility(visibility: 'hidden' | 'visible') {
             currentVisibility = visibility;
-        },
-        writeProps(nextProps: IntrospectionHostProps) {
-            currentProps = nextProps;
         }
     };
 }
 
-export function createTextInstance(text: string): IntrospectionTextInstance {
+function createTextInstance(text: string): IntrospectionTextInstance {
     let currentText = text;
     let currentVisibility: 'hidden' | 'visible' = 'visible';
 
     return {
+        kind: 'text',
         readText() {
             return currentText;
         },
@@ -279,15 +283,15 @@ export function createTextInstance(text: string): IntrospectionTextInstance {
     };
 }
 
-export function getChildHostContext(context: IntrospectionHostContext): IntrospectionHostContext {
+function getChildHostContext(context: IntrospectionHostContext): IntrospectionHostContext {
     return context;
 }
 
-export function getRootHostContext(container: IntrospectionHostContainer): IntrospectionHostContext {
-    return { refs: container.readRefs() };
+function getRootHostContext(container: IntrospectionHostContainer): IntrospectionHostContext {
+    return { refs: container.refs };
 }
 
-export function insertBefore(
+function insertBefore(
     parent: IntrospectionHostParent,
     child: IntrospectionHostChild,
     beforeChild: IntrospectionHostChild
@@ -300,7 +304,7 @@ export function insertBefore(
     parentByChild.set(child, parent);
 }
 
-export function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot {
+function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot {
     if (!container.readMounted()) {
         return createEmptyIntrospectionSnapshot(container.readNextRenderCount());
     }
@@ -308,29 +312,184 @@ export function toSnapshot(container: IntrospectionHostContainer): Introspection
     return createIntrospectionSnapshotFromSource(
         container.readChildren().map(toSourceNode),
         container.readNextRenderCount(),
-        container.readIdNormalization()
+        container.idNormalization
     );
 }
 
-export function hideInstance(instance: IntrospectionHostInstance): void {
-    instance.writeVisibility('hidden');
+function hideHostChild(child: IntrospectionHostChild): void {
+    child.writeVisibility('hidden');
 }
 
-export function hideTextInstance(instance: IntrospectionTextInstance): void {
-    instance.writeVisibility('hidden');
-}
-
-export function unhideInstance(instance: IntrospectionHostInstance): void {
-    instance.writeVisibility('visible');
-}
-
-export function unhideTextInstance(instance: IntrospectionTextInstance): void {
-    instance.writeVisibility('visible');
+function unhideHostChild(child: IntrospectionHostChild): void {
+    child.writeVisibility('visible');
 }
 
 export function validateContainerRefs(container: IntrospectionHostContainer): void {
     validateIntrospectionRefs(
-        container.readRefs(),
+        container.refs,
         container.readChildren().flatMap(collectRefTargets)
     );
+}
+
+const defaultEventPriority = 32;
+
+function noop(): void {
+    return undefined;
+}
+
+function alwaysFalse(): boolean {
+    return false;
+}
+
+function returnNull(): null {
+    return null;
+}
+
+function getDefaultEventPriority(): number {
+    return defaultEventPriority;
+}
+
+function publishContainerSnapshot(container: IntrospectionHostContainer): void {
+    container.publish(toSnapshot(container));
+}
+
+function prepareForCommit(): null {
+    return null;
+}
+
+export type IntrospectionHostConfig = {
+    readonly [member: string]: unknown;
+    readonly appendChild: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
+    readonly appendChildToContainer: (container: IntrospectionHostContainer, child: IntrospectionHostChild) => void;
+    readonly appendInitialChild: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
+    readonly clearContainer: (container: IntrospectionHostContainer) => void;
+    readonly commitTextUpdate: (instance: IntrospectionTextInstance, oldText: string, newText: string) => void;
+    readonly commitUpdate: (
+        instance: IntrospectionHostInstance,
+        type: string,
+        oldProps: IntrospectionHostProps,
+        newProps: IntrospectionHostProps
+    ) => void;
+    readonly finalizeInitialChildren: (
+        instance: IntrospectionHostInstance,
+        type: string,
+        props: IntrospectionHostProps,
+        context: IntrospectionHostContext
+    ) => boolean;
+    readonly getChildHostContext: (context: IntrospectionHostContext) => IntrospectionHostContext;
+    readonly getPublicInstance: (instance: IntrospectionHostInstance) => unknown;
+    readonly getRootHostContext: (container: IntrospectionHostContainer) => IntrospectionHostContext;
+    readonly hideInstance: (instance: IntrospectionHostInstance) => void;
+    readonly insertBefore: (
+        parent: IntrospectionHostParent,
+        child: IntrospectionHostChild,
+        beforeChild: IntrospectionHostChild
+    ) => void;
+    readonly prepareForCommit: () => null;
+    readonly removeChild: (parent: IntrospectionHostParent, child: IntrospectionHostChild) => void;
+    readonly unhideInstance: (instance: IntrospectionHostInstance, props: IntrospectionHostProps) => void;
+    readonly createInstance: (
+        type: string,
+        props: IntrospectionHostProps,
+        root: unknown,
+        context: IntrospectionHostContext
+    ) => IntrospectionHostInstance;
+    readonly createTextInstance: (
+        text: string,
+        root: unknown,
+        context: IntrospectionHostContext
+    ) => IntrospectionTextInstance;
+    readonly hideTextInstance: (instance: IntrospectionTextInstance) => void;
+    readonly insertInContainerBefore: (
+        container: IntrospectionHostContainer,
+        child: IntrospectionHostChild,
+        beforeChild: IntrospectionHostChild
+    ) => void;
+    readonly removeChildFromContainer: (container: IntrospectionHostContainer, child: IntrospectionHostChild) => void;
+    readonly resetAfterCommit: (container: IntrospectionHostContainer) => void;
+    readonly unhideTextInstance: (instance: IntrospectionTextInstance, text: string) => void;
+};
+
+export function createIntrospectionHostConfig(scheduling: IntrospectionHostScheduling): IntrospectionHostConfig {
+    return {
+        NotPendingTransition: null,
+        HostTransitionContext: {
+            _currentValue: null,
+            _currentValue2: null
+        },
+        appendChild,
+        appendChildToContainer: appendChild,
+        appendInitialChild: appendChild,
+        applyViewTransitionName: noop,
+        beforeActiveInstanceBlur: noop,
+        cancelTimeout: scheduling.cancelTimeout,
+        cancelRootViewTransitionName: noop,
+        cancelViewTransitionName: noop,
+        clearActivityBoundary: noop,
+        clearActivityBoundaryFromContainer: noop,
+        clearContainer,
+        clearSuspenseBoundary: noop,
+        commitMount: noop,
+        commitTextUpdate(instance: IntrospectionTextInstance, _oldText: string, newText: string) {
+            instance.writeText(newText);
+        },
+        commitUpdate(
+            instance: IntrospectionHostInstance,
+            _type: string,
+            _oldProps: IntrospectionHostProps,
+            newProps: IntrospectionHostProps
+        ) {
+            instance.update(newProps);
+        },
+        createInstance: createHostInstance,
+        createTextInstance,
+        detachDeletedInstance: noop,
+        finalizeInitialChildren: alwaysFalse,
+        getChildHostContext,
+        getCurrentUpdatePriority: getDefaultEventPriority,
+        getPublicInstance(instance: IntrospectionHostInstance) {
+            return instance.readPublicInstance();
+        },
+        getRootHostContext,
+        hideInstance: hideHostChild,
+        hideTextInstance: hideHostChild,
+        insertBefore,
+        insertInContainerBefore: insertBefore,
+        isPrimaryRenderer: false,
+        isSuspenseInstanceFallback: alwaysFalse,
+        isSuspenseInstancePending: alwaysFalse,
+        maySuspendCommit: alwaysFalse,
+        maySuspendCommitInSyncRender: alwaysFalse,
+        maySuspendCommitOnUpdate: alwaysFalse,
+        noTimeout: -1,
+        prepareForCommit,
+        preparePortalMount: noop,
+        removeChild,
+        removeChildFromContainer: removeChild,
+        resetAfterCommit: publishContainerSnapshot,
+        resetFormInstance: noop,
+        resolveEventTimeStamp: scheduling.readEventTimestamp,
+        resolveEventType: returnNull,
+        resolveUpdatePriority: getDefaultEventPriority,
+        restoreRootViewTransitionName: noop,
+        restoreViewTransitionName: noop,
+        scheduleMicrotask: scheduling.scheduleMicrotask,
+        scheduleTimeout: scheduling.scheduleTimeout,
+        setCurrentUpdatePriority: noop,
+        shouldAttemptEagerTransition: alwaysFalse,
+        shouldSetTextContent: alwaysFalse,
+        startSuspendingCommit: noop,
+        stopViewTransition: noop,
+        supportsHydration: false,
+        supportsMicrotasks: true,
+        supportsMutation: true,
+        supportsPersistence: false,
+        supportsTestSelectors: false,
+        suspendInstance: noop,
+        suspendOnActiveViewTransition: alwaysFalse,
+        trackSchedulerEvent: noop,
+        unhideInstance: unhideHostChild,
+        unhideTextInstance: unhideHostChild,
+        waitForCommitToBeReady: returnNull
+    };
 }

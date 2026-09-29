@@ -29,11 +29,6 @@ type ValueHost = { readonly kind: 'empty' | 'opaque'; readonly value: unknown; }
 
 export type InternalHost = ComponentHost | ValueHost | { readonly kind: 'host'; };
 
-const internalHostTypes = new Set([
-    introspectionComponentHostType,
-    introspectionEmptyHostType,
-    introspectionOpaqueHostType
-]);
 const createdComponentMetadata = new WeakSet();
 const unsupportedComponentMetadata: IntrospectionComponentMetadata = {
     activityMode: undefined,
@@ -141,10 +136,6 @@ function readComponentMetadata(props: Readonly<Record<PropertyKey, unknown>>): I
     const value = props[introspectionComponentMetadata];
 
     return isIntrospectionComponentMetadata(value) ? value : unsupportedComponentMetadata;
-}
-
-export function isInternalHostType(type: string): boolean {
-    return internalHostTypes.has(type);
 }
 
 export function readInternalHost(type: string, props: Readonly<Record<PropertyKey, unknown>>): InternalHost {
