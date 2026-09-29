@@ -17,11 +17,6 @@ type TransitionValueReaderProps = {
     readonly subscribe: (listener: (value: string) => void) => void;
 };
 
-type PendingRetry = {
-    readonly renderCount: number;
-    readonly wait: Promise<void>;
-};
-
 function rejectSuspenseThenable(error: unknown, onrejected: ((error: unknown) => void) | undefined): void {
     if (onrejected === undefined) {
         throw error instanceof Error ? error : new Error(String(error));
@@ -123,29 +118,6 @@ function createSuspenseResource(): SuspenseResource {
     };
 }
 
-async function actAsync(action: () => void): Promise<void> {
-    const hadActEnvironment = Object.hasOwn(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
-    const previousActEnvironment: unknown = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
-
-    Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-    try {
-        await React.act(async function runAction() {
-            action();
-            await Promise.resolve();
-            await new Promise<void>(function waitForTimer(resolve) {
-                timers.setTimeout(resolve, 0);
-            });
-        });
-    } finally {
-        if (hadActEnvironment) {
-            Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', previousActEnvironment);
-        } else {
-            Reflect.deleteProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
-        }
-    }
-}
-
 async function withActEnvironment<Result>(action: () => Promise<Result>): Promise<Result> {
     const hadActEnvironment = Object.hasOwn(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
     const previousActEnvironment: unknown = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
@@ -181,15 +153,6 @@ function startWaitingForIdle(view: IntrospectionView): IdleProgress {
         isIdle() {
             return idle;
         }
-    };
-}
-
-function waitForRetry(view: IntrospectionView): PendingRetry {
-    const renderCount = view.renderCount + 1;
-
-    return {
-        renderCount,
-        wait: view.waitForRenderCount(renderCount)
     };
 }
 
@@ -381,7 +344,7 @@ export const testNode = suite('runtime integration', [
                 {
                     depth: 'full',
                     strictMode: false,
-                    waitTimeout: 50,
+                    waitTimeout: 1000,
                     warningMode: 'capture'
                 }
             );
@@ -389,12 +352,10 @@ export const testNode = suite('runtime integration', [
             const fallbackStatus = view.find(Loading)?.renderedChildren.status;
             const fallbackText = view.find('em')?.textContent;
             const fallbackReadyNode = view.find('span');
-            const retry = waitForRetry(view);
+            const fallbackRenderCount = view.renderCount;
 
-            await actAsync(function resolveResource() {
-                resource.resolve();
-            });
-            await retry.wait;
+            resource.resolve();
+            await view.waitForIdle();
 
             scope.assert.deepEqual({
                 fallbackReadyNode,
@@ -411,7 +372,7 @@ export const testNode = suite('runtime integration', [
                 readyStatus: 'rendered',
                 readyText: 'ready',
                 removedFallback: undefined,
-                renderCount: retry.renderCount
+                renderCount: fallbackRenderCount + 1
             });
 
             return scope.assert.collect();

@@ -64,6 +64,8 @@ type IntrospectionTextInstance = {
     readonly writeText: (text: string) => void;
 };
 
+export const noHostTimeout = -1;
+
 export type IntrospectionHostScheduling = {
     readonly cancelTimeout: (timeoutIdentifier: TimeoutIdentifier) => void;
     readonly readCurrentUpdatePriority: () => number;
@@ -472,7 +474,7 @@ export function createIntrospectionHostConfig(scheduling: IntrospectionHostSched
         maySuspendCommit: alwaysFalse,
         maySuspendCommitInSyncRender: alwaysFalse,
         maySuspendCommitOnUpdate: alwaysFalse,
-        noTimeout: -1,
+        noTimeout: noHostTimeout,
         prepareForCommit,
         preparePortalMount: noop,
         removeChild,

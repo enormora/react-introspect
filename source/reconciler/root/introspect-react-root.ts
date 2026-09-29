@@ -2,7 +2,11 @@ import type React from 'react';
 import createReconciler, { type ReconcilerRoot } from 'react-reconciler';
 // eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
 import { ConcurrentRoot } from 'react-reconciler/constants.js';
-import { createIntrospectionHostConfig, type IntrospectionHostContainer } from '../host/introspect-host-tree.ts';
+import {
+    createIntrospectionHostConfig,
+    type IntrospectionHostContainer,
+    noHostTimeout
+} from '../host/introspect-host-tree.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/introspect-runtime-dependencies-types.ts';
 import { createIntrospectionReconcilerRuntime } from './introspect-reconciler-runtime.ts';
@@ -40,14 +44,22 @@ export function createReconcilerContainer(
     });
 }
 
-function hasScheduledRootTask(root: ReconcilerRoot): boolean {
-    if (!Object.hasOwn(root, 'callbackNode')) {
-        throw new Error('React Introspect expected the React root to expose callbackNode.');
+function readRootField(root: ReconcilerRoot, field: string): unknown {
+    if (!Object.hasOwn(root, field)) {
+        throw new Error(`React Introspect expected the React root to expose ${field}.`);
     }
 
-    const task = root.callbackNode;
+    return root[field];
+}
+
+function hasScheduledRootTask(root: ReconcilerRoot): boolean {
+    const task = readRootField(root, 'callbackNode');
 
     return isObject(task) && typeof task.callback === 'function';
+}
+
+function hasPendingRootWork(root: ReconcilerRoot): boolean {
+    return hasScheduledRootTask(root) || readRootField(root, 'timeoutHandle') !== noHostTimeout;
 }
 
 function runOutsideReactActEnvironment<Result>(action: () => Result): Result {
@@ -92,7 +104,7 @@ export async function flushScheduledWork(
 ): Promise<void> {
     do {
         await runtime.macrotasks.waitForNext();
-    } while (hasScheduledRootTask(root));
+    } while (hasPendingRootWork(root));
 }
 
 export function renderRootElement(
