@@ -35,6 +35,7 @@ export const testNode = suite('React element kinds', [
                 React.StrictMode,
                 React.Profiler,
                 LabelContext,
+                LabelContext.Consumer,
                 MemoLabel,
                 ForwardLabel,
                 LazyLabel,
@@ -52,6 +53,7 @@ export const testNode = suite('React element kinds', [
                 'strictMode',
                 'profiler',
                 'context',
+                'consumer',
                 'memo',
                 'forwardRef',
                 'lazy',
@@ -70,10 +72,11 @@ export const testNode = suite('React element kinds', [
                 { $$typeof: Symbol.for('react.forward_ref'), render: 'not callable' },
                 { $$typeof: Symbol.for('react.forward_ref') },
                 { $$typeof: Symbol.for('react.lazy'), _init: 'not callable', _payload: undefined },
-                { $$typeof: Symbol.for('react.lazy'), _init: Label }
+                { $$typeof: Symbol.for('react.lazy'), _init: Label },
+                { $$typeof: Symbol.for('react.consumer'), _context: 'not a context' }
             ]
                 .map(readKind),
-            [ 'other', 'other', 'other', 'other', 'other' ]
+            [ 'other', 'other', 'other', 'other', 'other', 'other' ]
         );
 
         return scope.assert.collect();

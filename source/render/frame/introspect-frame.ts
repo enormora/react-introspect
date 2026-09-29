@@ -11,8 +11,8 @@ import {
 } from '../protocol/introspect-host-protocol.ts';
 import { assertNotPortal } from '../../values/introspect-unsupported-react.ts';
 import { createIntrospectionUsageError } from '../../values/introspect-usage-error.ts';
-import type { IntrospectionClassComponent } from '../../values/introspect-class-component.ts';
 import { readClassFrameType } from './introspect-class-frame.ts';
+import { readConsumerFrame } from './introspect-consumer-frame.ts';
 import {
     type IntrospectionElement,
     type IntrospectionTransformedNode,
@@ -158,7 +158,7 @@ function transformWrapperElement(
 function createClassFrameElement(
     element: IntrospectionElement,
     depth: IntrospectionFrameDepth,
-    type: IntrospectionClassComponent
+    type: ReactElementKindByName['class']['component']
 ): React.ReactElement {
     return React.createElement(readClassFrameType(type), {
         depth,
@@ -291,6 +291,14 @@ const elementTransforms: ElementTransforms = {
     class(element, depth, elementKind) {
         return transformComponentElement(element, depth, function createClassFrame(componentDepth) {
             return createClassFrameElement(element, componentDepth, elementKind.component);
+        });
+    },
+    consumer(element, depth, elementKind) {
+        return React.createElement(readConsumerFrame(elementKind.context), {
+            depth,
+            element,
+            key: element.key ?? undefined,
+            renderChildren: transformNode
         });
     },
     context: transformRenderableElement,

@@ -140,6 +140,34 @@ function StatefulSecond(): React.ReactNode {
     return React.createElement('span', null, label);
 }
 
+const ThemeContext = React.createContext('light');
+
+function renderTheme(theme: string): React.ReactNode {
+    return React.createElement('span', null, theme);
+}
+
+const LocaleContext = React.createContext('en');
+
+type RememberedLabelProps = {
+    readonly initial: string;
+};
+
+function RememberedLabel(props: RememberedLabelProps): React.ReactNode {
+    const [ label ] = React.useState(props.initial);
+
+    return React.createElement('span', null, label);
+}
+
+function renderRememberedLabel(value: string): React.ReactNode {
+    return React.createElement(RememberedLabel, { initial: value });
+}
+
+function renderWithHook(theme: string): React.ReactNode {
+    const [ label ] = React.useState(theme);
+
+    return label;
+}
+
 function ignoreProfile(): undefined {
     return undefined;
 }
@@ -796,6 +824,80 @@ export const testNode = suite('execution shallow function components', [
             }),
             [ 'second state', 'second state', 'second state' ]
         );
+
+        return scope.assert.collect();
+    }),
+    test('runs the render prop of a context consumer with the provided value', function (scope) {
+        const view = introspect(
+            React.createElement(
+                ThemeContext,
+                { value: 'dark' },
+                React.createElement(ThemeContext.Consumer, { children: renderTheme })
+            ),
+            {
+                depth: 'full',
+                strictMode: false
+            }
+        );
+
+        scope.assert.equal(view.find('span')?.textContent, 'dark');
+        scope.assert.equal(view.formatTree(), 'Consumer\n  span\n    #text');
+
+        return scope.assert.collect();
+    }),
+    test('captures a throwing consumer render prop as an uncaught render error', function (scope) {
+        const failure = new Error('render prop failed');
+        const view = introspect(
+            React.createElement(ThemeContext.Consumer, {
+                children() {
+                    throw failure;
+                }
+            }),
+            {
+                depth: 'full',
+                errorMode: 'capture',
+                strictMode: false
+            }
+        );
+
+        scope.assert.undefined(view.root);
+        scope.assert.equal(view.uncaughtErrors.at(-1)?.cause, failure);
+
+        return scope.assert.collect();
+    }),
+    test('remounts when a consumer of another context takes the same position', function (scope) {
+        const view = introspect(React.createElement(ThemeContext.Consumer, { children: renderRememberedLabel }), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        view.update(React.createElement(LocaleContext.Consumer, { children: renderRememberedLabel }));
+
+        scope.assert.equal(view.find('span')?.textContent, 'en');
+
+        return scope.assert.collect();
+    }),
+    test('rejects hooks inside a consumer render prop like React does', function (scope) {
+        const view = introspect(React.createElement(ThemeContext.Consumer, { children: renderWithHook }), {
+            depth: 'full',
+            errorMode: 'capture',
+            strictMode: false,
+            warningMode: 'capture'
+        });
+
+        scope.assert.undefined(view.root);
+        scope.assert.match(view.uncaughtErrors.at(-1)?.message ?? '', /hook/iu);
+
+        return scope.assert.collect();
+    }),
+    test('marks a context consumer without a render prop unsupported', function (scope) {
+        const consumerProps = { children: 'not a function' } as unknown as React.ConsumerProps<string>;
+        const view = introspect(React.createElement(ThemeContext.Consumer, consumerProps), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        scope.assert.equal(view.root?.state.reason, 'unsupported');
 
         return scope.assert.collect();
     }),

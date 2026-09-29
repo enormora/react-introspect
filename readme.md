@@ -988,7 +988,7 @@ introspect(<FieldList />, {
 
 ### Context
 
-Providers pass through.
+Providers pass through, and `Context.Consumer` runs its render prop with the nearest provider's value.
 
 ```tsx
 const ThemeContext = React.createContext('light');
