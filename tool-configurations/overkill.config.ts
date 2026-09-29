@@ -10,7 +10,7 @@ export const config = defineConfig({
             },
             testFamily: 'microtest',
             files: {
-                exclude: [ 'source/integration-tests/**/*.test.ts' ],
+                exclude: [ 'source/integration-tests/**' ],
                 include: [ 'source/**/*.test.ts' ]
             },
             timeouts: {
@@ -24,7 +24,7 @@ export const config = defineConfig({
             },
             testFamily: 'integration',
             files: {
-                include: [ 'source/integration-tests/package-smoke/package-smoke.test.ts' ]
+                include: [ 'source/integration-tests/package-smoke/**/*.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000,
@@ -39,7 +39,7 @@ export const config = defineConfig({
             },
             testFamily: 'integration',
             files: {
-                include: [ 'source/integration-tests/runtime-integration/runtime-integration.test.ts' ]
+                include: [ 'source/integration-tests/runtime-integration/**/*.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000,
@@ -54,7 +54,7 @@ export const config = defineConfig({
             },
             testFamily: 'integration',
             files: {
-                include: [ 'source/integration-tests/runtime-integration/runtime-integration-development.test.ts' ]
+                include: [ 'source/integration-tests/runtime-integration-development/**/*.test.ts' ]
             },
             timeouts: {
                 collectionMilliseconds: 30_000,
