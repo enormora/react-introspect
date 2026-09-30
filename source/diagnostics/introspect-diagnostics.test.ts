@@ -19,6 +19,26 @@ type NodeConsoleSubscription = readonly [
     record: (message: unknown) => void
 ];
 
+function describeOutcome(action: () => unknown): string {
+    try {
+        action();
+    } catch (error) {
+        return error instanceof Error ? `threw: ${error.message}` : 'threw';
+    }
+
+    return 'returned';
+}
+
+async function readAsyncError(pending: Promise<unknown>): Promise<Error> {
+    try {
+        await pending;
+    } catch (error) {
+        return error instanceof Error ? error : new Error(String(error));
+    }
+
+    throw new Error('Expected the operation to fail.');
+}
+
 function requireError(action: () => unknown): Error {
     try {
         action();
@@ -285,6 +305,73 @@ export const testNode = suite('diagnostics', [
         });
 
         scope.assert.equal(error.message, 'between operations');
+
+        return scope.assert.collect();
+    }),
+    test('keeps a diagnostic from a failing run out of later runs', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const failure = requireError(function runFailingOperation() {
+            diagnostics.run(function warnThenFail() {
+                diagnostics.recordRecoverableError(new Error('recoverable warning'));
+
+                throw new Error('operation failed');
+            });
+        });
+        const later = describeOutcome(function runLaterOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.deepEqual(
+            { failure: failure.message, later, warnings: diagnostics.warnings.length },
+            { failure: 'operation failed', later: 'returned', warnings: 1 }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('keeps a diagnostic from a failing async run out of later runs', async function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const failure = await readAsyncError(diagnostics.runAsync(async function warnThenFail() {
+            diagnostics.recordRecoverableError(new Error('recoverable warning'));
+
+            throw new Error('operation failed');
+        }));
+        const later = describeOutcome(function runLaterOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.deepEqual(
+            { failure: failure.message, later, warnings: diagnostics.warnings.length },
+            { failure: 'operation failed', later: 'returned', warnings: 1 }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('throws the first diagnostic recorded in a successful async run', async function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const error = await readAsyncError(diagnostics.runAsync(async function warnThenResolve() {
+            diagnostics.recordRecoverableError(new Error('async warning'));
+
+            return 'done';
+        }));
+
+        scope.assert.equal(error.message, 'async warning');
+
+        return scope.assert.collect();
+    }),
+    test('throws the first of several diagnostics recorded in one run', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const error = requireError(function runWarningOperation() {
+            diagnostics.run(function warnTwice() {
+                diagnostics.recordRecoverableError(new Error('first warning'));
+                diagnostics.recordRecoverableError(new Error('second warning'));
+            });
+        });
+
+        scope.assert.equal(error.message, 'first warning');
 
         return scope.assert.collect();
     })

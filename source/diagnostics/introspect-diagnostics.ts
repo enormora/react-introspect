@@ -29,6 +29,14 @@ export type IntrospectionDiagnostics = {
     readonly runAsync: <Result>(action: () => Promise<Result>) => Promise<Result>;
 };
 
+type ThrownDiagnostic = IntrospectionError | IntrospectionWarning;
+
+type ThrownDiagnostics = {
+    readonly hold: (diagnostic: ThrownDiagnostic) => void;
+    readonly run: <Result>(action: () => Result) => Result;
+    readonly runAsync: <Result>(action: () => Promise<Result>) => Promise<Result>;
+};
+
 const storage = new AsyncLocalStorage<IntrospectionDiagnosticsContext>();
 const subscribedConsoleDiagnostics = new WeakSet<IntrospectionConsoleDiagnostics>();
 
@@ -36,12 +44,65 @@ function messageFromCause(cause: unknown): string {
     return cause instanceof Error ? cause.message : String(cause);
 }
 
-function throwDiagnostic(diagnostic: IntrospectionError | IntrospectionWarning): never {
+function throwDiagnostic(diagnostic: ThrownDiagnostic): never {
     if (diagnostic.cause instanceof Error) {
         throw diagnostic.cause;
     }
 
     throw new Error(diagnostic.message);
+}
+
+function createThrownDiagnostics(): ThrownDiagnostics {
+    let unsettled: readonly ThrownDiagnostic[] = [];
+
+    function settle(): ThrownDiagnostic | undefined {
+        const [ firstDiagnostic ] = unsettled;
+
+        unsettled = [];
+
+        return firstDiagnostic;
+    }
+
+    function throwFirstUnsettled(): void {
+        const diagnostic = settle();
+
+        if (diagnostic !== undefined) {
+            throwDiagnostic(diagnostic);
+        }
+    }
+
+    return {
+        hold(diagnostic) {
+            unsettled = [
+                ...unsettled,
+                diagnostic
+            ];
+        },
+        run(action) {
+            try {
+                const result = action();
+
+                throwFirstUnsettled();
+
+                return result;
+            } catch (error) {
+                settle();
+                throw error;
+            }
+        },
+        async runAsync(action) {
+            try {
+                const result = await action();
+
+                throwFirstUnsettled();
+
+                return result;
+            } catch (error) {
+                settle();
+                throw error;
+            }
+        }
+    };
 }
 
 export function createDiagnosticRecord(cause: unknown): IntrospectionError & IntrospectionWarning {
@@ -98,7 +159,7 @@ export function createIntrospectionDiagnostics(
     let caughtErrors: readonly IntrospectionError[] = Object.freeze([]);
     let uncaughtErrors: readonly IntrospectionError[] = Object.freeze([]);
     let warnings: readonly IntrospectionWarning[] = Object.freeze([]);
-    let pendingThrownDiagnostic: IntrospectionError | IntrospectionWarning | null = null;
+    const thrownDiagnostics = createThrownDiagnostics();
 
     function appendWarning(warning: IntrospectionWarning): void {
         if (options.warningMode === 'ignore') {
@@ -111,7 +172,7 @@ export function createIntrospectionDiagnostics(
         ]);
 
         if (options.warningMode === 'throw') {
-            pendingThrownDiagnostic = warning;
+            thrownDiagnostics.hold(warning);
         }
     }
 
@@ -130,16 +191,7 @@ export function createIntrospectionDiagnostics(
         ]);
 
         if (options.errorMode === 'throw') {
-            pendingThrownDiagnostic = error;
-        }
-    }
-
-    function assertNoThrownDiagnostics(): void {
-        if (pendingThrownDiagnostic !== null) {
-            const diagnostic = pendingThrownDiagnostic;
-
-            pendingThrownDiagnostic = null;
-            throwDiagnostic(diagnostic);
+            thrownDiagnostics.hold(error);
         }
     }
 
@@ -176,20 +228,12 @@ export function createIntrospectionDiagnostics(
         },
         run<Result>(action: () => Result) {
             return storage.run(context, function runWithDiagnostics() {
-                const result = action();
-
-                assertNoThrownDiagnostics();
-
-                return result;
+                return thrownDiagnostics.run(action);
             });
         },
         async runAsync<Result>(action: () => Promise<Result>) {
             return storage.run(context, async function runWithDiagnostics() {
-                const result = await action();
-
-                assertNoThrownDiagnostics();
-
-                return result;
+                return thrownDiagnostics.runAsync(action);
             });
         }
     };
