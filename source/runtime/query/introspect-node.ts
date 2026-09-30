@@ -12,6 +12,7 @@ import {
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { describeRender } from '../../snapshot/model/introspect-snapshot-render.ts';
 import { type NestedReplacement, replaceNestedTargets } from '../../values/introspect-nested-replacement.ts';
+import { isObject } from '../../values/introspect-value-kinds.ts';
 import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
 import { createIntrospectionList } from './introspect-list.ts';
 
@@ -42,7 +43,7 @@ function callProp(props: SnapshotProps, property: string, parameters: readonly u
 }
 
 function isEventOverride(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
+    return isObject(value) && !Array.isArray(value);
 }
 
 function createHostEvent(
