@@ -1,6 +1,7 @@
 import type { IntrospectionHostSchema, IntrospectionSelector } from '../../public/introspect-public-types.ts';
 import type { RuntimeIntrospectionNode } from '../types/introspect-runtime-types.ts';
 import { matchesTargetCriteria } from '../../matching/introspect-target-criteria.ts';
+import { hasReactTypeMarker } from '../../values/introspect-react-element-kind.ts';
 import { isObject } from '../../values/introspect-value-kinds.ts';
 
 const selectorFields = [
@@ -13,7 +14,7 @@ const selectorFields = [
 ];
 
 function isSelectorObject(value: unknown): value is IntrospectionSelector {
-    return isObject(value) && !Object.hasOwn(value, '$$typeof') &&
+    return isObject(value) && !hasReactTypeMarker(value) &&
         selectorFields.some(function hasSelectorField(field) {
             return Object.hasOwn(value, field);
         });
