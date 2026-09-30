@@ -4,6 +4,7 @@ import type {
     RuntimeIntrospectionView,
     RuntimeNodeSequence
 } from '../types/introspect-runtime-types.ts';
+import { createNodeSequence } from './introspect-list.ts';
 
 type LocatorTarget = {
     readonly selector: unknown;
@@ -82,21 +83,7 @@ export function createIntrospectionListLocator(
 ): RuntimeNodeSequence {
     const target = { selector, view };
 
-    return Object.freeze({
-        get first() {
-            return readLocatedNodes(target)[0];
-        },
-        get last() {
-            return readLocatedNodes(target).at(-1);
-        },
-        get length() {
-            return readLocatedNodes(target).length;
-        },
-        [Symbol.iterator]() {
-            return readLocatedNodes(target)[Symbol.iterator]();
-        },
-        at(index: number) {
-            return readLocatedNodes(target).at(index);
-        }
-    });
+    return createNodeSequence(function readMatches() {
+        return readLocatedNodes(target);
+    }, {});
 }
