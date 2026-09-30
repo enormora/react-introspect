@@ -39,6 +39,29 @@ async function readAsyncError(pending: Promise<unknown>): Promise<Error> {
     throw new Error('Expected the operation to fail.');
 }
 
+type RunWithUsageErrorCheck = {
+    readonly finish: () => Promise<void>;
+    readonly holdsUsageError: () => boolean;
+};
+
+async function startRunWithUsageErrorCheck(diagnostics: IntrospectionDiagnostics): Promise<RunWithUsageErrorCheck> {
+    const gate = Promise.withResolvers<undefined>();
+    const checkCreated = Promise.withResolvers<() => boolean>();
+    const pending = diagnostics.runAsync(async function waitWithCheck() {
+        checkCreated.resolve(diagnostics.createUsageErrorCheck());
+        await gate.promise;
+    });
+    const holdsUsageError = await checkCreated.promise;
+
+    return {
+        async finish() {
+            gate.resolve(undefined);
+            await pending;
+        },
+        holdsUsageError
+    };
+}
+
 function requireError(action: () => unknown): Error {
     try {
         action();
@@ -485,6 +508,39 @@ export const testNode = suite('diagnostics', [
         });
 
         scope.assert.deepEqual({ failure: failure.message, later }, { failure: 'operation failed', later: 'returned' });
+
+        return scope.assert.collect();
+    }),
+    test('checks only its own run and the between-runs queue for held usage errors', async function (scope) {
+        const diagnostics = createIsolatedDiagnostics('capture');
+        const waitingRun = await startRunWithUsageErrorCheck(diagnostics);
+        const seenFromOtherRun: boolean[] = [];
+        const otherRunOutcome = describeOutcome(function runOtherOperation() {
+            diagnostics.run(function misuse() {
+                diagnostics.holdUsageError(new TypeError('usage failed'));
+                seenFromOtherRun.push(waitingRun.holdsUsageError());
+            });
+        });
+
+        await waitingRun.finish();
+
+        scope.assert.deepEqual(
+            { otherRunOutcome, seenFromOtherRun },
+            { otherRunOutcome: 'threw: usage failed', seenFromOtherRun: [ false ] }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('reports a usage error held between runs as held outside any run', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('capture');
+        const heldBefore = diagnostics.holdsUsageError();
+
+        diagnostics.holdUsageError(new TypeError('usage failed'));
+
+        scope.assert.deepEqual(
+            { heldAfter: diagnostics.holdsUsageError(), heldBefore },
+            { heldAfter: true, heldBefore: false }
+        );
 
         return scope.assert.collect();
     }),

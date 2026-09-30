@@ -125,11 +125,17 @@ function createRootWaits(dependencies: RootWaitDependencies): RootWaits {
 
     async function waitUntil(operation: WaitOperation, predicate: () => boolean): Promise<void> {
         await diagnostics.runAsync(async function waitUntilWithDiagnostics() {
-            if (predicate()) {
+            const holdsUsageError = diagnostics.createUsageErrorCheck();
+
+            function isSatisfiedOrFailed(): boolean {
+                return holdsUsageError() || predicate();
+            }
+
+            if (isSatisfiedOrFailed()) {
                 return;
             }
 
-            await waiters.waitUntil(predicate, { clock, flushUntilIdle, operation, timeoutInMilliseconds });
+            await waiters.waitUntil(isSatisfiedOrFailed, { clock, flushUntilIdle, operation, timeoutInMilliseconds });
         });
     }
 
@@ -164,13 +170,24 @@ function createIntrospectionReconcilerRoot(
     let renderCount = 0;
     const waiters = createWaiterQueue();
     const container = createHostContainer(
-        function publishSnapshot(snapshot) {
-            renderCount = snapshot.renderCount;
-            options.publish(snapshot);
-            waiters.settle();
-        },
-        function readNextRenderCount() {
-            return renderCount + 1;
+        {
+            captureSnapshotError(cause, failedContainer) {
+                captureUncaughtError({
+                    container: failedContainer,
+                    diagnostics: options.diagnostics,
+                    readRenderCount() {
+                        return renderCount;
+                    }
+                }, cause);
+            },
+            publish(snapshot) {
+                renderCount = snapshot.renderCount;
+                options.publish(snapshot);
+                waiters.settle();
+            },
+            readNextRenderCount() {
+                return renderCount + 1;
+            }
         },
         {
             generator: options.idGenerator,

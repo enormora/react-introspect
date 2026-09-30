@@ -18,16 +18,20 @@ type IntrospectionChildStore = {
     readonly writeChildren: (children: readonly IntrospectionHostChild[]) => void;
 };
 
-export type IntrospectionHostContainer = {
+export type IntrospectionHostContainer = IntrospectionHostContainerHooks & {
     readonly idNormalization: IntrospectionIdNormalization;
     readonly refs: IntrospectionRefs | undefined;
-    readonly publish: (snapshot: IntrospectionSnapshot) => void;
-    readonly readNextRenderCount: () => number;
     readonly beginCommit: (mounted: boolean) => void;
     readonly discard: (renderCount: number) => void;
     readonly readMounted: () => boolean;
     readonly validateRefs: () => void;
 } & IntrospectionChildStore;
+
+export type IntrospectionHostContainerHooks = {
+    readonly captureSnapshotError: (cause: unknown, container: IntrospectionHostContainerControl) => void;
+    readonly publish: (snapshot: IntrospectionSnapshot) => void;
+    readonly readNextRenderCount: () => number;
+};
 
 export type IntrospectionHostContainerControl = Pick<
     IntrospectionHostContainer,
@@ -206,15 +210,16 @@ function unhideHostChild(child: IntrospectionHostChild): void {
 }
 
 export function createHostContainer(
-    publish: (snapshot: IntrospectionSnapshot) => void,
-    readNextRenderCount: () => number,
+    hooks: IntrospectionHostContainerHooks,
     idNormalization: IntrospectionIdNormalization,
     refs: IntrospectionRefs | undefined
 ): IntrospectionHostContainer {
+    const { captureSnapshotError, publish, readNextRenderCount } = hooks;
     let mounted = true;
     const childStore = createChildStore();
     const container: IntrospectionHostContainer = {
         ...childStore,
+        captureSnapshotError,
         beginCommit(nextMounted: boolean) {
             mounted = nextMounted;
         },
@@ -250,8 +255,22 @@ function returnNull(): null {
     return null;
 }
 
+function readContainerSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot | undefined {
+    try {
+        return createHostSnapshot(container);
+    } catch (error) {
+        container.captureSnapshotError(error, container);
+
+        return undefined;
+    }
+}
+
 function publishContainerSnapshot(container: IntrospectionHostContainer): void {
-    container.publish(createHostSnapshot(container));
+    const snapshot = readContainerSnapshot(container);
+
+    if (snapshot !== undefined) {
+        container.publish(snapshot);
+    }
 }
 
 function prepareForCommit(): null {

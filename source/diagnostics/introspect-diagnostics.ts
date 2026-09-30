@@ -22,6 +22,7 @@ export type IntrospectionDiagnostics = {
     readonly hasWarnings: boolean;
     readonly uncaughtErrors: readonly IntrospectionError[];
     readonly warnings: readonly IntrospectionWarning[];
+    readonly createUsageErrorCheck: () => () => boolean;
     readonly holdUsageError: (error: TypeError) => void;
     readonly holdsUsageError: () => boolean;
     readonly recordCaughtError: (cause: unknown) => void;
@@ -41,6 +42,7 @@ type ThrownFailure = ThrownDiagnosticFailure | ThrownUsageFailure;
 
 type ThrownDiagnostics = {
     readonly hold: (diagnostic: ThrownDiagnostic) => void;
+    readonly createUsageErrorCheck: () => () => boolean;
     readonly holdUsageError: (error: TypeError) => void;
     readonly holdsUsageError: () => boolean;
     readonly run: <Result>(context: IntrospectionDiagnosticsContext, action: () => Result) => Result;
@@ -159,6 +161,16 @@ function createThrownDiagnostics(): ThrownDiagnostics {
         (readOpenWindow() ?? betweenOperations).hold(failure);
     }
 
+    function createUsageErrorCheck(): () => boolean {
+        const window = readOpenWindow();
+
+        return function holdsUsageErrorForWindow() {
+            const windowFailures = window?.isOpen() === true ? window.read() : [];
+
+            return [ ...betweenOperations.read(), ...windowFailures ].some(isUsageFailure);
+        };
+    }
+
     function settleOperation(window: OperationWindow): void {
         throwFirstFailure([ ...betweenOperations.take(), ...window.close() ]);
     }
@@ -170,8 +182,9 @@ function createThrownDiagnostics(): ThrownDiagnostics {
         holdUsageError(error) {
             hold({ error, kind: 'usage' });
         },
+        createUsageErrorCheck,
         holdsUsageError() {
-            return readOpenWindow()?.read().some(isUsageFailure) === true;
+            return createUsageErrorCheck()();
         },
         run(context, action) {
             const window = createOperationWindow();
@@ -317,6 +330,7 @@ export function createIntrospectionDiagnostics(
         get warnings() {
             return warnings;
         },
+        createUsageErrorCheck: thrownDiagnostics.createUsageErrorCheck,
         holdUsageError: thrownDiagnostics.holdUsageError,
         holdsUsageError: thrownDiagnostics.holdsUsageError,
         recordCaughtError(cause) {

@@ -30,11 +30,16 @@ function requireValue<Value>(value: Value | undefined): Value {
 function createContainer(): PublishingContainer {
     const published: IntrospectionSnapshot[] = [];
     const container = createHostContainer(
-        function recordSnapshot(snapshot) {
-            published.push(snapshot);
-        },
-        function readNextRenderCount() {
-            return 1;
+        {
+            captureSnapshotError(cause) {
+                throw cause;
+            },
+            publish(snapshot) {
+                published.push(snapshot);
+            },
+            readNextRenderCount() {
+                return 1;
+            }
         },
         { generator: undefined, prefix: 'test-' },
         undefined
@@ -48,6 +53,45 @@ function createContainer(): PublishingContainer {
         },
         container
     };
+}
+
+type RecordingContainer = {
+    readonly container: IntrospectionHostContainer;
+    readonly capturedErrors: readonly unknown[];
+    readonly published: readonly IntrospectionSnapshot[];
+};
+
+function createRecordingContainer(generator: (generatedId: string) => string): RecordingContainer {
+    const capturedErrors: unknown[] = [];
+    const published: IntrospectionSnapshot[] = [];
+    const container = createHostContainer(
+        {
+            captureSnapshotError(cause) {
+                capturedErrors.push(cause);
+            },
+            publish(snapshot) {
+                published.push(snapshot);
+            },
+            readNextRenderCount() {
+                return 1;
+            }
+        },
+        { generator, prefix: 'test-' },
+        undefined
+    );
+
+    return { capturedErrors, container, published };
+}
+
+function readErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
+function commitButtonWithProps(host: RecordingContainer, props: Readonly<Record<PropertyKey, unknown>>): void {
+    const button = hostConfig.createInstance('button', props, host.container, { refs: undefined });
+
+    hostConfig.appendChildToContainer(host.container, button);
+    hostConfig.resetAfterCommit(host.container);
 }
 
 function createInstance(
@@ -74,6 +118,33 @@ function createButtonSnapshot(): IntrospectionSnapshot {
 }
 
 export const testNode = suite('introspection host tree', [
+    test('hands a usage error from building the snapshot to the container instead of publishing', function (scope) {
+        const host = createRecordingContainer(String);
+        const portal = { $$typeof: Symbol.for('react.portal'), children: null, containerInfo: {}, key: null };
+
+        commitButtonWithProps(host, { slot: portal });
+
+        scope.assert.deepEqual(
+            { captured: host.capturedErrors.map(readErrorMessage), published: host.published.length },
+            { captured: [ 'React Introspect cannot represent portal output yet.' ], published: 0 }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('hands other errors from building the snapshot to the container instead of throwing', function (scope) {
+        const host = createRecordingContainer(function failToGenerate() {
+            throw new Error('generator failed');
+        });
+
+        commitButtonWithProps(host, { id: '_test-r_a_' });
+
+        scope.assert.deepEqual(
+            { captured: host.capturedErrors.map(readErrorMessage), published: host.published.length },
+            { captured: [ 'generator failed' ], published: 0 }
+        );
+
+        return scope.assert.collect();
+    }),
     test('publishes host children as snapshot nodes', function (scope) {
         const snapshot = createButtonSnapshot();
         const root = requireValue(snapshot.root);

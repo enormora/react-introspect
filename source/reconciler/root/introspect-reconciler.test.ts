@@ -264,6 +264,35 @@ function createExternalStore(initialValue: string): ExternalStore {
     };
 }
 
+function PortalHolder(): React.ReactNode {
+    return null;
+}
+
+function TransitionPortalReader(props: StoreReaderProps): React.ReactNode {
+    const [ value, setValue ] = React.useState(props.store.read());
+
+    React.useLayoutEffect(function subscribeToStore() {
+        return props.store.subscribe(function applyStoreValueInTransition() {
+            React.startTransition(function applyStoreValue() {
+                setValue(props.store.read());
+            });
+        });
+    }, [ props.store ]);
+
+    if (value !== 'portal') {
+        return React.createElement('span', null, value);
+    }
+
+    const portal = {
+        $$typeof: Symbol.for('react.portal'),
+        children: null,
+        containerInfo: {},
+        key: null
+    } as unknown as React.ReactElement;
+
+    return React.createElement(PortalHolder, null, new Set([ portal ]));
+}
+
 function TransitionStoreReader(props: StoreReaderProps): React.ReactNode {
     const [ value, setValue ] = React.useState(props.store.read());
 
@@ -503,6 +532,25 @@ export const testNode = suite('custom reconciler host layer', [
         await nextRender;
 
         scope.assert.equal(view.textContent, 'Hello next');
+
+        return scope.assert.collect();
+    }),
+    test('fails a render wait with the usage error a scheduled commit held', async function (scope) {
+        const store = createExternalStore('before');
+        const view = introspect(React.createElement(TransitionPortalReader, { store }), {
+            depth: 'full',
+            strictMode: false,
+            waitTimeout: 50
+        });
+
+        store.write('portal');
+
+        const error = await readRejection(view.waitForNextRender());
+
+        scope.assert.equal(
+            error instanceof Error ? error.message : error,
+            'React Introspect cannot represent portal output yet.'
+        );
 
         return scope.assert.collect();
     }),

@@ -145,6 +145,43 @@ const CatchAllBoundary = class extends React.Component<CatchAllBoundaryProps, Ca
     }
 };
 
+type IterableChildRootProps = {
+    readonly items: Iterable<React.ReactNode>;
+};
+
+function IterableChildRoot(props: IterableChildRootProps): React.ReactNode {
+    return React.createElement(Icon, null, props.items);
+}
+
+function* createLabels(): Generator<React.ReactNode> {
+    yield React.createElement('span', null, 'first');
+    yield React.createElement('span', null, 'second');
+}
+
+function LabelledInput(): React.ReactNode {
+    const id = React.useId();
+
+    return React.createElement('input', { id });
+}
+
+function* createPortalLabels(): Generator<React.ReactNode> {
+    yield createPortalValue(React.createElement('span', null, 'portal'));
+}
+
+function describeFailure(action: () => void): string {
+    try {
+        action();
+    } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+    }
+
+    return 'returned';
+}
+
+function readTextContent(node: IntrospectionNode): string {
+    return node.textContent;
+}
+
 function readErrorMessage(error: IntrospectionError): string {
     return error.message;
 }
@@ -298,6 +335,99 @@ export const testNode = suite('unsupported React concepts and hardening', [
 
         return scope.assert.collect();
     }),
+    test('keeps given children that come from a generator', function (scope) {
+        const view = introspect(React.createElement(IterableChildRoot, { items: createLabels() }), {
+            strictMode: false
+        });
+        const icon = requireValue(view.find(Icon));
+
+        scope.assert.deepEqual(Array.from(icon.givenChildren, readTextContent), [ 'first', 'second' ]);
+
+        return scope.assert.collect();
+    }),
+    test('fails clearly for portal children inside a Set of given children', function (scope) {
+        scope.assert.throws(
+            function () {
+                introspect(
+                    React.createElement(IterableChildRoot, {
+                        items: new Set([ createPortalValue(React.createElement('span', null, 'portal')) ])
+                    }),
+                    { strictMode: false }
+                );
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('fails clearly for portal children from a generator of given children', function (scope) {
+        scope.assert.throws(
+            function () {
+                introspect(React.createElement(IterableChildRoot, { items: createPortalLabels() }), {
+                    strictMode: false
+                });
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('keeps later views working after portal children fail inside the commit', function (scope) {
+        const failure = describeFailure(function introspectPortalSet() {
+            introspect(
+                React.createElement(IterableChildRoot, {
+                    items: new Set([ createPortalValue(React.createElement('span', null, 'portal')) ])
+                }),
+                { strictMode: false }
+            );
+        });
+        const laterView = introspect(React.createElement('main', null, 'after'), { strictMode: false });
+
+        scope.assert.deepEqual(
+            { failure, laterText: laterView.textContent },
+            { failure: 'React Introspect cannot represent portal output yet.', laterText: 'after' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('records a failing idGenerator as an uncaught error and keeps later views working', function (scope) {
+        const view = introspect(React.createElement(LabelledInput), {
+            errorMode: 'capture',
+            idGenerator() {
+                throw new Error('generator failed');
+            },
+            strictMode: false
+        });
+        const laterView = introspect(React.createElement('main', null, 'after'), { strictMode: false });
+
+        scope.assert.deepEqual(
+            { laterText: laterView.textContent, uncaught: view.uncaughtErrors.map(readErrorMessage) },
+            { laterText: 'after', uncaught: [ 'generator failed' ] }
+        );
+
+        return scope.assert.collect();
+    }),
+    test(
+        'unmounts the view like an uncaught render error when an update fails building the snapshot',
+        function (scope) {
+            const view = introspect(React.createElement('main', null, 'first'), {
+                errorMode: 'capture',
+                idGenerator() {
+                    throw new Error('generator failed');
+                },
+                strictMode: false
+            });
+
+            view.update(React.createElement(LabelledInput));
+
+            scope.assert.deepEqual(
+                { root: view.root, uncaught: view.uncaughtErrors.map(readErrorMessage) },
+                { root: undefined, uncaught: [ 'generator failed' ] }
+            );
+
+            return scope.assert.collect();
+        }
+    ),
     test('fails clearly for portal children captured in snapshots', function (scope) {
         scope.assert.throws(
             function () {
