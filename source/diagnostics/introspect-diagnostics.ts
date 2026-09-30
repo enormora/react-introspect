@@ -22,6 +22,7 @@ export type IntrospectionDiagnostics = {
     readonly hasWarnings: boolean;
     readonly uncaughtErrors: readonly IntrospectionError[];
     readonly warnings: readonly IntrospectionWarning[];
+    readonly holdUsageError: (error: TypeError) => void;
     readonly recordCaughtError: (cause: unknown) => void;
     readonly recordRecoverableError: (cause: unknown) => void;
     readonly recordUncaughtError: (cause: unknown) => void;
@@ -31,8 +32,15 @@ export type IntrospectionDiagnostics = {
 
 type ThrownDiagnostic = IntrospectionError | IntrospectionWarning;
 
+type ThrownDiagnosticFailure = { readonly diagnostic: ThrownDiagnostic; readonly kind: 'diagnostic'; };
+
+type ThrownUsageFailure = { readonly error: TypeError; readonly kind: 'usage'; };
+
+type ThrownFailure = ThrownDiagnosticFailure | ThrownUsageFailure;
+
 type ThrownDiagnostics = {
     readonly hold: (diagnostic: ThrownDiagnostic) => void;
+    readonly holdUsageError: (error: TypeError) => void;
     readonly run: <Result>(action: () => Result) => Result;
     readonly runAsync: <Result>(action: () => Promise<Result>) => Promise<Result>;
 };
@@ -52,31 +60,50 @@ function throwDiagnostic(diagnostic: ThrownDiagnostic): never {
     throw new Error(diagnostic.message);
 }
 
-function createThrownDiagnostics(): ThrownDiagnostics {
-    let unsettled: readonly ThrownDiagnostic[] = [];
+function isUsageFailure(failure: ThrownFailure): boolean {
+    return failure.kind === 'usage';
+}
 
-    function settle(): ThrownDiagnostic | undefined {
-        const [ firstDiagnostic ] = unsettled;
+function throwFailure(failure: ThrownFailure): never {
+    if (failure.kind === 'usage') {
+        throw failure.error;
+    }
+
+    throwDiagnostic(failure.diagnostic);
+}
+
+function createThrownDiagnostics(): ThrownDiagnostics {
+    let unsettled: readonly ThrownFailure[] = [];
+
+    function settle(): ThrownFailure | undefined {
+        const firstFailure = unsettled.find(isUsageFailure) ?? unsettled[0];
 
         unsettled = [];
 
-        return firstDiagnostic;
+        return firstFailure;
     }
 
     function throwFirstUnsettled(): void {
-        const diagnostic = settle();
+        const failure = settle();
 
-        if (diagnostic !== undefined) {
-            throwDiagnostic(diagnostic);
+        if (failure !== undefined) {
+            throwFailure(failure);
         }
+    }
+
+    function hold(failure: ThrownFailure): void {
+        unsettled = [
+            ...unsettled,
+            failure
+        ];
     }
 
     return {
         hold(diagnostic) {
-            unsettled = [
-                ...unsettled,
-                diagnostic
-            ];
+            hold({ diagnostic, kind: 'diagnostic' });
+        },
+        holdUsageError(error) {
+            hold({ error, kind: 'usage' });
         },
         run(action) {
             try {
@@ -214,6 +241,7 @@ export function createIntrospectionDiagnostics(
         get warnings() {
             return warnings;
         },
+        holdUsageError: thrownDiagnostics.holdUsageError,
         recordCaughtError(cause) {
             caughtErrors = Object.freeze([
                 ...caughtErrors,

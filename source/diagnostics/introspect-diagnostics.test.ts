@@ -362,6 +362,55 @@ export const testNode = suite('diagnostics', [
 
         return scope.assert.collect();
     }),
+    test('throws a held usage error before a held diagnostic', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const usageError = new TypeError('usage failed');
+        const error = requireError(function runOperation() {
+            diagnostics.run(function warnThenMisuse() {
+                diagnostics.recordRecoverableError(new Error('recoverable warning'));
+                diagnostics.holdUsageError(usageError);
+            });
+        });
+
+        scope.assert.equal(error, usageError);
+
+        return scope.assert.collect();
+    }),
+    test('keeps a usage error from a failing run out of later runs', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('capture');
+        const failure = requireError(function runFailingOperation() {
+            diagnostics.run(function misuseThenFail() {
+                diagnostics.holdUsageError(new TypeError('usage failed'));
+
+                throw new Error('operation failed');
+            });
+        });
+        const later = describeOutcome(function runLaterOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.deepEqual({ failure: failure.message, later }, { failure: 'operation failed', later: 'returned' });
+
+        return scope.assert.collect();
+    }),
+    test('throws a usage error held outside any run from the next run', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('capture');
+        const usageError = new TypeError('usage failed');
+
+        diagnostics.holdUsageError(usageError);
+
+        const error = requireError(function runNextOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.equal(error, usageError);
+
+        return scope.assert.collect();
+    }),
     test('throws the first of several diagnostics recorded in one run', function (scope) {
         const diagnostics = createIsolatedDiagnostics('throw');
         const error = requireError(function runWarningOperation() {
