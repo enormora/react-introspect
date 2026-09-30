@@ -61,7 +61,7 @@ type SnapshotSourceOpaque = {
 
 type SnapshotSourceText = {
     readonly kind: 'text';
-    readonly value: bigint | number | string;
+    readonly value: string;
     readonly hostVisibility: SnapshotVisibility;
 };
 

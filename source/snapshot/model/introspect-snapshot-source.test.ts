@@ -26,7 +26,7 @@ function describeValue(value: unknown): unknown {
         );
     }
 
-    return typeof value === 'bigint' ? `${value}n` : value;
+    return value;
 }
 
 function readIds(nodes: readonly SnapshotNode[]): string {
@@ -100,8 +100,8 @@ export const testNode = suite('snapshots of given children and elements in props
 
         scope.assert.deepEqual(snapshot.nodes.map(describeNode), [
             '#1<0 text #text key=null path=Icon > #text[0] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="text" props={"value":"text"}',
-            '#2<0 text #text key=null path=Icon > #text[1] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="5" props={"value":5}',
-            '#3<0 text #text key=null path=Icon > #text[2] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="7" props={"value":"7n"}',
+            '#2<0 text #text key=null path=Icon > #text[1] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="5" props={"value":"5"}',
+            '#3<0 text #text key=null path=Icon > #text[2] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="7" props={"value":"7"}',
             '#4<0 empty #empty key=null path=Icon > #empty[3] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="" props={"value":null}',
             '#5<0 empty #empty key=null path=Icon > #empty[4] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="" props={"value":false}',
             '#7<6 text #text key=null path=Icon > em[5] > #text[0] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="x-" props={"value":"x-"}',
@@ -117,7 +117,7 @@ export const testNode = suite('snapshots of given children and elements in props
             '#16<0 opaque Opaque key=null path=Icon > Opaque[10] given=[] rendered=[] render={"reason":"unsupported","status":"notRendered"} text="" props={"value":{"opaque":true}}',
             '#18<17 text #text key=null path=Icon > Icon[icon] > #text[0] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="label text" props={"value":"label text"}',
             '#17<0 component Icon key=icon path=Icon > Icon[icon] given=[18] rendered=[18] render={"hiddenBy":"activity","reason":"depth","status":"notRendered","visibility":"hidden"} text="label text" props={"label":"prop"}',
-            '#20<19 text #text key=null path=Icon > li[list.0] > #text[0] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="1" props={"value":1}',
+            '#20<19 text #text key=null path=Icon > li[list.0] > #text[0] given=[] rendered=[] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="1" props={"value":"1"}',
             '#19<0 host li key=first path=Icon > li[list.0] given=[20] rendered=[20] render={"hiddenBy":"activity","status":"rendered","visibility":"hidden"} text="1" props={}',
             '#0<undefined component Icon key=panel path=Icon given=[1,2,3,4,5,6,8,10,12,13,16] rendered=[1,2,3,4,5,6,8,10,12,13,16] render={"hiddenBy":"activity","reason":"depth","status":"notRendered","visibility":"hidden"} text="text57x-from-iterableinside" props={"icon":"#17","list":["#19"]}'
         ]);
