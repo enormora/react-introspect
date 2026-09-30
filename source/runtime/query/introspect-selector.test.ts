@@ -1,8 +1,13 @@
 import { suite, test } from '@overkill-dev/test';
+import React from 'react';
 import type { IntrospectionSelector } from '../../public/introspect-public-types.ts';
 import type { RuntimeIntrospectionNode } from '../types/introspect-runtime-types.ts';
 import { createIntrospectionList } from './introspect-list.ts';
 import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
+
+function Label(): React.ReactNode {
+    return null;
+}
 
 function createNode(): RuntimeIntrospectionNode {
     return {
@@ -61,6 +66,15 @@ export const testNode = suite('introspection selector', [
     test('normalizes non-selector values to type selectors', function (scope) {
         scope.assert.deepEqual(toSelector('button'), { type: 'button' });
         scope.assert.deepEqual(toSelector({ type: 'button' }), { type: 'button' });
+
+        return scope.assert.collect();
+    }),
+    test('treats React-marked values with selector-like fields as type selectors', function (scope) {
+        const memoizedLabel = React.memo(Label);
+        const labelElement = React.createElement(Label);
+
+        scope.assert.equal(toSelector(memoizedLabel).type, memoizedLabel);
+        scope.assert.equal(toSelector(labelElement).type, labelElement);
 
         return scope.assert.collect();
     }),

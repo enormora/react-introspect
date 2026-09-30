@@ -80,6 +80,10 @@ function hasReactType(value: unknown, type: symbol): value is PropsRecord {
     return isObjectOrFunction(value) && value.$$typeof === type;
 }
 
+export function hasReactTypeMarker(value: PropsRecord): boolean {
+    return Object.hasOwn(value, '$$typeof');
+}
+
 export function readDisplayName(type: PropsRecord): string | undefined {
     const { displayName } = type;
 
