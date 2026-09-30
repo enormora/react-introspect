@@ -158,6 +158,12 @@ function* createLabels(): Generator<React.ReactNode> {
     yield React.createElement('span', null, 'second');
 }
 
+function LabelledInput(): React.ReactNode {
+    const id = React.useId();
+
+    return React.createElement('input', { id });
+}
+
 function* createPortalLabels(): Generator<React.ReactNode> {
     yield createPortalValue(React.createElement('span', null, 'portal'));
 }
@@ -384,6 +390,44 @@ export const testNode = suite('unsupported React concepts and hardening', [
 
         return scope.assert.collect();
     }),
+    test('records a failing idGenerator as an uncaught error and keeps later views working', function (scope) {
+        const view = introspect(React.createElement(LabelledInput), {
+            errorMode: 'capture',
+            idGenerator() {
+                throw new Error('generator failed');
+            },
+            strictMode: false
+        });
+        const laterView = introspect(React.createElement('main', null, 'after'), { strictMode: false });
+
+        scope.assert.deepEqual(
+            { laterText: laterView.textContent, uncaught: view.uncaughtErrors.map(readErrorMessage) },
+            { laterText: 'after', uncaught: [ 'generator failed' ] }
+        );
+
+        return scope.assert.collect();
+    }),
+    test(
+        'unmounts the view like an uncaught render error when an update fails building the snapshot',
+        function (scope) {
+            const view = introspect(React.createElement('main', null, 'first'), {
+                errorMode: 'capture',
+                idGenerator() {
+                    throw new Error('generator failed');
+                },
+                strictMode: false
+            });
+
+            view.update(React.createElement(LabelledInput));
+
+            scope.assert.deepEqual(
+                { root: view.root, uncaught: view.uncaughtErrors.map(readErrorMessage) },
+                { root: undefined, uncaught: [ 'generator failed' ] }
+            );
+
+            return scope.assert.collect();
+        }
+    ),
     test('fails clearly for portal children captured in snapshots', function (scope) {
         scope.assert.throws(
             function () {

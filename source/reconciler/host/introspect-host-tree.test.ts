@@ -31,8 +31,8 @@ function createContainer(): PublishingContainer {
     const published: IntrospectionSnapshot[] = [];
     const container = createHostContainer(
         {
-            holdUsageError(error) {
-                throw error;
+            captureSnapshotError(cause) {
+                throw cause;
             },
             publish(snapshot) {
                 published.push(snapshot);
@@ -57,17 +57,17 @@ function createContainer(): PublishingContainer {
 
 type RecordingContainer = {
     readonly container: IntrospectionHostContainer;
-    readonly heldUsageErrors: readonly TypeError[];
+    readonly capturedErrors: readonly unknown[];
     readonly published: readonly IntrospectionSnapshot[];
 };
 
 function createRecordingContainer(generator: (generatedId: string) => string): RecordingContainer {
-    const heldUsageErrors: TypeError[] = [];
+    const capturedErrors: unknown[] = [];
     const published: IntrospectionSnapshot[] = [];
     const container = createHostContainer(
         {
-            holdUsageError(error) {
-                heldUsageErrors.push(error);
+            captureSnapshotError(cause) {
+                capturedErrors.push(cause);
             },
             publish(snapshot) {
                 published.push(snapshot);
@@ -80,7 +80,11 @@ function createRecordingContainer(generator: (generatedId: string) => string): R
         undefined
     );
 
-    return { container, heldUsageErrors, published };
+    return { capturedErrors, container, published };
+}
+
+function readErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }
 
 function commitButtonWithProps(host: RecordingContainer, props: Readonly<Record<PropertyKey, unknown>>): void {
@@ -114,39 +118,30 @@ function createButtonSnapshot(): IntrospectionSnapshot {
 }
 
 export const testNode = suite('introspection host tree', [
-    test('holds a usage error from building the snapshot instead of publishing', function (scope) {
+    test('hands a usage error from building the snapshot to the container instead of publishing', function (scope) {
         const host = createRecordingContainer(String);
         const portal = { $$typeof: Symbol.for('react.portal'), children: null, containerInfo: {}, key: null };
 
         commitButtonWithProps(host, { slot: portal });
 
         scope.assert.deepEqual(
-            {
-                held: host.heldUsageErrors.map(function readMessage(error) {
-                    return error.message;
-                }),
-                published: host.published.length
-            },
-            { held: [ 'React Introspect cannot represent portal output yet.' ], published: 0 }
+            { captured: host.capturedErrors.map(readErrorMessage), published: host.published.length },
+            { captured: [ 'React Introspect cannot represent portal output yet.' ], published: 0 }
         );
 
         return scope.assert.collect();
     }),
-    test('rethrows other errors from building the snapshot', function (scope) {
+    test('hands other errors from building the snapshot to the container instead of throwing', function (scope) {
         const host = createRecordingContainer(function failToGenerate() {
             throw new Error('generator failed');
         });
 
-        scope.assert.throws(
-            function () {
-                commitButtonWithProps(host, { id: '_test-r_a_' });
-            },
-            { message: 'generator failed' }
+        commitButtonWithProps(host, { id: '_test-r_a_' });
+
+        scope.assert.deepEqual(
+            { captured: host.capturedErrors.map(readErrorMessage), published: host.published.length },
+            { captured: [ 'generator failed' ], published: 0 }
         );
-        scope.assert.deepEqual({ held: host.heldUsageErrors.length, published: host.published.length }, {
-            held: 0,
-            published: 0
-        });
 
         return scope.assert.collect();
     }),

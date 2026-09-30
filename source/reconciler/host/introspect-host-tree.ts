@@ -5,7 +5,6 @@ import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import { isIntrospectionUsageError } from '../../values/introspect-usage-error.ts';
 import { createHostSnapshot, resolvePublicInstance, validateHostRefs } from './introspect-host-projection.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
@@ -19,12 +18,9 @@ type IntrospectionChildStore = {
     readonly writeChildren: (children: readonly IntrospectionHostChild[]) => void;
 };
 
-export type IntrospectionHostContainer = {
-    readonly holdUsageError: (error: TypeError) => void;
+export type IntrospectionHostContainer = IntrospectionHostContainerHooks & {
     readonly idNormalization: IntrospectionIdNormalization;
     readonly refs: IntrospectionRefs | undefined;
-    readonly publish: (snapshot: IntrospectionSnapshot) => void;
-    readonly readNextRenderCount: () => number;
     readonly beginCommit: (mounted: boolean) => void;
     readonly discard: (renderCount: number) => void;
     readonly readMounted: () => boolean;
@@ -32,7 +28,7 @@ export type IntrospectionHostContainer = {
 } & IntrospectionChildStore;
 
 export type IntrospectionHostContainerHooks = {
-    readonly holdUsageError: (error: TypeError) => void;
+    readonly captureSnapshotError: (cause: unknown, container: IntrospectionHostContainerControl) => void;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
 };
@@ -218,12 +214,12 @@ export function createHostContainer(
     idNormalization: IntrospectionIdNormalization,
     refs: IntrospectionRefs | undefined
 ): IntrospectionHostContainer {
-    const { holdUsageError, publish, readNextRenderCount } = hooks;
+    const { captureSnapshotError, publish, readNextRenderCount } = hooks;
     let mounted = true;
     const childStore = createChildStore();
     const container: IntrospectionHostContainer = {
         ...childStore,
-        holdUsageError,
+        captureSnapshotError,
         beginCommit(nextMounted: boolean) {
             mounted = nextMounted;
         },
@@ -263,11 +259,7 @@ function readContainerSnapshot(container: IntrospectionHostContainer): Introspec
     try {
         return createHostSnapshot(container);
     } catch (error) {
-        if (!isIntrospectionUsageError(error)) {
-            throw error;
-        }
-
-        container.holdUsageError(error);
+        container.captureSnapshotError(error, container);
 
         return undefined;
     }
