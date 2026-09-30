@@ -147,10 +147,8 @@ function createIntrospectionReconcilerSession(
         }
     }, options.strictMode);
     async function flushUntilIdle(): Promise<void> {
-        await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-            await flushScheduledWork(runtime, root);
-            flushPassiveEffects(runtime, waiters.settle);
-        });
+        await flushScheduledWork(runtime, root);
+        flushPassiveEffects(runtime, waiters.settle);
     }
 
     const session: IntrospectionReconcilerSession = {
@@ -169,18 +167,22 @@ function createIntrospectionReconcilerSession(
             });
         },
         async waitForIdle() {
-            await withDeadline(runtime.clock, options.waitTimeout, 'waitForIdle', flushUntilIdle());
+            await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
+                await withDeadline(runtime.clock, options.waitTimeout, 'waitForIdle', flushUntilIdle());
+            });
         },
         async waitUntil(operation, predicate) {
-            if (options.diagnostics.run(predicate)) {
-                return;
-            }
+            await options.diagnostics.runAsync(async function waitUntilWithDiagnostics() {
+                if (predicate()) {
+                    return;
+                }
 
-            await waiters.waitUntil(predicate, {
-                clock: runtime.clock,
-                flushUntilIdle,
-                operation,
-                timeoutInMilliseconds: options.waitTimeout
+                await waiters.waitUntil(predicate, {
+                    clock: runtime.clock,
+                    flushUntilIdle,
+                    operation,
+                    timeoutInMilliseconds: options.waitTimeout
+                });
             });
         }
     };
