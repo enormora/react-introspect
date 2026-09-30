@@ -7,17 +7,13 @@ import {
 import type { IntrospectionIdNormalization } from '../../snapshot/normalization/introspect-id-normalization.ts';
 import type { IntrospectionRefs } from '../../public/introspect-public-types.ts';
 import {
-    type IntrospectionRefHostTarget,
-    resolveIntrospectionRef,
-    validateIntrospectionRefs
-} from '../../refs/introspect-ref.ts';
-import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot,
     type SnapshotSourceNode
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
 import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
 import { toSnapshotSourceNodes, toSourceOutput } from '../../snapshot/model/introspect-snapshot-source-mapping.ts';
+import { resolvePublicInstance, validateHostRefs } from './introspect-host-projection.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -97,44 +93,6 @@ function createChildStore(): IntrospectionChildStore {
             currentChildren = children;
         }
     };
-}
-
-function toRefTarget(type: string, props: IntrospectionHostProps): IntrospectionRefHostTarget {
-    return Object.freeze({
-        key: readHostKey(props),
-        name: type,
-        props: readPublicHostProps(props),
-        type
-    });
-}
-
-function resolvePublicInstance(
-    refs: IntrospectionRefs | undefined,
-    type: string,
-    props: IntrospectionHostProps
-): unknown {
-    if (readInternalHost(type, props).kind !== 'host') {
-        return null;
-    }
-
-    return resolveIntrospectionRef(refs, toRefTarget(type, props));
-}
-
-function collectRefTargets(child: IntrospectionHostChild): readonly IntrospectionRefHostTarget[] {
-    if (child.kind === 'text') {
-        return [];
-    }
-
-    const childTargets = child.readChildren().flatMap(collectRefTargets);
-
-    if (readInternalHost(child.type, child.readProps()).kind !== 'host') {
-        return childTargets;
-    }
-
-    return [
-        toRefTarget(child.type, child.readProps()),
-        ...childTargets
-    ];
 }
 
 function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
@@ -307,13 +265,6 @@ function unhideHostChild(child: IntrospectionHostChild): void {
     child.writeVisibility('visible');
 }
 
-function validateContainerRefs(container: IntrospectionHostContainer): void {
-    validateIntrospectionRefs(
-        container.refs,
-        container.readChildren().flatMap(collectRefTargets)
-    );
-}
-
 export function createHostContainer(
     publish: (snapshot: IntrospectionSnapshot) => void,
     readNextRenderCount: () => number,
@@ -340,7 +291,7 @@ export function createHostContainer(
         readNextRenderCount,
         refs,
         validateRefs() {
-            validateContainerRefs(container);
+            validateHostRefs(refs, childStore.readChildren());
         }
     };
 
