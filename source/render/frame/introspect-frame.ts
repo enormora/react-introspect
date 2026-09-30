@@ -22,6 +22,7 @@ import {
     canExecuteComponent,
     enterComponentDepth,
     type IntrospectionFrameDepth,
+    isSameFrameDepth,
     nextDepth
 } from './introspect-frame-depth.ts';
 
@@ -182,10 +183,6 @@ function IntrospectionFrame(props: IntrospectionFrameProps): React.ReactElement 
     );
 }
 
-function haveEqualFrameDepth(previous: IntrospectionFrameDepth, next: IntrospectionFrameDepth): boolean {
-    return previous.budget === next.budget && previous.counting === next.counting && previous.policy === next.policy;
-}
-
 function readMemoKindThroughLazy(type: unknown): ReactElementKindByName['memo'] | undefined {
     const elementKind = classifyElementType(type);
 
@@ -204,7 +201,7 @@ function haveEqualMemoProps(previous: IntrospectionElement, next: IntrospectionE
 
 function areMemoFramePropsEqual(previous: IntrospectionFrameProps, next: IntrospectionFrameProps): boolean {
     return readElementRef(previous.element) === readElementRef(next.element) &&
-        haveEqualFrameDepth(previous.depth, next.depth) &&
+        isSameFrameDepth(previous.depth, next.depth) &&
         haveEqualMemoProps(previous.element, next.element);
 }
 

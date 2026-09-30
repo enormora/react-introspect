@@ -28,6 +28,10 @@ export function createFrameDepth(options: IntrospectionDepthOptions): Introspect
     };
 }
 
+export function isSameFrameDepth(previous: IntrospectionFrameDepth, next: IntrospectionFrameDepth): boolean {
+    return previous.budget === next.budget && previous.counting === next.counting && previous.policy === next.policy;
+}
+
 export function enterComponentDepth(depth: IntrospectionFrameDepth, type: unknown): IntrospectionFrameDepth {
     return !depth.counting && type === depth.policy.depthFrom ? { ...depth, counting: true } : depth;
 }
