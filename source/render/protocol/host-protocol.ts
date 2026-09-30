@@ -1,7 +1,7 @@
 import React from 'react';
 import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/public-types.ts';
-import { assertSupportedReactValue } from '../../values/unsupported-react.ts';
-import { readPublicProps } from '../../values/public-props.ts';
+import { assertSupportedReactValue } from '../../react-elements/unsupported-react.ts';
+import { readPublicProps } from '../../react-elements/public-props.ts';
 import { isObjectOrFunction } from '../../values/value-kinds.ts';
 
 type EncodedElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;

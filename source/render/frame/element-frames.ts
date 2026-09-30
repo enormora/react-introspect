@@ -1,5 +1,5 @@
 import React from 'react';
-import { classifyElementType, type ReactElementKindByName } from '../../values/react-element-kind.ts';
+import { classifyElementType, type ReactElementKindByName } from '../../react-elements/element-kind.ts';
 import { isEmptyReactNode, isIterable, isObjectOrFunction, isThenable } from '../../values/value-kinds.ts';
 import {
     createActivityComponentHost,
@@ -9,7 +9,7 @@ import {
     createUnexecutedComponentHost,
     elementKeyProps
 } from '../protocol/host-protocol.ts';
-import { assertNotPortal } from '../../values/unsupported-react.ts';
+import { assertNotPortal } from '../../react-elements/unsupported-react.ts';
 import { createIntrospectionUsageError } from '../../values/usage-error.ts';
 import { readClassFrameType } from './class-component-frame.ts';
 import { readConsumerFrame } from './context-consumer-frame.ts';

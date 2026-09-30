@@ -1,6 +1,6 @@
 import React from 'react';
 import { getElementKind } from '../shape/snapshot-shape.ts';
-import { readPublicProps } from '../../values/public-props.ts';
+import { readPublicProps } from '../../react-elements/public-props.ts';
 import { isEmptyReactNode, isIterable } from '../../values/value-kinds.ts';
 import type {
     SnapshotProps,

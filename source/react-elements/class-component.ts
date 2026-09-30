@@ -1,5 +1,5 @@
 import type React from 'react';
-import { isObjectOrFunction } from './value-kinds.ts';
+import { isObjectOrFunction } from '../values/value-kinds.ts';
 
 export type IntrospectionClassUpdater = {
     readonly enqueueForceUpdate: (

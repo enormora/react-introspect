@@ -1,7 +1,7 @@
 import React from 'react';
+import { shallowEquals } from '../values/shallow-equality.ts';
+import { isObjectOrFunction } from '../values/value-kinds.ts';
 import { type IntrospectionClassComponent, isClassComponent } from './class-component.ts';
-import { shallowEquals } from './shallow-equality.ts';
-import { isObjectOrFunction } from './value-kinds.ts';
 
 type PropsRecord = Readonly<Record<PropertyKey, unknown>>;
 

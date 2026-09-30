@@ -4,7 +4,7 @@ import type {
     IntrospectionClassComponent,
     IntrospectionClassInstance,
     IntrospectionClassUpdater
-} from '../../values/class-component.ts';
+} from '../../react-elements/class-component.ts';
 import { shallowEquals } from '../../values/shallow-equality.ts';
 import { isObjectOrFunction } from '../../values/value-kinds.ts';
 import {

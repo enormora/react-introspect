@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import { classifyElementType } from './react-element-kind.ts';
+import { classifyElementType } from './element-kind.ts';
 
 function Label(): React.ReactNode {
     return null;

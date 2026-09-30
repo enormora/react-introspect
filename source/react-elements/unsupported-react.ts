@@ -1,6 +1,6 @@
 import React from 'react';
-import { createIntrospectionUsageError } from './usage-error.ts';
-import { isObjectOrFunction } from './value-kinds.ts';
+import { createIntrospectionUsageError } from '../values/usage-error.ts';
+import { isObjectOrFunction } from '../values/value-kinds.ts';
 
 const reactPortalType = Symbol.for('react.portal');
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { assertNotPortal } from '../../values/unsupported-react.ts';
+import { assertNotPortal } from '../../react-elements/unsupported-react.ts';
 import { type NestedReplacement, replaceNestedTargets } from '../../values/nested-replacement.ts';
 
 export type IntrospectionIdNormalization = {

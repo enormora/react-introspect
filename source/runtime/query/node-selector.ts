@@ -1,7 +1,7 @@
 import type { IntrospectionHostSchema, IntrospectionSelector } from '../../public/public-types.ts';
 import type { RuntimeIntrospectionNode } from '../types/runtime-types.ts';
 import { matchesTargetCriteria } from '../../matching/target-criteria.ts';
-import { hasReactTypeMarker } from '../../values/react-element-kind.ts';
+import { hasReactTypeMarker } from '../../react-elements/element-kind.ts';
 import { isObject } from '../../values/value-kinds.ts';
 
 const selectorFields = [

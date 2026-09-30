@@ -3,7 +3,7 @@ import {
     type ReactElementKind,
     type ReactElementKindByName,
     readDisplayName
-} from '../../values/react-element-kind.ts';
+} from '../../react-elements/element-kind.ts';
 import type {
     SnapshotNode,
     SnapshotNodeKind
