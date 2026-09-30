@@ -8,9 +8,9 @@ import {
     type IntrospectionSnapshot,
     isSnapshotNode,
     type SnapshotNode,
-    type SnapshotProps,
-    type SnapshotRender
+    type SnapshotProps
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import { describeRender } from '../../snapshot/model/introspect-snapshot-render.ts';
 import { type NestedReplacement, replaceNestedTargets } from '../../values/introspect-nested-replacement.ts';
 import { nodeMatchesSelector, toSelector } from './introspect-selector.ts';
 import { createIntrospectionList } from './introspect-list.ts';
@@ -19,10 +19,6 @@ export type SnapshotReader = {
     readonly currentSnapshot: IntrospectionSnapshot;
     readonly hostEvent: Readonly<Record<PropertyKey, unknown>>;
     readonly act: (action: () => unknown) => unknown;
-};
-
-type RenderDescription = Pick<IntrospectionNodeState, 'reason' | 'rendered'> & {
-    readonly visibility: RuntimeIntrospectionNode['visibility'];
 };
 
 export type SnapshotQuery = {
@@ -137,20 +133,6 @@ function formatNode(node: SnapshotNode, depth: number): string {
         : '';
 
     return `${prefix}${node.name}${children}`;
-}
-
-function describeRender(render: SnapshotRender): RenderDescription {
-    if (render.status === 'rendered') {
-        return {
-            reason: render.visibility === 'hidden' ? render.hiddenBy : undefined,
-            rendered: true,
-            visibility: render.visibility
-        };
-    }
-
-    return render.reason === 'unsupported'
-        ? { reason: 'unsupported', rendered: false, visibility: 'notRendered' }
-        : { reason: render.reason, rendered: false, visibility: render.visibility };
 }
 
 function nodeState(node: SnapshotNode): IntrospectionNodeState {
