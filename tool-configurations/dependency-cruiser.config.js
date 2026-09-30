@@ -36,6 +36,18 @@ export default {
             }
         },
         {
+            name: 'no-react-elements-to-other-layers',
+            severity: 'error',
+            from: {
+                path: '^source/react-elements/',
+                pathNot: testFiles
+            },
+            to: {
+                path: '^source/',
+                pathNot: '^source/(react-elements|values)/'
+            }
+        },
+        {
             name: 'no-public-to-other-layers',
             severity: 'error',
             from: {

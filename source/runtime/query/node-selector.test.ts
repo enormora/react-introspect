@@ -1,0 +1,114 @@
+import { suite, test } from '@overkill-dev/test';
+import React from 'react';
+import type { IntrospectionSelector } from '../../public/public-types.ts';
+import type { RuntimeIntrospectionNode } from '../types/runtime-types.ts';
+import { createIntrospectionList } from './node-list.ts';
+import { nodeMatchesSelector, toSelector } from './node-selector.ts';
+
+function Label(): React.ReactNode {
+    return null;
+}
+
+function createNode(): RuntimeIntrospectionNode {
+    return {
+        callProp() {
+            return undefined;
+        },
+        caughtError: undefined,
+        find(selector: unknown) {
+            if (selector === 'strong') {
+                return createNode();
+            }
+
+            return typeof selector === 'object' && selector !== null && Reflect.get(selector, 'type') === 'strong'
+                ? createNode()
+                : undefined;
+        },
+        findAll() {
+            return createIntrospectionList([]);
+        },
+        findClosest() {
+            return undefined;
+        },
+        formatTree() {
+            return 'button';
+        },
+        givenChildren: createIntrospectionList([]),
+        isStale: false,
+        key: 'save',
+        kind: 'host',
+        name: 'button',
+        omitProps() {
+            return {};
+        },
+        path: 'button',
+        pickProps() {
+            return {};
+        },
+        props: {
+            metadata: {
+                actions: [ { id: 'save' } ]
+            },
+            title: 'Save'
+        },
+        renderedChildren: { nodes: createIntrospectionList([]), status: 'rendered' },
+        sendEvent() {
+            return undefined;
+        },
+        state: { activityMode: undefined, reason: undefined, rendered: true, visible: true },
+        textContent: 'Save now',
+        type: 'button',
+        visibility: 'visible'
+    };
+}
+
+export const testNode = suite('introspection selector', [
+    test('normalizes non-selector values to type selectors', function (scope) {
+        scope.assert.deepEqual(toSelector('button'), { type: 'button' });
+        scope.assert.deepEqual(toSelector({ type: 'button' }), { type: 'button' });
+
+        return scope.assert.collect();
+    }),
+    test('treats React-marked values with selector-like fields as type selectors', function (scope) {
+        const memoizedLabel = React.memo(Label);
+        const labelElement = React.createElement(Label);
+
+        scope.assert.equal(toSelector(memoizedLabel).type, memoizedLabel);
+        scope.assert.equal(toSelector(labelElement).type, labelElement);
+
+        return scope.assert.collect();
+    }),
+    test('matches type, key, props, text, child, and predicate selectors', function (scope) {
+        const node = createNode();
+
+        scope.assert.equal(
+            nodeMatchesSelector(node, {
+                has: { type: 'strong' },
+                key: 'save',
+                props: { metadata: { actions: [ { id: 'save' } ] } },
+                textContent: /save/iu,
+                type: 'button',
+                where(target) {
+                    return target.name === 'button';
+                }
+            }),
+            true
+        );
+        scope.assert.equal(nodeMatchesSelector(node, { props: { title: 'Delete' } }), false);
+        const selectorWithUndefinedTextContent = { textContent: undefined } as unknown as IntrospectionSelector;
+
+        scope.assert.equal(nodeMatchesSelector(node, selectorWithUndefinedTextContent), true);
+
+        return scope.assert.collect();
+    }),
+    test('ignores inherited selector fields like ref rules do', function (scope) {
+        const inheritedTypeSelector: unknown = Object.create({ type: 'button' });
+
+        scope.assert.deepEqual(toSelector(inheritedTypeSelector), { type: inheritedTypeSelector });
+        const inheritedKeySelector = Object.create({ key: 'delete' }) as IntrospectionSelector;
+
+        scope.assert.equal(nodeMatchesSelector(createNode(), inheritedKeySelector), true);
+
+        return scope.assert.collect();
+    })
+]);
