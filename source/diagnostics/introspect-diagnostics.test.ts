@@ -272,5 +272,20 @@ export const testNode = suite('diagnostics', [
         );
 
         return scope.assert.collect();
+    }),
+    test('throws a diagnostic recorded outside any run from the next run', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+
+        diagnostics.recordRecoverableError(new Error('between operations'));
+
+        const error = requireError(function runNextOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.equal(error.message, 'between operations');
+
+        return scope.assert.collect();
     })
 ]);
