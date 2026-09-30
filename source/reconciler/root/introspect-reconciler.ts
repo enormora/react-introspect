@@ -125,11 +125,17 @@ function createRootWaits(dependencies: RootWaitDependencies): RootWaits {
 
     async function waitUntil(operation: WaitOperation, predicate: () => boolean): Promise<void> {
         await diagnostics.runAsync(async function waitUntilWithDiagnostics() {
-            if (predicate()) {
+            const holdsUsageError = diagnostics.createUsageErrorCheck();
+
+            function isSatisfiedOrFailed(): boolean {
+                return holdsUsageError() || predicate();
+            }
+
+            if (isSatisfiedOrFailed()) {
                 return;
             }
 
-            await waiters.waitUntil(predicate, { clock, flushUntilIdle, operation, timeoutInMilliseconds });
+            await waiters.waitUntil(isSatisfiedOrFailed, { clock, flushUntilIdle, operation, timeoutInMilliseconds });
         });
     }
 
