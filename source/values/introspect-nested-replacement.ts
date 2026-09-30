@@ -92,13 +92,11 @@ const nestedTargetReplacer = {
         replacement: NestedReplacement<Target>,
         location: string
     ): Readonly<Record<PropertyKey, unknown>> {
-        const rebuilt: Record<PropertyKey, unknown> = {};
-
-        for (const key of Reflect.ownKeys(record)) {
-            rebuilt[key] = nestedTargetReplacer.replace(record[key], replacement, childLocation(location, key));
-        }
-
-        return Object.freeze(rebuilt);
+        return Object.freeze(Object.fromEntries(
+            Reflect.ownKeys(record).map(function rebuildEntry(key) {
+                return [ key, nestedTargetReplacer.replace(record[key], replacement, childLocation(location, key)) ];
+            })
+        ));
     },
     replace<Target>(value: unknown, replacement: NestedReplacement<Target>, location: string): unknown {
         if (replacement.isTarget(value)) {

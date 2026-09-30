@@ -102,13 +102,9 @@ function omitProperties(props: SnapshotProps, keys: readonly PropertyKey[]): Sna
 }
 
 function pickProperties(props: SnapshotProps, keys: readonly PropertyKey[]): SnapshotProps {
-    const picked: Record<PropertyKey, unknown> = {};
-
-    for (const key of keys) {
-        picked[key] = props[key];
-    }
-
-    return Object.freeze(picked);
+    return Object.freeze(Object.fromEntries(keys.map(function pickEntry(key) {
+        return [ key, props[key] ];
+    })));
 }
 
 function collectDescendants(node: SnapshotNode): readonly SnapshotNode[] {
@@ -162,13 +158,11 @@ function exposePropElements(
         isTarget: isSnapshotNode,
         replaceTarget: createPropNode
     };
-    const exposed: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        exposed[key] = replaceNestedTargets(props[key], replacement, '');
-    }
-
-    return Object.freeze(exposed);
+    return Object.freeze(Object.fromEntries(
+        Reflect.ownKeys(props).map(function exposeEntry(key) {
+            return [ key, replaceNestedTargets(props[key], replacement, '') ];
+        })
+    ));
 }
 
 const exposedPropsBySnapshotNode = new WeakMap<SnapshotNode, SnapshotProps>();
