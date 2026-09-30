@@ -70,7 +70,6 @@ type SourceSnapshotNodeRequest = SnapshotSiblingPlacement & {
 type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
     readonly element: SnapshotSourceElement;
     readonly givenChildren: readonly SnapshotNode[];
-    readonly parentId: number;
 };
 
 type PropsSnapshotRequest = SnapshotChildPlacement & {
@@ -271,23 +270,18 @@ const snapshotOperations = {
         });
     },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): readonly SnapshotNode[] {
-        const { output } = request.element;
+        const { element, givenChildren, ...placement } = request;
+        const { output } = element;
 
         if (output.status === 'notRendered') {
-            return output.reason === 'depth' ? request.givenChildren : Object.freeze([]);
+            return output.reason === 'depth' ? givenChildren : Object.freeze([]);
         }
 
         if (output.children === 'given') {
-            return request.givenChildren;
+            return givenChildren;
         }
 
-        return snapshotOperations.createSourceChildSnapshots({
-            build: request.build,
-            children: output.children,
-            inheritedHiddenBy: request.inheritedHiddenBy,
-            parentId: request.parentId,
-            parentPath: request.parentPath
-        });
+        return snapshotOperations.createSourceChildSnapshots({ ...placement, children: output.children });
     },
     createSourceChildSnapshots(request: SourceChildSnapshotsRequest): readonly SnapshotNode[] {
         const { children, ...placement } = request;
