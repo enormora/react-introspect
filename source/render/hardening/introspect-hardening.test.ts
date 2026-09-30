@@ -158,6 +158,20 @@ function* createLabels(): Generator<React.ReactNode> {
     yield React.createElement('span', null, 'second');
 }
 
+function* createPortalLabels(): Generator<React.ReactNode> {
+    yield createPortalValue(React.createElement('span', null, 'portal'));
+}
+
+function describeFailure(action: () => void): string {
+    try {
+        action();
+    } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+    }
+
+    return 'returned';
+}
+
 function readTextContent(node: IntrospectionNode): string {
     return node.textContent;
 }
@@ -322,6 +336,51 @@ export const testNode = suite('unsupported React concepts and hardening', [
         const icon = requireValue(view.find(Icon));
 
         scope.assert.deepEqual(Array.from(icon.givenChildren, readTextContent), [ 'first', 'second' ]);
+
+        return scope.assert.collect();
+    }),
+    test('fails clearly for portal children inside a Set of given children', function (scope) {
+        scope.assert.throws(
+            function () {
+                introspect(
+                    React.createElement(IterableChildRoot, {
+                        items: new Set([ createPortalValue(React.createElement('span', null, 'portal')) ])
+                    }),
+                    { strictMode: false }
+                );
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('fails clearly for portal children from a generator of given children', function (scope) {
+        scope.assert.throws(
+            function () {
+                introspect(React.createElement(IterableChildRoot, { items: createPortalLabels() }), {
+                    strictMode: false
+                });
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('keeps later views working after portal children fail inside the commit', function (scope) {
+        const failure = describeFailure(function introspectPortalSet() {
+            introspect(
+                React.createElement(IterableChildRoot, {
+                    items: new Set([ createPortalValue(React.createElement('span', null, 'portal')) ])
+                }),
+                { strictMode: false }
+            );
+        });
+        const laterView = introspect(React.createElement('main', null, 'after'), { strictMode: false });
+
+        scope.assert.deepEqual(
+            { failure, laterText: laterView.textContent },
+            { failure: 'React Introspect cannot represent portal output yet.', laterText: 'after' }
+        );
 
         return scope.assert.collect();
     }),

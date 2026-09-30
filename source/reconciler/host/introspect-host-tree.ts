@@ -5,6 +5,7 @@ import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
+import { isIntrospectionUsageError } from '../../values/introspect-usage-error.ts';
 import { createHostSnapshot, resolvePublicInstance, validateHostRefs } from './introspect-host-projection.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
@@ -19,6 +20,7 @@ type IntrospectionChildStore = {
 };
 
 export type IntrospectionHostContainer = {
+    readonly holdUsageError: (error: TypeError) => void;
     readonly idNormalization: IntrospectionIdNormalization;
     readonly refs: IntrospectionRefs | undefined;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
@@ -30,6 +32,7 @@ export type IntrospectionHostContainer = {
 } & IntrospectionChildStore;
 
 export type IntrospectionHostContainerHooks = {
+    readonly holdUsageError: (error: TypeError) => void;
     readonly publish: (snapshot: IntrospectionSnapshot) => void;
     readonly readNextRenderCount: () => number;
 };
@@ -215,11 +218,12 @@ export function createHostContainer(
     idNormalization: IntrospectionIdNormalization,
     refs: IntrospectionRefs | undefined
 ): IntrospectionHostContainer {
-    const { publish, readNextRenderCount } = hooks;
+    const { holdUsageError, publish, readNextRenderCount } = hooks;
     let mounted = true;
     const childStore = createChildStore();
     const container: IntrospectionHostContainer = {
         ...childStore,
+        holdUsageError,
         beginCommit(nextMounted: boolean) {
             mounted = nextMounted;
         },
@@ -255,8 +259,26 @@ function returnNull(): null {
     return null;
 }
 
+function readContainerSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot | undefined {
+    try {
+        return createHostSnapshot(container);
+    } catch (error) {
+        if (!isIntrospectionUsageError(error)) {
+            throw error;
+        }
+
+        container.holdUsageError(error);
+
+        return undefined;
+    }
+}
+
 function publishContainerSnapshot(container: IntrospectionHostContainer): void {
-    container.publish(createHostSnapshot(container));
+    const snapshot = readContainerSnapshot(container);
+
+    if (snapshot !== undefined) {
+        container.publish(snapshot);
+    }
 }
 
 function prepareForCommit(): null {

@@ -165,6 +165,7 @@ function createIntrospectionReconcilerRoot(
     const waiters = createWaiterQueue();
     const container = createHostContainer(
         {
+            holdUsageError: options.diagnostics.holdUsageError,
             publish(snapshot) {
                 renderCount = snapshot.renderCount;
                 options.publish(snapshot);
