@@ -102,7 +102,7 @@ function toSourceNode(child: ProjectedHostChild): SnapshotSourceNode {
             kind: 'element',
             key: metadata.key,
             props: metadata.props,
-            output: toSourceOutput(metadata.renderedReason, child.readChildren().map(toSourceNode)),
+            output: toSourceOutput(metadata.renderStatus, child.readChildren().map(toSourceNode)),
             type: metadata.type,
             hostVisibility: child.readVisibility()
         };
