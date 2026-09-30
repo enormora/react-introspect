@@ -1,23 +1,11 @@
 import type { TimeoutIdentifier } from '@enormora/clock';
-import {
-    readHostKey,
-    readInternalHost,
-    readPublicHostProps
-} from '../../render/protocol/introspect-host-protocol.ts';
 import type { IntrospectionIdNormalization } from '../../snapshot/normalization/introspect-id-normalization.ts';
 import type { IntrospectionRefs } from '../../public/introspect-public-types.ts';
 import {
-    type IntrospectionRefHostTarget,
-    resolveIntrospectionRef,
-    validateIntrospectionRefs
-} from '../../refs/introspect-ref.ts';
-import {
     createEmptyIntrospectionSnapshot,
-    type IntrospectionSnapshot,
-    type SnapshotSourceNode
+    type IntrospectionSnapshot
 } from '../../snapshot/model/introspect-snapshot-contract.ts';
-import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
-import { toSnapshotSourceNodes, toSourceOutput } from '../../snapshot/model/introspect-snapshot-source-mapping.ts';
+import { createHostSnapshot, resolvePublicInstance, validateHostRefs } from './introspect-host-projection.ts';
 
 type IntrospectionHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -99,44 +87,6 @@ function createChildStore(): IntrospectionChildStore {
     };
 }
 
-function toRefTarget(type: string, props: IntrospectionHostProps): IntrospectionRefHostTarget {
-    return Object.freeze({
-        key: readHostKey(props),
-        name: type,
-        props: readPublicHostProps(props),
-        type
-    });
-}
-
-function resolvePublicInstance(
-    refs: IntrospectionRefs | undefined,
-    type: string,
-    props: IntrospectionHostProps
-): unknown {
-    if (readInternalHost(type, props).kind !== 'host') {
-        return null;
-    }
-
-    return resolveIntrospectionRef(refs, toRefTarget(type, props));
-}
-
-function collectRefTargets(child: IntrospectionHostChild): readonly IntrospectionRefHostTarget[] {
-    if (child.kind === 'text') {
-        return [];
-    }
-
-    const childTargets = child.readChildren().flatMap(collectRefTargets);
-
-    if (readInternalHost(child.type, child.readProps()).kind !== 'host') {
-        return childTargets;
-    }
-
-    return [
-        toRefTarget(child.type, child.readProps()),
-        ...childTargets
-    ];
-}
-
 function removeChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
     const children = parent.readChildren();
     const index = children.indexOf(child);
@@ -154,46 +104,6 @@ function detachChild(child: IntrospectionHostChild): void {
     if (parent !== undefined) {
         removeChild(parent, child);
     }
-}
-
-function toSourceNode(child: IntrospectionHostChild): SnapshotSourceNode {
-    if (child.kind === 'text') {
-        return { kind: 'text', value: child.readText(), hostVisibility: child.readVisibility() };
-    }
-
-    const internalHost = readInternalHost(child.type, child.readProps());
-
-    if (internalHost.kind === 'empty' || internalHost.kind === 'opaque') {
-        return { kind: internalHost.kind, value: internalHost.value, hostVisibility: child.readVisibility() };
-    }
-
-    if (internalHost.kind === 'component') {
-        const { metadata } = internalHost;
-
-        return {
-            activityMode: metadata.activityMode,
-            caughtError: metadata.caughtError,
-            givenChildren: toSnapshotSourceNodes(metadata.givenChildren),
-            kind: 'element',
-            key: metadata.key,
-            props: metadata.props,
-            output: toSourceOutput(metadata.renderedReason, child.readChildren().map(toSourceNode)),
-            type: metadata.type,
-            hostVisibility: child.readVisibility()
-        };
-    }
-
-    return {
-        activityMode: undefined,
-        caughtError: undefined,
-        givenChildren: child.readChildren().map(toSourceNode),
-        kind: 'element',
-        key: readHostKey(child.readProps()),
-        props: readPublicHostProps(child.readProps()),
-        output: { children: 'given', status: 'rendered' },
-        type: child.type,
-        hostVisibility: child.readVisibility()
-    };
 }
 
 function appendChild(parent: IntrospectionHostParent, child: IntrospectionHostChild): void {
@@ -287,31 +197,12 @@ function insertBefore(
     parentByChild.set(child, parent);
 }
 
-function toSnapshot(container: IntrospectionHostContainer): IntrospectionSnapshot {
-    if (!container.readMounted()) {
-        return createEmptyIntrospectionSnapshot(container.readNextRenderCount());
-    }
-
-    return createIntrospectionSnapshotFromSource(
-        container.readChildren().map(toSourceNode),
-        container.readNextRenderCount(),
-        container.idNormalization
-    );
-}
-
 function hideHostChild(child: IntrospectionHostChild): void {
     child.writeVisibility('hidden');
 }
 
 function unhideHostChild(child: IntrospectionHostChild): void {
     child.writeVisibility('visible');
-}
-
-function validateContainerRefs(container: IntrospectionHostContainer): void {
-    validateIntrospectionRefs(
-        container.refs,
-        container.readChildren().flatMap(collectRefTargets)
-    );
 }
 
 export function createHostContainer(
@@ -340,7 +231,7 @@ export function createHostContainer(
         readNextRenderCount,
         refs,
         validateRefs() {
-            validateContainerRefs(container);
+            validateHostRefs(refs, childStore.readChildren());
         }
     };
 
@@ -360,7 +251,7 @@ function returnNull(): null {
 }
 
 function publishContainerSnapshot(container: IntrospectionHostContainer): void {
-    container.publish(toSnapshot(container));
+    container.publish(createHostSnapshot(container));
 }
 
 function prepareForCommit(): null {
