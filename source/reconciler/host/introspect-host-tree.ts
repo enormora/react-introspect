@@ -29,6 +29,11 @@ export type IntrospectionHostContainer = {
     readonly validateRefs: () => void;
 } & IntrospectionChildStore;
 
+export type IntrospectionHostContainerHooks = {
+    readonly publish: (snapshot: IntrospectionSnapshot) => void;
+    readonly readNextRenderCount: () => number;
+};
+
 export type IntrospectionHostContainerControl = Pick<
     IntrospectionHostContainer,
     'beginCommit' | 'discard' | 'readMounted' | 'validateRefs'
@@ -206,11 +211,11 @@ function unhideHostChild(child: IntrospectionHostChild): void {
 }
 
 export function createHostContainer(
-    publish: (snapshot: IntrospectionSnapshot) => void,
-    readNextRenderCount: () => number,
+    hooks: IntrospectionHostContainerHooks,
     idNormalization: IntrospectionIdNormalization,
     refs: IntrospectionRefs | undefined
 ): IntrospectionHostContainer {
+    const { publish, readNextRenderCount } = hooks;
     let mounted = true;
     const childStore = createChildStore();
     const container: IntrospectionHostContainer = {

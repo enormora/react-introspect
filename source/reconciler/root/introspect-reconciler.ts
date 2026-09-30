@@ -164,13 +164,15 @@ function createIntrospectionReconcilerRoot(
     let renderCount = 0;
     const waiters = createWaiterQueue();
     const container = createHostContainer(
-        function publishSnapshot(snapshot) {
-            renderCount = snapshot.renderCount;
-            options.publish(snapshot);
-            waiters.settle();
-        },
-        function readNextRenderCount() {
-            return renderCount + 1;
+        {
+            publish(snapshot) {
+                renderCount = snapshot.renderCount;
+                options.publish(snapshot);
+                waiters.settle();
+            },
+            readNextRenderCount() {
+                return renderCount + 1;
+            }
         },
         {
             generator: options.idGenerator,

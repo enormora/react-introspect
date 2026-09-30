@@ -30,11 +30,13 @@ function requireValue<Value>(value: Value | undefined): Value {
 function createContainer(): PublishingContainer {
     const published: IntrospectionSnapshot[] = [];
     const container = createHostContainer(
-        function recordSnapshot(snapshot) {
-            published.push(snapshot);
-        },
-        function readNextRenderCount() {
-            return 1;
+        {
+            publish(snapshot) {
+                published.push(snapshot);
+            },
+            readNextRenderCount() {
+                return 1;
+            }
         },
         { generator: undefined, prefix: 'test-' },
         undefined
