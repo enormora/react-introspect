@@ -5,6 +5,14 @@ import {
     resolveIntrospectionRef,
     validateIntrospectionRefs
 } from '../../refs/introspect-ref.ts';
+import {
+    createEmptyIntrospectionSnapshot,
+    type IntrospectionSnapshot,
+    type SnapshotSourceNode
+} from '../../snapshot/model/introspect-snapshot-contract.ts';
+import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/introspect-snapshot.ts';
+import { toSnapshotSourceNodes, toSourceOutput } from '../../snapshot/model/introspect-snapshot-source-mapping.ts';
+import type { IntrospectionIdNormalization } from '../../snapshot/normalization/introspect-id-normalization.ts';
 
 type ProjectedHostProps = Readonly<Record<PropertyKey, unknown>>;
 
@@ -22,7 +30,14 @@ type ProjectedTextInstance = {
     readonly readVisibility: () => 'hidden' | 'visible';
 };
 
-export type ProjectedHostChild = ProjectedHostInstance | ProjectedTextInstance;
+type ProjectedHostChild = ProjectedHostInstance | ProjectedTextInstance;
+
+type ProjectedHostContainer = {
+    readonly idNormalization: IntrospectionIdNormalization;
+    readonly readChildren: () => readonly ProjectedHostChild[];
+    readonly readMounted: () => boolean;
+    readonly readNextRenderCount: () => number;
+};
 
 function toRefTarget(type: string, props: ProjectedHostProps): IntrospectionRefHostTarget {
     return Object.freeze({
@@ -64,4 +79,56 @@ function collectRefTargets(child: ProjectedHostChild): readonly IntrospectionRef
 
 export function validateHostRefs(refs: IntrospectionRefs | undefined, children: readonly ProjectedHostChild[]): void {
     validateIntrospectionRefs(refs, children.flatMap(collectRefTargets));
+}
+
+function toSourceNode(child: ProjectedHostChild): SnapshotSourceNode {
+    if (child.kind === 'text') {
+        return { kind: 'text', value: child.readText(), hostVisibility: child.readVisibility() };
+    }
+
+    const internalHost = readInternalHost(child.type, child.readProps());
+
+    if (internalHost.kind === 'empty' || internalHost.kind === 'opaque') {
+        return { kind: internalHost.kind, value: internalHost.value, hostVisibility: child.readVisibility() };
+    }
+
+    if (internalHost.kind === 'component') {
+        const { metadata } = internalHost;
+
+        return {
+            activityMode: metadata.activityMode,
+            caughtError: metadata.caughtError,
+            givenChildren: toSnapshotSourceNodes(metadata.givenChildren),
+            kind: 'element',
+            key: metadata.key,
+            props: metadata.props,
+            output: toSourceOutput(metadata.renderedReason, child.readChildren().map(toSourceNode)),
+            type: metadata.type,
+            hostVisibility: child.readVisibility()
+        };
+    }
+
+    return {
+        activityMode: undefined,
+        caughtError: undefined,
+        givenChildren: child.readChildren().map(toSourceNode),
+        kind: 'element',
+        key: readHostKey(child.readProps()),
+        props: readPublicHostProps(child.readProps()),
+        output: { children: 'given', status: 'rendered' },
+        type: child.type,
+        hostVisibility: child.readVisibility()
+    };
+}
+
+export function createHostSnapshot(container: ProjectedHostContainer): IntrospectionSnapshot {
+    if (!container.readMounted()) {
+        return createEmptyIntrospectionSnapshot(container.readNextRenderCount());
+    }
+
+    return createIntrospectionSnapshotFromSource(
+        container.readChildren().map(toSourceNode),
+        container.readNextRenderCount(),
+        container.idNormalization
+    );
 }
