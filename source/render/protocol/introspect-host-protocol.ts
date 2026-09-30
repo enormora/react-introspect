@@ -1,7 +1,7 @@
 import React from 'react';
 import type { IntrospectionError, IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import { assertSupportedReactValue } from '../../values/introspect-unsupported-react.ts';
-import { isReactReservedPropKey } from '../../values/introspect-react-element-kind.ts';
+import { readPublicProps } from '../../values/introspect-public-props.ts';
 import { isObjectOrFunction } from '../../values/introspect-value-kinds.ts';
 
 type EncodedElement = React.ReactElement<Readonly<Record<PropertyKey, unknown>>>;
@@ -41,24 +41,11 @@ const unsupportedComponentMetadata: IntrospectionComponentMetadata = {
     type: introspectionComponentHostType
 };
 
-function isPublicPropKey(key: PropertyKey): boolean {
-    return !isReactReservedPropKey(key) && key !== introspectionElementKeyMetadata;
-}
-
-function filterProps(
-    props: Readonly<Record<PropertyKey, unknown>>,
-    isKept: (key: PropertyKey) => boolean
-): Record<PropertyKey, unknown> {
-    const result: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        if (isKept(key)) {
-            result[key] = props[key];
-        }
-    }
-
-    return result;
-}
+const internalPropKeys = new Set<PropertyKey>([
+    introspectionComponentMetadata,
+    introspectionElementKeyMetadata,
+    introspectionValueMetadata
+]);
 
 type ComponentMetadataRequest = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
@@ -78,7 +65,7 @@ function createComponentMetadata(request: ComponentMetadataRequest): Introspecti
         caughtError,
         givenChildren: props.children,
         key: element.key,
-        props: filterProps(props, isPublicPropKey),
+        props: readPublicProps(props, internalPropKeys),
         renderedReason,
         type: element.type
     };
@@ -161,13 +148,6 @@ export function elementKeyProps(element: EncodedElement): Readonly<Record<Proper
     return { [introspectionElementKeyMetadata]: element.key };
 }
 
-function isPublicHostPropKey(key: PropertyKey): boolean {
-    return !isReactReservedPropKey(key) &&
-        key !== introspectionComponentMetadata &&
-        key !== introspectionElementKeyMetadata &&
-        key !== introspectionValueMetadata;
-}
-
 function isIntrospectionComponentMetadata(value: unknown): value is IntrospectionComponentMetadata {
     return isObjectOrFunction(value) && createdComponentMetadata.has(value);
 }
@@ -197,7 +177,7 @@ export function readInternalHost(type: string, props: Readonly<Record<PropertyKe
 export function readPublicHostProps(
     props: Readonly<Record<PropertyKey, unknown>>
 ): Readonly<Record<PropertyKey, unknown>> {
-    return Object.freeze(filterProps(props, isPublicHostPropKey));
+    return readPublicProps(props, internalPropKeys);
 }
 
 export function readHostKey(props: Readonly<Record<PropertyKey, unknown>>): string | null {
