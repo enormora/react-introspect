@@ -70,14 +70,9 @@ type SourceSnapshotNodeRequest = SnapshotSiblingPlacement & {
 type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
     readonly element: SnapshotSourceElement;
     readonly givenChildren: readonly SnapshotNode[];
-    readonly parentId: number;
 };
 
-type PropsSnapshotRequest = {
-    readonly build: SnapshotBuilder;
-    readonly inheritedHiddenBy: IntrospectionHiddenReason | undefined;
-    readonly ownerId: number;
-    readonly ownerPath: string;
+type PropsSnapshotRequest = SnapshotChildPlacement & {
     readonly props: SnapshotProps;
 };
 
@@ -242,10 +237,7 @@ const snapshotOperations = {
             });
             const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
             const snapshotProps = snapshotOperations.createPropsSnapshot({
-                build: request.build,
-                inheritedHiddenBy: hiddenBy,
-                ownerId: id,
-                ownerPath: path,
+                ...childPlacement,
                 props: request.element.props
             });
 
@@ -267,35 +259,29 @@ const snapshotOperations = {
         });
     },
     createPropsSnapshot(request: PropsSnapshotRequest): SnapshotProps {
-        return request.build.normalizeProps(request.props, function describeElement(element, location) {
+        const { props, ...placement } = request;
+
+        return placement.build.normalizeProps(props, function describeElement(element, location) {
             return snapshotOperations.createSourceElementSnapshotNode({
-                build: request.build,
+                ...placement,
                 element: toSourceElement(element),
-                index: location,
-                inheritedHiddenBy: request.inheritedHiddenBy,
-                parentId: request.ownerId,
-                parentPath: request.ownerPath
+                index: location
             });
         });
     },
     createSourceElementRenderedChildren(request: SourceElementRenderedChildrenRequest): readonly SnapshotNode[] {
-        const { output } = request.element;
+        const { element, givenChildren, ...placement } = request;
+        const { output } = element;
 
         if (output.status === 'notRendered') {
-            return output.reason === 'depth' ? request.givenChildren : Object.freeze([]);
+            return output.reason === 'depth' ? givenChildren : Object.freeze([]);
         }
 
         if (output.children === 'given') {
-            return request.givenChildren;
+            return givenChildren;
         }
 
-        return snapshotOperations.createSourceChildSnapshots({
-            build: request.build,
-            children: output.children,
-            inheritedHiddenBy: request.inheritedHiddenBy,
-            parentId: request.parentId,
-            parentPath: request.parentPath
-        });
+        return snapshotOperations.createSourceChildSnapshots({ ...placement, children: output.children });
     },
     createSourceChildSnapshots(request: SourceChildSnapshotsRequest): readonly SnapshotNode[] {
         const { children, ...placement } = request;
