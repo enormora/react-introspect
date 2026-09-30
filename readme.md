@@ -814,6 +814,8 @@ assert.equal(view.caughtErrors.length, 0);
 
 Use `errorMode: 'throw'` when a thrown render error should escape `introspect()`.
 
+In throw mode, the call that did the work throws the first error or warning it recorded. If that call fails on its own, for example a wait that times out, its own error wins and the recorded ones stay in the lists. Anything recorded by work that runs between calls, or that keeps running after a timed out wait, is thrown by the next call.
+
 ```tsx
 assert.throws(() => {
     introspect(<Crashes />, { errorMode: 'throw' });
