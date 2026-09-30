@@ -227,5 +227,27 @@ export const testNode = suite('introspection locators', [
         scope.assert.deepEqual(Array.from(locator), [ first, second ]);
 
         return scope.assert.collect();
+    }),
+    test('re-reads list locator matches on every access', function (scope) {
+        const first = createNode('button');
+        const second = createNode('button');
+        const nodes = [ first ];
+        const locator = createIntrospectionListLocator(createView(nodes), 'button');
+        const lengthBefore = locator.length;
+
+        nodes.push(second);
+
+        scope.assert.deepEqual(
+            {
+                at: locator.at(1),
+                items: Array.from(locator),
+                last: locator.last,
+                lengthAfter: locator.length,
+                lengthBefore
+            },
+            { at: second, items: [ first, second ], last: second, lengthAfter: 2, lengthBefore: 1 }
+        );
+
+        return scope.assert.collect();
     })
 ]);
