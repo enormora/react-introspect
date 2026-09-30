@@ -4,7 +4,7 @@ import type {
     RuntimeIntrospectionView,
     RuntimeNodeSequence
 } from '../types/runtime-types.ts';
-import { createNodeSequence } from './list.ts';
+import { createNodeSequence } from './node-list.ts';
 
 type LocatorTarget = {
     readonly selector: unknown;

@@ -1,10 +1,10 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { IntrospectionError, IntrospectionNode } from '../../public/public-types.ts';
-import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/diagnostics.ts';
-import { createUnitIntrospectionView as introspect } from '../../runtime/view/unit-view.test.ts';
-import { createFakeRefNode, matchRefs } from '../../refs/ref.ts';
-import { normalizeSnapshotValue } from '../../snapshot/normalization/id-normalization.ts';
+import type { IntrospectionError, IntrospectionNode } from '../public/public-types.ts';
+import type { IntrospectionConsoleDiagnostics } from '../diagnostics/render-diagnostics.ts';
+import { createUnitIntrospectionView as introspect } from '../runtime/view/unit-view.test.ts';
+import { createFakeRefNode, matchRefs } from '../refs/ref-matching.ts';
+import { normalizeSnapshotValue } from '../snapshot/normalization/id-normalization.ts';
 
 type ElementProp = {
     readonly key: string | null;

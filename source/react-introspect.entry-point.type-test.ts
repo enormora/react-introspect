@@ -20,7 +20,7 @@ import type {
 import {
     createFakeRefNode,
     matchRefs
-} from './refs/ref.ts';
+} from './refs/ref-matching.ts';
 import {
     createIntrospect,
     introspect

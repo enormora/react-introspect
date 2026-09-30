@@ -11,9 +11,9 @@ import type {
 import {
     createFakeRefNode as createFakeRefNodeImplementation,
     matchRefs as matchRefsImplementation
-} from './refs/ref.ts';
+} from './refs/ref-matching.ts';
 import { createNodeConsoleDiagnostics } from './diagnostics/node-console-diagnostics.ts';
-import { createIntrospectionReconcilerModule } from './reconciler/root/reconciler.ts';
+import { createIntrospectionReconcilerModule } from './reconciler/root/root-lifecycle.ts';
 import type { RuntimeIntrospectionView } from './runtime/types/runtime-types.ts';
 import {
     createNodeRuntimeDependencies

@@ -4,7 +4,7 @@ import React from 'react';
 import type { IntrospectionNode } from '../../public/public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/unit-view.test.ts';
 import { createFrameDepth } from './frame-depth.ts';
-import { createIntrospectionRenderElement } from './frame.ts';
+import { createIntrospectionRenderElement } from './element-frames.ts';
 
 type Counts = {
     readonly readButtonRenders: () => number;

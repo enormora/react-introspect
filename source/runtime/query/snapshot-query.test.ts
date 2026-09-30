@@ -4,7 +4,7 @@ import {
     registerSnapshotNode,
     type SnapshotNode
 } from '../../snapshot/model/snapshot-contract.ts';
-import { createSnapshotQuery, type SnapshotReader } from './node.ts';
+import { createSnapshotQuery, type SnapshotReader } from './snapshot-query.ts';
 
 type Count = {
     readonly read: () => number;

@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { IntrospectionDiagnostics } from '../../diagnostics/diagnostics.ts';
+import type { IntrospectionDiagnostics } from '../../diagnostics/render-diagnostics.ts';
 import { createHostContainer, type IntrospectionHostContainerControl } from '../host/host-tree.ts';
 import type { IntrospectionRefs, IntrospectionRenderControl } from '../../public/public-types.ts';
 import type { IntrospectionSnapshot } from '../../snapshot/model/snapshot-contract.ts';
@@ -12,13 +12,13 @@ import {
     flushScheduledWork,
     reconcilerRuntime,
     renderRootElement
-} from './react-root.ts';
+} from './reconciler-container.ts';
 import {
     createWaiterQueue,
     type WaiterQueue,
     type WaitOperation,
     withDeadline
-} from './wait.ts';
+} from './render-waiters.ts';
 
 type IntrospectionReconcilerRootOptions = {
     readonly diagnostics: IntrospectionDiagnostics;

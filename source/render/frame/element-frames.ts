@@ -11,8 +11,8 @@ import {
 } from '../protocol/host-protocol.ts';
 import { assertNotPortal } from '../../values/unsupported-react.ts';
 import { createIntrospectionUsageError } from '../../values/usage-error.ts';
-import { readClassFrameType } from './class-frame.ts';
-import { readConsumerFrame } from './consumer-frame.ts';
+import { readClassFrameType } from './class-component-frame.ts';
+import { readConsumerFrame } from './context-consumer-frame.ts';
 import {
     type IntrospectionElement,
     type IntrospectionTransformedNode,

@@ -3,7 +3,7 @@ import type {
     RuntimeIntrospectionNode,
     RuntimeNodeSequence
 } from '../types/runtime-types.ts';
-import { nodeMatchesSelector, toSelector } from './selector.ts';
+import { nodeMatchesSelector, toSelector } from './node-selector.ts';
 
 export function createNodeSequence<Members extends Record<string, unknown>>(
     readNodes: () => readonly RuntimeIntrospectionNode[],

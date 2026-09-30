@@ -1,5 +1,5 @@
 import React from 'react';
-import { createDiagnosticRecord } from '../../diagnostics/diagnostics.ts';
+import { createDiagnosticRecord } from '../../diagnostics/render-diagnostics.ts';
 import type {
     IntrospectionClassComponent,
     IntrospectionClassInstance,

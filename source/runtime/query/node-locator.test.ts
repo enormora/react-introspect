@@ -5,8 +5,8 @@ import type {
     RuntimeIntrospectionNode,
     RuntimeIntrospectionView
 } from '../types/runtime-types.ts';
-import { createIntrospectionList } from './list.ts';
-import { createIntrospectionListLocator, createIntrospectionLocator } from './locator.ts';
+import { createIntrospectionList } from './node-list.ts';
+import { createIntrospectionListLocator, createIntrospectionLocator } from './node-locator.ts';
 
 function createNode(name: string): RuntimeIntrospectionNode {
     return {

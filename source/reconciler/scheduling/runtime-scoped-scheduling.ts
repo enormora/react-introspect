@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 // eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
 import { DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants.js';
 import type { IntrospectionHostScheduling } from '../host/host-tree.ts';
-import type { IntrospectionRuntimeDependencies } from '../scheduling/runtime-dependencies-types.ts';
+import type { IntrospectionRuntimeDependencies } from './runtime-dependencies-types.ts';
 
 export type IntrospectionReconcilerRuntime = IntrospectionHostScheduling & {
     readonly run: <Result>(runtime: IntrospectionRuntimeDependencies, action: () => Result) => Result;

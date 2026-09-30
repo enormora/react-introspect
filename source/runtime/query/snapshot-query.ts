@@ -10,11 +10,11 @@ import {
     type SnapshotNode,
     type SnapshotProps
 } from '../../snapshot/model/snapshot-contract.ts';
-import { describeRender } from '../../snapshot/model/snapshot-render.ts';
+import { describeRender } from '../../snapshot/model/render-state.ts';
 import { type NestedReplacement, replaceNestedTargets } from '../../values/nested-replacement.ts';
 import { isObject } from '../../values/value-kinds.ts';
-import { nodeMatchesSelector, toSelector } from './selector.ts';
-import { createIntrospectionList } from './list.ts';
+import { nodeMatchesSelector, toSelector } from './node-selector.ts';
+import { createIntrospectionList } from './node-list.ts';
 
 export type SnapshotReader = {
     readonly currentSnapshot: IntrospectionSnapshot;

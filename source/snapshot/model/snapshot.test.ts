@@ -5,9 +5,9 @@ import type {
     IntrospectionOptions,
     IntrospectionView
 } from '../../public/public-types.ts';
-import { createIntrospectionDiagnostics } from '../../diagnostics/diagnostics.ts';
-import { createIntrospectionReconcilerModule } from '../../reconciler/root/reconciler.ts';
-import { createIntrospectionRenderElement } from '../../render/frame/frame.ts';
+import { createIntrospectionDiagnostics } from '../../diagnostics/render-diagnostics.ts';
+import { createIntrospectionReconcilerModule } from '../../reconciler/root/root-lifecycle.ts';
+import { createIntrospectionRenderElement } from '../../render/frame/element-frames.ts';
 import { createFrameDepth } from '../../render/frame/frame-depth.ts';
 import { createUnitRuntimeDependencies } from '../../reconciler/scheduling/runtime-dependencies.test.ts';
 import { createUnitIntrospectionView } from '../../runtime/view/unit-view.test.ts';

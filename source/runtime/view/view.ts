@@ -3,20 +3,20 @@ import {
     createIntrospectionDiagnostics,
     type IntrospectionConsoleDiagnostics,
     type IntrospectionDiagnosticsOptions
-} from '../../diagnostics/diagnostics.ts';
+} from '../../diagnostics/render-diagnostics.ts';
 import { createFrameDepth } from '../../render/frame/frame-depth.ts';
-import { createIntrospectionRenderElement } from '../../render/frame/frame.ts';
+import { createIntrospectionRenderElement } from '../../render/frame/element-frames.ts';
 import {
     createIntrospectionListLocator,
     createIntrospectionLocator
-} from '../query/locator.ts';
+} from '../query/node-locator.ts';
 import {
     createSnapshotQuery,
     type SnapshotQuery,
     type SnapshotReader
-} from '../query/node.ts';
+} from '../query/snapshot-query.ts';
 import type { IntrospectionOptions } from '../../public/public-types.ts';
-import type { IntrospectionReconcilerModule } from '../../reconciler/root/reconciler.ts';
+import type { IntrospectionReconcilerModule } from '../../reconciler/root/root-lifecycle.ts';
 import type { RuntimeIntrospectionNode, RuntimeIntrospectionView } from '../types/runtime-types.ts';
 import {
     createEmptyIntrospectionSnapshot

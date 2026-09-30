@@ -6,7 +6,7 @@ import {
     createIntrospectionDiagnostics,
     type IntrospectionConsoleDiagnostics,
     type IntrospectionDiagnostics
-} from './diagnostics.ts';
+} from './render-diagnostics.ts';
 import { createNodeConsoleDiagnostics } from './node-console-diagnostics.ts';
 
 type ConsoleDiagnosticPublisher = {

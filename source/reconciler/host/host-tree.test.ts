@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import type { IntrospectionSnapshot } from '../../snapshot/model/snapshot-contract.ts';
-import { createIntrospectionReconcilerRuntime } from '../root/reconciler-runtime.ts';
+import { createIntrospectionReconcilerRuntime } from '../scheduling/runtime-scoped-scheduling.ts';
 import {
     createHostContainer,
     createIntrospectionHostConfig,

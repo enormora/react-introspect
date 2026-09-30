@@ -5,12 +5,12 @@ import type {
     IntrospectionNode,
     IntrospectionOptions,
     IntrospectionView
-} from '../../public/public-types.ts';
-import { createUnitIntrospectionView } from '../../runtime/view/unit-view.test.ts';
+} from '../public/public-types.ts';
+import { createUnitIntrospectionView } from '../runtime/view/unit-view.test.ts';
 import {
     createIdNormalizer,
     normalizeSnapshotValue
-} from '../../snapshot/normalization/id-normalization.ts';
+} from '../snapshot/normalization/id-normalization.ts';
 
 type LabelHostSchema = {
     readonly label: {

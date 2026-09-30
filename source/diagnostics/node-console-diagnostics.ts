@@ -1,4 +1,4 @@
-import type { IntrospectionConsoleDiagnostics } from './diagnostics.ts';
+import type { IntrospectionConsoleDiagnostics } from './render-diagnostics.ts';
 
 type ConsoleDiagnosticRecorder = (message: unknown) => void;
 

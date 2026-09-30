@@ -3,7 +3,7 @@ import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 // eslint-disable-next-line import/extensions -- react-reconciler has no exports map, so Node needs the file name
 import { DefaultEventPriority, DiscreteEventPriority, NoEventPriority } from 'react-reconciler/constants.js';
-import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/diagnostics.ts';
+import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/render-diagnostics.ts';
 import type {
     IntrospectionNodeState,
     IntrospectionOptions,
@@ -14,7 +14,7 @@ import { createUnitRuntimeDependencies } from '../scheduling/runtime-dependencie
 import { createUnitIntrospectionView } from '../../runtime/view/unit-view.test.ts';
 import {
     createIntrospectionReconcilerRuntime
-} from './reconciler-runtime.ts';
+} from '../scheduling/runtime-scoped-scheduling.ts';
 
 type HostSchema = {
     readonly main: {

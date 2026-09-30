@@ -4,14 +4,14 @@ import {
     type IntrospectionRefHostTarget,
     resolveIntrospectionRef,
     validateIntrospectionRefs
-} from '../../refs/ref.ts';
+} from '../../refs/ref-matching.ts';
 import {
     createEmptyIntrospectionSnapshot,
     type IntrospectionSnapshot,
     type SnapshotSourceNode
 } from '../../snapshot/model/snapshot-contract.ts';
-import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/snapshot.ts';
-import { toSnapshotSourceNodes, toSourceOutput } from '../../snapshot/model/snapshot-source-mapping.ts';
+import { createIntrospectionSnapshotFromSource } from '../../snapshot/model/snapshot-builder.ts';
+import { toSnapshotSourceNodes, toSourceOutput } from '../../snapshot/model/source-mapping.ts';
 import type { IntrospectionIdNormalization } from '../../snapshot/normalization/id-normalization.ts';
 
 type ProjectedHostProps = Readonly<Record<PropertyKey, unknown>>;

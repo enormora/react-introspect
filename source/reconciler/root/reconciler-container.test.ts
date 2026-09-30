@@ -2,7 +2,7 @@ import { suite, test } from '@overkill-dev/test';
 import { noHostTimeout } from '../host/host-tree.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/runtime-dependencies-types.ts';
 import { createUnitRuntimeDependencies } from '../scheduling/runtime-dependencies.test.ts';
-import { flushScheduledWork } from './react-root.ts';
+import { flushScheduledWork } from './reconciler-container.ts';
 
 type CountedRuntime = {
     readonly readMacrotaskCount: () => number;

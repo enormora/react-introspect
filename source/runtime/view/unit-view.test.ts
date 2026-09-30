@@ -1,8 +1,8 @@
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
-import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/diagnostics.ts';
+import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/render-diagnostics.ts';
 import type { IntrospectionOptions } from '../../public/public-types.ts';
-import { createIntrospectionReconcilerModule } from '../../reconciler/root/reconciler.ts';
+import { createIntrospectionReconcilerModule } from '../../reconciler/root/root-lifecycle.ts';
 import type { RuntimeIntrospectionView } from '../types/runtime-types.ts';
 import type { IntrospectionRuntimeDependencies } from '../../reconciler/scheduling/runtime-dependencies-types.ts';
 import { createUnitRuntimeDependencies } from '../../reconciler/scheduling/runtime-dependencies.test.ts';

@@ -9,7 +9,7 @@ import {
 } from '../host/host-tree.ts';
 import { isObject } from '../../values/value-kinds.ts';
 import type { IntrospectionRuntimeDependencies } from '../scheduling/runtime-dependencies-types.ts';
-import { createIntrospectionReconcilerRuntime } from './reconciler-runtime.ts';
+import { createIntrospectionReconcilerRuntime } from '../scheduling/runtime-scoped-scheduling.ts';
 
 export type ReconcilerRootErrorRecorders = {
     readonly recordCaughtError: (cause: unknown) => void;

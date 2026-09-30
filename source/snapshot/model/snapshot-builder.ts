@@ -22,8 +22,8 @@ import {
     type SnapshotSourceNode,
     type SnapshotSourceRenderStatus
 } from './snapshot-contract.ts';
-import { hiddenByFromSource, renderFromSource } from './snapshot-render.ts';
-import { toSourceElement } from './snapshot-source-mapping.ts';
+import { hiddenByFromSource, renderFromSource } from './render-state.ts';
+import { toSourceElement } from './source-mapping.ts';
 
 type SnapshotNodeDescription = Pick<SnapshotNode, Exclude<keyof SnapshotNode, 'id'>>;
 

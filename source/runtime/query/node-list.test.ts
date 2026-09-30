@@ -1,6 +1,6 @@
 import { suite, test } from '@overkill-dev/test';
 import type { RuntimeIntrospectionNode } from '../types/runtime-types.ts';
-import { createIntrospectionList } from './list.ts';
+import { createIntrospectionList } from './node-list.ts';
 
 function createNode(name: string, textContent: string): RuntimeIntrospectionNode {
     return {

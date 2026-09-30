@@ -2,8 +2,8 @@ import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionSelector } from '../../public/public-types.ts';
 import type { RuntimeIntrospectionNode } from '../types/runtime-types.ts';
-import { createIntrospectionList } from './list.ts';
-import { nodeMatchesSelector, toSelector } from './selector.ts';
+import { createIntrospectionList } from './node-list.ts';
+import { nodeMatchesSelector, toSelector } from './node-selector.ts';
 
 function Label(): React.ReactNode {
     return null;

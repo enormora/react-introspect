@@ -2,7 +2,7 @@ import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import type { IntrospectionFakeRefNode } from '../public/public-types.ts';
 import { createUnitIntrospectionView as introspect } from '../runtime/view/unit-view.test.ts';
-import { createFakeRefNode, matchRefs } from './ref.ts';
+import { createFakeRefNode, matchRefs } from './ref-matching.ts';
 
 type FocusNode = {
     readonly focus: () => void;
