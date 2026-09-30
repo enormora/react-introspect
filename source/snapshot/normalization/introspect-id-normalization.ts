@@ -75,13 +75,11 @@ export function normalizeSnapshotProps(
     props: Readonly<Record<PropertyKey, unknown>>,
     normalization: SnapshotPropsNormalization
 ): Readonly<Record<PropertyKey, unknown>> {
-    const normalized: Record<PropertyKey, unknown> = {};
-
-    for (const key of Reflect.ownKeys(props)) {
-        normalized[key] = normalizeSnapshotProp(props[key], normalization, String(key));
-    }
-
-    return Object.freeze(normalized);
+    return Object.freeze(Object.fromEntries(
+        Reflect.ownKeys(props).map(function normalizeEntry(key) {
+            return [ key, normalizeSnapshotProp(props[key], normalization, String(key)) ];
+        })
+    ));
 }
 
 export function normalizeSnapshotValue(value: unknown, normalizeIdString: (value: string) => string): unknown {

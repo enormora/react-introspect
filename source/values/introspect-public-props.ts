@@ -3,13 +3,11 @@ type Props = Readonly<Record<PropertyKey, unknown>>;
 const reactReservedPropKeys = new Set<PropertyKey>([ 'children', 'key', 'ref' ]);
 
 export function readPublicProps(props: Props, internalKeys: ReadonlySet<PropertyKey>): Props {
-    const publicProps: Record<PropertyKey, unknown> = {};
+    const publicKeys = Reflect.ownKeys(props).filter(function isPublicKey(key) {
+        return !reactReservedPropKeys.has(key) && !internalKeys.has(key);
+    });
 
-    for (const key of Reflect.ownKeys(props)) {
-        if (!reactReservedPropKeys.has(key) && !internalKeys.has(key)) {
-            publicProps[key] = props[key];
-        }
-    }
-
-    return Object.freeze(publicProps);
+    return Object.freeze(Object.fromEntries(publicKeys.map(function readPublicEntry(key) {
+        return [ key, props[key] ];
+    })));
 }
