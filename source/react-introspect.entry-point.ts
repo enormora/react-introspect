@@ -7,18 +7,18 @@ import type {
     IntrospectionRefMatcher,
     IntrospectionRefRule,
     IntrospectionView
-} from './public/introspect-public-types.js';
+} from './public/public-types.js';
 import {
     createFakeRefNode as createFakeRefNodeImplementation,
     matchRefs as matchRefsImplementation
-} from './refs/introspect-ref.ts';
-import { createNodeConsoleDiagnostics } from './diagnostics/introspect-node-console-diagnostics.ts';
-import { createIntrospectionReconcilerModule } from './reconciler/root/introspect-reconciler.ts';
-import type { RuntimeIntrospectionView } from './runtime/types/introspect-runtime-types.ts';
+} from './refs/ref.ts';
+import { createNodeConsoleDiagnostics } from './diagnostics/node-console-diagnostics.ts';
+import { createIntrospectionReconcilerModule } from './reconciler/root/reconciler.ts';
+import type { RuntimeIntrospectionView } from './runtime/types/runtime-types.ts';
 import {
     createNodeRuntimeDependencies
-} from './reconciler/scheduling/introspect-node-runtime-dependencies.entry-point.ts';
-import { createIntrospectionViewModule } from './runtime/view/introspect-view.ts';
+} from './reconciler/scheduling/node-runtime-dependencies.entry-point.ts';
+import { createIntrospectionViewModule } from './runtime/view/view.ts';
 
 const nodeConsoleDiagnostics = createNodeConsoleDiagnostics(diagnosticsChannel);
 const runtimeDependencies = createNodeRuntimeDependencies();
@@ -51,7 +51,7 @@ export type {
     IntrospectionView,
     IntrospectionWarning,
     RenderedChildren
-} from './public/introspect-public-types.js';
+} from './public/public-types.js';
 
 export function introspect<HostSchema extends IntrospectionHostSchema = IntrospectionHostSchema>(
     element: React.ReactElement,

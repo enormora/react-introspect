@@ -16,11 +16,11 @@ import type {
     IntrospectionView,
     IntrospectionWarning,
     RenderedChildren
-} from './public/introspect-public-types.ts';
+} from './public/public-types.ts';
 import {
     createFakeRefNode,
     matchRefs
-} from './refs/introspect-ref.ts';
+} from './refs/ref.ts';
 import {
     createIntrospect,
     introspect
