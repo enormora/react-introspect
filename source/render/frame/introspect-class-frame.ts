@@ -58,11 +58,18 @@ type IntrospectionClassRender = {
     readonly state: unknown;
 };
 
-type IntrospectionClassRenderPass = {
+type IntrospectionClassMountOrSkippedRenderPass = {
+    readonly kind: 'mount' | 'skippedUpdate';
     readonly next: IntrospectionClassRender;
-    readonly previous: IntrospectionClassRender | undefined;
-    readonly shouldUpdate: boolean;
 };
+
+type IntrospectionClassUpdateRenderPass = {
+    readonly kind: 'update';
+    readonly next: IntrospectionClassRender;
+    readonly previous: IntrospectionClassRender;
+};
+
+type IntrospectionClassRenderPass = IntrospectionClassMountOrSkippedRenderPass | IntrospectionClassUpdateRenderPass;
 
 function isErrorBoundary(type: IntrospectionClassComponent): boolean {
     return typeof type.getDerivedStateFromError === 'function' ||
@@ -243,7 +250,7 @@ const IntrospectionClassFrameBase = class
         this.commitRenderPass();
         applyElementRef(readElementRef(this.props.element), this.userInstance);
 
-        if (renderPass?.shouldUpdate === true && renderPass.previous !== undefined) {
+        if (renderPass?.kind === 'update') {
             this.userInstance.componentDidUpdate?.(renderPass.previous.props, renderPass.previous.state, snapshot);
         }
     }
@@ -251,7 +258,7 @@ const IntrospectionClassFrameBase = class
     public override getSnapshotBeforeUpdate(): unknown {
         const { renderPass } = this;
 
-        if (renderPass?.shouldUpdate !== true || renderPass.previous === undefined) {
+        if (renderPass?.kind !== 'update') {
             return null;
         }
 
@@ -296,23 +303,25 @@ const IntrospectionClassFrameBase = class
     ): IntrospectionClassRenderPass {
         const previous = this.committedRender;
 
-        if (previous !== undefined) {
-            this.showUserInstance(previous.props, previous.state);
+        if (previous === undefined) {
+            this.showUserInstance(props, state);
+
+            return { kind: 'mount', next: { node: this.renderUserOutput(), props, state } };
         }
 
-        const shouldUpdate = previous === undefined || this.shouldRender(previous, props, state);
+        this.showUserInstance(previous.props, previous.state);
+
+        const shouldUpdate = this.shouldRender(previous, props, state);
 
         this.showUserInstance(props, state);
 
-        return {
-            next: {
-                node: shouldUpdate || isCapturing(this.state.caught) ? this.renderUserOutput() : previous.node,
-                props,
-                state
-            },
-            previous,
-            shouldUpdate
+        const next = {
+            node: shouldUpdate || isCapturing(this.state.caught) ? this.renderUserOutput() : previous.node,
+            props,
+            state
         };
+
+        return shouldUpdate ? { kind: 'update', next, previous } : { kind: 'skippedUpdate', next };
     }
 
     protected showUserInstance(props: Readonly<Record<PropertyKey, unknown>>, state: unknown): void {
