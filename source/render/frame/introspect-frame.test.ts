@@ -208,6 +208,15 @@ function GivenLeaf(props: React.PropsWithChildren): React.ReactNode {
     return React.createElement('div', null, props.children);
 }
 
+function NumericTextRoot(): React.ReactNode {
+    return React.createElement(
+        'section',
+        null,
+        React.createElement(GivenLeaf, null, 7n, 42),
+        React.createElement('main', null, 7n, 42)
+    );
+}
+
 function GivenChildrenRoot(): React.ReactNode {
     return React.createElement(
         GivenLeaf,
@@ -649,6 +658,27 @@ export const testNode = suite('execution shallow function components', [
         });
 
         scope.assert.equal(view.textContent, '9007199254740993');
+
+        return scope.assert.collect();
+    }),
+    test('stores number and bigint text in given children as the text React renders', function (scope) {
+        const view = introspect(React.createElement(NumericTextRoot), { strictMode: false });
+        const leaf = requireValue(view.find(GivenLeaf));
+        const main = requireValue(view.find('main'));
+
+        function readTextValue(node: IntrospectionNode): unknown {
+            const { props } = node;
+
+            return typeof props === 'object' && props !== null ? Reflect.get(props, 'value') : undefined;
+        }
+
+        scope.assert.deepEqual(
+            {
+                given: Array.from(leaf.givenChildren, readTextValue),
+                rendered: Array.from(main.findAll('#text'), readTextValue)
+            },
+            { given: [ '7', '42' ], rendered: [ '7', '42' ] }
+        );
 
         return scope.assert.collect();
     }),

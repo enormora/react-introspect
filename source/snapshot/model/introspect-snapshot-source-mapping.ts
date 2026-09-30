@@ -49,7 +49,7 @@ function toSourceNode(node: unknown): SnapshotSourceNode {
     }
 
     if (typeof node === 'string' || typeof node === 'number' || typeof node === 'bigint') {
-        return { kind: 'text', value: node, hostVisibility: 'visible' };
+        return { kind: 'text', value: String(node), hostVisibility: 'visible' };
     }
 
     return React.isValidElement<SnapshotProps>(node)
