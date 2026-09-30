@@ -26,7 +26,7 @@ import {
     type SnapshotRender,
     type SnapshotSourceElement,
     type SnapshotSourceNode,
-    type SnapshotSourceOutput,
+    type SnapshotSourceRenderStatus,
     type SnapshotVisibility
 } from './introspect-snapshot-contract.ts';
 import { toSourceElement } from './introspect-snapshot-source-mapping.ts';
@@ -107,17 +107,13 @@ const notRenderedFromSource: Readonly<
     }
 };
 
-function readNotRenderedReason(output: SnapshotSourceOutput): IntrospectionNotRenderedReason | undefined {
-    return output.status === 'notRendered' ? output.reason : undefined;
-}
-
 function renderFromSource(
-    renderedReason: IntrospectionNotRenderedReason | undefined,
+    renderStatus: SnapshotSourceRenderStatus,
     hiddenBy: IntrospectionHiddenReason | undefined
 ): SnapshotRender {
-    return renderedReason === undefined
+    return renderStatus.status === 'rendered'
         ? { ...placementFromSource(hiddenBy), status: 'rendered' }
-        : notRenderedFromSource[renderedReason](hiddenBy);
+        : notRenderedFromSource[renderStatus.reason](hiddenBy);
 }
 
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
@@ -152,7 +148,7 @@ type SnapshotLeafKind = Exclude<SnapshotSourceNode['kind'], 'element'>;
 type SnapshotLeafDescription = {
     readonly name: string;
     readonly readTextContent: (request: LeafNodeRequest) => string;
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+    readonly renderStatus: SnapshotSourceRenderStatus;
     readonly type: string;
 };
 
@@ -164,13 +160,13 @@ const snapshotLeafDescriptions: Readonly<Record<SnapshotLeafKind, SnapshotLeafDe
     empty: {
         name: '#empty',
         readTextContent: readNoTextContent,
-        renderedReason: undefined,
+        renderStatus: { status: 'rendered' },
         type: '#empty'
     },
     opaque: {
         name: 'Opaque',
         readTextContent: readNoTextContent,
-        renderedReason: 'unsupported',
+        renderStatus: { reason: 'unsupported', status: 'notRendered' },
         type: 'opaque'
     },
     text: {
@@ -178,7 +174,7 @@ const snapshotLeafDescriptions: Readonly<Record<SnapshotLeafKind, SnapshotLeafDe
         readTextContent(request) {
             return request.build.normalizeIdString(String(request.value));
         },
-        renderedReason: undefined,
+        renderStatus: { status: 'rendered' },
         type: '#text'
     }
 };
@@ -199,7 +195,7 @@ function createLeafSnapshotNode(kind: SnapshotLeafKind, request: LeafNodeRequest
             props: Object.freeze({
                 value: normalizeSnapshotValue(request.value, request.build.normalizeIdString)
             }),
-            render: renderFromSource(description.renderedReason, request.inheritedHiddenBy),
+            render: renderFromSource(description.renderStatus, request.inheritedHiddenBy),
             renderedChildren: Object.freeze([]),
             textContent: description.readTextContent(request),
             type: description.type
@@ -251,7 +247,7 @@ const snapshotOperations = {
                 parentId: request.parentId,
                 path,
                 props: snapshotProps,
-                render: renderFromSource(readNotRenderedReason(request.element.output), hiddenBy),
+                render: renderFromSource(request.element.output, hiddenBy),
                 renderedChildren,
                 textContent: getTextContent(visibleChildren),
                 type: request.element.type

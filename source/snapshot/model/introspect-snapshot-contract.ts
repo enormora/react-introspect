@@ -33,6 +33,8 @@ type SnapshotSourceNotRenderedOutput = {
 
 export type SnapshotSourceOutput = SnapshotSourceNotRenderedOutput | SnapshotSourceRenderedOutput;
 
+export type SnapshotSourceRenderStatus = SnapshotSourceNotRenderedOutput | { readonly status: 'rendered'; };
+
 export type SnapshotSourceElement = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly kind: 'element';

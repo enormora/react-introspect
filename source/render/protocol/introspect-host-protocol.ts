@@ -14,13 +14,21 @@ const introspectionComponentMetadata = '__reactIntrospectionComponentMetadata';
 const introspectionElementKeyMetadata = '__reactIntrospectionElementKeyMetadata';
 const introspectionValueMetadata = '__reactIntrospectionValueMetadata';
 
+type ComponentNotRenderedStatus = { readonly reason: IntrospectionNotRenderedReason; readonly status: 'notRendered'; };
+
+type ComponentRenderedStatus = { readonly status: 'rendered'; };
+
+type ComponentRenderStatus = ComponentNotRenderedStatus | ComponentRenderedStatus;
+
+const renderedStatus: ComponentRenderedStatus = { status: 'rendered' };
+
 type IntrospectionComponentMetadata = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly caughtError: IntrospectionError | undefined;
     readonly givenChildren: unknown;
     readonly key: string | null;
     readonly props: Readonly<Record<PropertyKey, unknown>>;
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+    readonly renderStatus: ComponentRenderStatus;
     readonly type: unknown;
 };
 
@@ -37,7 +45,7 @@ const unsupportedComponentMetadata: IntrospectionComponentMetadata = {
     givenChildren: undefined,
     key: null,
     props: {},
-    renderedReason: 'unsupported',
+    renderStatus: { reason: 'unsupported', status: 'notRendered' },
     type: introspectionComponentHostType
 };
 
@@ -51,11 +59,11 @@ type ComponentMetadataRequest = {
     readonly activityMode: 'hidden' | 'visible' | undefined;
     readonly caughtError: IntrospectionError | undefined;
     readonly element: EncodedElement;
-    readonly renderedReason: IntrospectionNotRenderedReason | undefined;
+    readonly renderStatus: ComponentRenderStatus;
 };
 
 function createComponentMetadata(request: ComponentMetadataRequest): IntrospectionComponentMetadata {
-    const { activityMode, caughtError, element, renderedReason } = request;
+    const { activityMode, caughtError, element, renderStatus } = request;
     const { props } = element;
 
     assertSupportedReactValue(props.children);
@@ -66,7 +74,7 @@ function createComponentMetadata(request: ComponentMetadataRequest): Introspecti
         givenChildren: props.children,
         key: element.key,
         props: readPublicProps(props, internalPropKeys),
-        renderedReason,
+        renderStatus,
         type: element.type
     };
 
@@ -100,7 +108,7 @@ export function createExecutedComponentHost(element: EncodedElement, children: R
             activityMode: undefined,
             caughtError: undefined,
             element,
-            renderedReason: undefined
+            renderStatus: renderedStatus
         }),
         children
     );
@@ -112,7 +120,7 @@ export function createActivityComponentHost(
     children: React.ReactNode
 ): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata({ activityMode, caughtError: undefined, element, renderedReason: undefined }),
+        createComponentMetadata({ activityMode, caughtError: undefined, element, renderStatus: renderedStatus }),
         children
     );
 }
@@ -123,17 +131,22 @@ export function createCaughtErrorComponentHost(
     children: React.ReactNode
 ): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata({ activityMode: undefined, caughtError, element, renderedReason: undefined }),
+        createComponentMetadata({ activityMode: undefined, caughtError, element, renderStatus: renderedStatus }),
         children
     );
 }
 
 export function createUnexecutedComponentHost(
     element: EncodedElement,
-    renderedReason: IntrospectionNotRenderedReason
+    reason: IntrospectionNotRenderedReason
 ): React.ReactElement {
     return createComponentHost(
-        createComponentMetadata({ activityMode: undefined, caughtError: undefined, element, renderedReason }),
+        createComponentMetadata({
+            activityMode: undefined,
+            caughtError: undefined,
+            element,
+            renderStatus: { reason, status: 'notRendered' }
+        }),
         createEmptyHost(undefined)
     );
 }

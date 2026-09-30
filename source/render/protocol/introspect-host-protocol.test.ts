@@ -42,7 +42,7 @@ export const testNode = suite('introspection host protocol', [
             givenChildren: 'Save',
             key: 'save',
             props: { title: 'Save' },
-            renderedReason: undefined,
+            renderStatus: { status: 'rendered' },
             type: 'button'
         });
 
@@ -59,7 +59,7 @@ export const testNode = suite('introspection host protocol', [
             givenChildren: undefined,
             key: null,
             props: {},
-            renderedReason: undefined,
+            renderStatus: { status: 'rendered' },
             type: 'span'
         });
 
@@ -77,7 +77,7 @@ export const testNode = suite('introspection host protocol', [
             givenChildren: undefined,
             key: null,
             props: {},
-            renderedReason: undefined,
+            renderStatus: { status: 'rendered' },
             type: 'span'
         });
 
@@ -92,7 +92,7 @@ export const testNode = suite('introspection host protocol', [
             givenChildren: undefined,
             key: null,
             props: {},
-            renderedReason: 'depth',
+            renderStatus: { reason: 'depth', status: 'notRendered' },
             type: 'span'
         });
 
@@ -120,11 +120,11 @@ export const testNode = suite('introspection host protocol', [
             })
         );
         const decoded = readInternalHost(componentHost.type, forgedProps);
+        const decodedRenderStatus: unknown = decoded.kind === 'component'
+            ? decoded.metadata.renderStatus
+            : decoded.kind;
 
-        scope.assert.equal(
-            decoded.kind === 'component' ? decoded.metadata.renderedReason : decoded.kind,
-            'unsupported'
-        );
+        scope.assert.deepEqual(decodedRenderStatus, { reason: 'unsupported', status: 'notRendered' });
 
         return scope.assert.collect();
     })

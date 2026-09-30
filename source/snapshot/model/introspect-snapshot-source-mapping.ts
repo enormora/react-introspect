@@ -2,12 +2,12 @@ import React from 'react';
 import { getElementKind } from '../shape/introspect-snapshot-shape.ts';
 import { readPublicProps } from '../../values/introspect-public-props.ts';
 import { isEmptyReactNode, isIterable } from '../../values/introspect-value-kinds.ts';
-import type { IntrospectionNotRenderedReason } from '../../public/introspect-public-types.ts';
 import type {
     SnapshotProps,
     SnapshotSourceElement,
     SnapshotSourceNode,
-    SnapshotSourceOutput
+    SnapshotSourceOutput,
+    SnapshotSourceRenderStatus
 } from './introspect-snapshot-contract.ts';
 
 const noInternalPropKeys = new Set<PropertyKey>();
@@ -62,10 +62,8 @@ export function toSnapshotSourceNodes(children: unknown): readonly SnapshotSourc
 }
 
 export function toSourceOutput(
-    renderedReason: IntrospectionNotRenderedReason | undefined,
+    renderStatus: SnapshotSourceRenderStatus,
     children: readonly SnapshotSourceNode[]
 ): SnapshotSourceOutput {
-    return renderedReason === undefined
-        ? { children, status: 'rendered' }
-        : { reason: renderedReason, status: 'notRendered' };
+    return renderStatus.status === 'rendered' ? { children, status: 'rendered' } : renderStatus;
 }
