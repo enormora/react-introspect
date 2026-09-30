@@ -73,11 +73,7 @@ type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
     readonly parentId: number;
 };
 
-type PropsSnapshotRequest = {
-    readonly build: SnapshotBuilder;
-    readonly inheritedHiddenBy: IntrospectionHiddenReason | undefined;
-    readonly ownerId: number;
-    readonly ownerPath: string;
+type PropsSnapshotRequest = SnapshotChildPlacement & {
     readonly props: SnapshotProps;
 };
 
@@ -242,10 +238,7 @@ const snapshotOperations = {
             });
             const visibleChildren = renderedChildren.length > 0 ? renderedChildren : givenChildren;
             const snapshotProps = snapshotOperations.createPropsSnapshot({
-                build: request.build,
-                inheritedHiddenBy: hiddenBy,
-                ownerId: id,
-                ownerPath: path,
+                ...childPlacement,
                 props: request.element.props
             });
 
@@ -267,14 +260,13 @@ const snapshotOperations = {
         });
     },
     createPropsSnapshot(request: PropsSnapshotRequest): SnapshotProps {
-        return request.build.normalizeProps(request.props, function describeElement(element, location) {
+        const { props, ...placement } = request;
+
+        return placement.build.normalizeProps(props, function describeElement(element, location) {
             return snapshotOperations.createSourceElementSnapshotNode({
-                build: request.build,
+                ...placement,
                 element: toSourceElement(element),
-                index: location,
-                inheritedHiddenBy: request.inheritedHiddenBy,
-                parentId: request.ownerId,
-                parentPath: request.ownerPath
+                index: location
             });
         });
     },
