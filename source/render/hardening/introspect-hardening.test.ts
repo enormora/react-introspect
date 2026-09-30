@@ -237,6 +237,28 @@ export const testNode = suite('unsupported React concepts and hardening', [
 
         return scope.assert.collect();
     }),
+    test('reports portal output under a boundary before ref shorthands its fallback cannot satisfy', function (scope) {
+        scope.assert.throws(
+            function () {
+                introspect(
+                    React.createElement(
+                        CatchAllBoundary,
+                        null,
+                        React.createElement('input', { ref: React.createRef() }),
+                        React.createElement(PortalOutput)
+                    ),
+                    {
+                        depth: 'full',
+                        refs: { input: createFakeRefNode({ tag: 'input' }) },
+                        strictMode: false
+                    }
+                );
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
     test('fails clearly for an ambiguous ref rule under an error boundary', function (scope) {
         const inputNode = createFakeRefNode({ tag: 'input' });
 

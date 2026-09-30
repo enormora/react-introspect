@@ -105,6 +105,11 @@ function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, co
 
     target.container.beginCommit(mounted);
     commitElement();
+
+    if (target.diagnostics.holdsUsageError()) {
+        return;
+    }
+
     target.container.validateRefs();
     captureMissingInitialCommit(target, renderCountBefore);
 }

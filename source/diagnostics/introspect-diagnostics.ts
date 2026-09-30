@@ -23,6 +23,7 @@ export type IntrospectionDiagnostics = {
     readonly uncaughtErrors: readonly IntrospectionError[];
     readonly warnings: readonly IntrospectionWarning[];
     readonly holdUsageError: (error: TypeError) => void;
+    readonly holdsUsageError: () => boolean;
     readonly recordCaughtError: (cause: unknown) => void;
     readonly recordRecoverableError: (cause: unknown) => void;
     readonly recordUncaughtError: (cause: unknown) => void;
@@ -41,6 +42,7 @@ type ThrownFailure = ThrownDiagnosticFailure | ThrownUsageFailure;
 type ThrownDiagnostics = {
     readonly hold: (diagnostic: ThrownDiagnostic) => void;
     readonly holdUsageError: (error: TypeError) => void;
+    readonly holdsUsageError: () => boolean;
     readonly run: <Result>(context: IntrospectionDiagnosticsContext, action: () => Result) => Result;
     readonly runAsync: <Result>(
         context: IntrospectionDiagnosticsContext,
@@ -50,6 +52,7 @@ type ThrownDiagnostics = {
 
 type FailureQueue = {
     readonly hold: (failure: ThrownFailure) => void;
+    readonly read: () => readonly ThrownFailure[];
     readonly take: () => readonly ThrownFailure[];
 };
 
@@ -57,6 +60,7 @@ type OperationWindow = {
     readonly close: () => readonly ThrownFailure[];
     readonly hold: (failure: ThrownFailure) => void;
     readonly isOpen: () => boolean;
+    readonly read: () => readonly ThrownFailure[];
 };
 
 type DiagnosticsScope = {
@@ -102,6 +106,9 @@ function createFailureQueue(): FailureQueue {
                 failure
             ];
         },
+        read() {
+            return held;
+        },
         take() {
             const taken = held;
 
@@ -125,7 +132,8 @@ function createOperationWindow(): OperationWindow {
         hold: queue.hold,
         isOpen() {
             return open;
-        }
+        },
+        read: queue.read
     };
 }
 
@@ -141,16 +149,14 @@ function createThrownDiagnostics(): ThrownDiagnostics {
     const owner = Object.freeze({});
     const betweenOperations = createFailureQueue();
 
-    function hold(failure: ThrownFailure): void {
+    function readOpenWindow(): OperationWindow | undefined {
         const scope = storage.getStore();
 
-        if (scope?.owner === owner && scope.window.isOpen()) {
-            scope.window.hold(failure);
+        return scope?.owner === owner && scope.window.isOpen() ? scope.window : undefined;
+    }
 
-            return;
-        }
-
-        betweenOperations.hold(failure);
+    function hold(failure: ThrownFailure): void {
+        (readOpenWindow() ?? betweenOperations).hold(failure);
     }
 
     function settleOperation(window: OperationWindow): void {
@@ -163,6 +169,9 @@ function createThrownDiagnostics(): ThrownDiagnostics {
         },
         holdUsageError(error) {
             hold({ error, kind: 'usage' });
+        },
+        holdsUsageError() {
+            return readOpenWindow()?.read().some(isUsageFailure) === true;
         },
         run(context, action) {
             const window = createOperationWindow();
@@ -309,6 +318,7 @@ export function createIntrospectionDiagnostics(
             return warnings;
         },
         holdUsageError: thrownDiagnostics.holdUsageError,
+        holdsUsageError: thrownDiagnostics.holdsUsageError,
         recordCaughtError(cause) {
             caughtErrors = Object.freeze([
                 ...caughtErrors,
