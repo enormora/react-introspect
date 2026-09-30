@@ -55,33 +55,7 @@ type SessionRenderTarget = {
     readonly container: IntrospectionHostContainerControl;
     readonly diagnostics: IntrospectionDiagnostics;
     readonly readRenderCount: () => number;
-    readonly usageErrors: UsageErrorRelay;
 };
-
-type UsageErrorRelay = {
-    readonly hold: (error: TypeError) => void;
-    readonly rethrow: () => void;
-};
-
-function createUsageErrorRelay(): UsageErrorRelay {
-    let heldError: TypeError | null = null;
-
-    return {
-        hold(error) {
-            if (heldError === null) {
-                heldError = error;
-            }
-        },
-        rethrow() {
-            if (heldError !== null) {
-                const error = heldError;
-
-                heldError = null;
-                throw error;
-            }
-        }
-    };
-}
 
 function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefore: number): void {
     const errorRenderCount = Math.max(target.readRenderCount(), renderCountBefore + 1);
@@ -91,7 +65,7 @@ function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefor
 
 function captureCaughtError(target: SessionRenderTarget, cause: unknown): void {
     if (isIntrospectionUsageError(cause)) {
-        target.usageErrors.hold(cause);
+        target.diagnostics.holdUsageError(cause);
 
         return;
     }
@@ -101,7 +75,7 @@ function captureCaughtError(target: SessionRenderTarget, cause: unknown): void {
 
 function captureUncaughtError(target: SessionRenderTarget, cause: unknown): void {
     if (isIntrospectionUsageError(cause)) {
-        target.usageErrors.hold(cause);
+        target.diagnostics.holdUsageError(cause);
 
         return;
     }
@@ -131,7 +105,11 @@ function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, co
 
     target.container.beginCommit(mounted);
     commitElement();
-    target.usageErrors.rethrow();
+
+    if (target.diagnostics.holdsUsageError()) {
+        return;
+    }
+
     target.container.validateRefs();
     captureMissingInitialCommit(target, renderCountBefore);
 }
@@ -162,8 +140,7 @@ function createIntrospectionReconcilerSession(
         diagnostics: options.diagnostics,
         readRenderCount() {
             return renderCount;
-        },
-        usageErrors: createUsageErrorRelay()
+        }
     };
     const root = createReconcilerContainer(runtime, container, {
         recordCaughtError(cause) {
@@ -175,21 +152,14 @@ function createIntrospectionReconcilerSession(
         }
     }, options.strictMode);
     async function flushUntilIdle(): Promise<void> {
-        await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-            await flushScheduledWork(runtime, root);
-            flushPassiveEffects(runtime, waiters.settle);
-            target.usageErrors.rethrow();
-        });
+        await flushScheduledWork(runtime, root);
+        flushPassiveEffects(runtime, waiters.settle);
     }
 
     const session: IntrospectionReconcilerSession = {
         act(action) {
             return options.diagnostics.run(function actWithDiagnostics() {
-                const result = dispatchDiscreteUpdate(runtime, action);
-
-                target.usageErrors.rethrow();
-
-                return result;
+                return dispatchDiscreteUpdate(runtime, action);
             });
         },
         readMounted: container.readMounted,
@@ -202,18 +172,22 @@ function createIntrospectionReconcilerSession(
             });
         },
         async waitForIdle() {
-            await withDeadline(runtime.clock, options.waitTimeout, 'waitForIdle', flushUntilIdle());
+            await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
+                await withDeadline(runtime.clock, options.waitTimeout, 'waitForIdle', flushUntilIdle());
+            });
         },
         async waitUntil(operation, predicate) {
-            if (options.diagnostics.run(predicate)) {
-                return;
-            }
+            await options.diagnostics.runAsync(async function waitUntilWithDiagnostics() {
+                if (predicate()) {
+                    return;
+                }
 
-            await waiters.waitUntil(predicate, {
-                clock: runtime.clock,
-                flushUntilIdle,
-                operation,
-                timeoutInMilliseconds: options.waitTimeout
+                await waiters.waitUntil(predicate, {
+                    clock: runtime.clock,
+                    flushUntilIdle,
+                    operation,
+                    timeoutInMilliseconds: options.waitTimeout
+                });
             });
         }
     };

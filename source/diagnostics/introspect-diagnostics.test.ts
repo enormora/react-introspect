@@ -362,6 +362,148 @@ export const testNode = suite('diagnostics', [
 
         return scope.assert.collect();
     }),
+    test('keeps the diagnostic of an async run when a concurrent run fails', async function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const gate = Promise.withResolvers<undefined>();
+        const pending = readAsyncError(diagnostics.runAsync(async function warnThenWait() {
+            diagnostics.recordRecoverableError(new Error('async warning'));
+            await gate.promise;
+        }));
+        const concurrentFailure = requireError(function runFailingOperation() {
+            diagnostics.run(function fail() {
+                throw new Error('operation failed');
+            });
+        });
+
+        gate.resolve(undefined);
+
+        const asyncError = await pending;
+
+        scope.assert.deepEqual(
+            { asyncError: asyncError.message, concurrentFailure: concurrentFailure.message },
+            { asyncError: 'async warning', concurrentFailure: 'operation failed' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('leaves the diagnostic of an async run to that run when a concurrent run succeeds', async function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const gate = Promise.withResolvers<undefined>();
+        const pending = readAsyncError(diagnostics.runAsync(async function warnThenWait() {
+            diagnostics.recordRecoverableError(new Error('async warning'));
+            await gate.promise;
+        }));
+        const concurrentOutcome = describeOutcome(function runOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        gate.resolve(undefined);
+
+        const asyncError = await pending;
+
+        scope.assert.deepEqual(
+            { asyncError: asyncError.message, concurrentOutcome },
+            { asyncError: 'async warning', concurrentOutcome: 'returned' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('throws a diagnostic from work that outlived its run from the next run', async function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const gate = Promise.withResolvers<undefined>();
+
+        async function warnAfterGate(): Promise<void> {
+            await gate.promise;
+            diagnostics.recordRecoverableError(new Error('late warning'));
+        }
+
+        const backgroundWork = diagnostics.run(warnAfterGate);
+
+        gate.resolve(undefined);
+        await backgroundWork;
+
+        const error = requireError(function runNextOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.equal(error.message, 'late warning');
+
+        return scope.assert.collect();
+    }),
+    test('keeps a diagnostic held inside the run of another view for its own next run', function (scope) {
+        const outer = createIsolatedDiagnostics('throw');
+        const inner = createIsolatedDiagnostics('throw');
+        const outerOutcome = describeOutcome(function runOuterOperation() {
+            outer.run(function warnOnInner() {
+                inner.recordRecoverableError(new Error('inner warning'));
+            });
+        });
+        const innerOutcome = describeOutcome(function runInnerOperation() {
+            inner.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.deepEqual(
+            { innerOutcome, outerOutcome },
+            { innerOutcome: 'threw: inner warning', outerOutcome: 'returned' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('throws a held usage error before a held diagnostic', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('throw');
+        const usageError = new TypeError('usage failed');
+        const error = requireError(function runOperation() {
+            diagnostics.run(function warnThenMisuse() {
+                diagnostics.recordRecoverableError(new Error('recoverable warning'));
+                diagnostics.holdUsageError(usageError);
+            });
+        });
+
+        scope.assert.equal(error, usageError);
+
+        return scope.assert.collect();
+    }),
+    test('keeps a usage error from a failing run out of later runs', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('capture');
+        const failure = requireError(function runFailingOperation() {
+            diagnostics.run(function misuseThenFail() {
+                diagnostics.holdUsageError(new TypeError('usage failed'));
+
+                throw new Error('operation failed');
+            });
+        });
+        const later = describeOutcome(function runLaterOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.deepEqual({ failure: failure.message, later }, { failure: 'operation failed', later: 'returned' });
+
+        return scope.assert.collect();
+    }),
+    test('throws a usage error held outside any run from the next run', function (scope) {
+        const diagnostics = createIsolatedDiagnostics('capture');
+        const usageError = new TypeError('usage failed');
+
+        diagnostics.holdUsageError(usageError);
+
+        const error = requireError(function runNextOperation() {
+            diagnostics.run(function doNothing() {
+                return undefined;
+            });
+        });
+
+        scope.assert.equal(error, usageError);
+
+        return scope.assert.collect();
+    }),
     test('throws the first of several diagnostics recorded in one run', function (scope) {
         const diagnostics = createIsolatedDiagnostics('throw');
         const error = requireError(function runWarningOperation() {

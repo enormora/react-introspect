@@ -22,6 +22,8 @@ export type IntrospectionDiagnostics = {
     readonly hasWarnings: boolean;
     readonly uncaughtErrors: readonly IntrospectionError[];
     readonly warnings: readonly IntrospectionWarning[];
+    readonly holdUsageError: (error: TypeError) => void;
+    readonly holdsUsageError: () => boolean;
     readonly recordCaughtError: (cause: unknown) => void;
     readonly recordRecoverableError: (cause: unknown) => void;
     readonly recordUncaughtError: (cause: unknown) => void;
@@ -31,13 +33,43 @@ export type IntrospectionDiagnostics = {
 
 type ThrownDiagnostic = IntrospectionError | IntrospectionWarning;
 
+type ThrownDiagnosticFailure = { readonly diagnostic: ThrownDiagnostic; readonly kind: 'diagnostic'; };
+
+type ThrownUsageFailure = { readonly error: TypeError; readonly kind: 'usage'; };
+
+type ThrownFailure = ThrownDiagnosticFailure | ThrownUsageFailure;
+
 type ThrownDiagnostics = {
     readonly hold: (diagnostic: ThrownDiagnostic) => void;
-    readonly run: <Result>(action: () => Result) => Result;
-    readonly runAsync: <Result>(action: () => Promise<Result>) => Promise<Result>;
+    readonly holdUsageError: (error: TypeError) => void;
+    readonly holdsUsageError: () => boolean;
+    readonly run: <Result>(context: IntrospectionDiagnosticsContext, action: () => Result) => Result;
+    readonly runAsync: <Result>(
+        context: IntrospectionDiagnosticsContext,
+        action: () => Promise<Result>
+    ) => Promise<Result>;
 };
 
-const storage = new AsyncLocalStorage<IntrospectionDiagnosticsContext>();
+type FailureQueue = {
+    readonly hold: (failure: ThrownFailure) => void;
+    readonly read: () => readonly ThrownFailure[];
+    readonly take: () => readonly ThrownFailure[];
+};
+
+type OperationWindow = {
+    readonly close: () => readonly ThrownFailure[];
+    readonly hold: (failure: ThrownFailure) => void;
+    readonly isOpen: () => boolean;
+    readonly read: () => readonly ThrownFailure[];
+};
+
+type DiagnosticsScope = {
+    readonly context: IntrospectionDiagnosticsContext;
+    readonly owner: WeakKey;
+    readonly window: OperationWindow;
+};
+
+const storage = new AsyncLocalStorage<DiagnosticsScope>();
 const subscribedConsoleDiagnostics = new WeakSet<IntrospectionConsoleDiagnostics>();
 
 function messageFromCause(cause: unknown): string {
@@ -52,55 +84,126 @@ function throwDiagnostic(diagnostic: ThrownDiagnostic): never {
     throw new Error(diagnostic.message);
 }
 
-function createThrownDiagnostics(): ThrownDiagnostics {
-    let unsettled: readonly ThrownDiagnostic[] = [];
+function isUsageFailure(failure: ThrownFailure): boolean {
+    return failure.kind === 'usage';
+}
 
-    function settle(): ThrownDiagnostic | undefined {
-        const [ firstDiagnostic ] = unsettled;
-
-        unsettled = [];
-
-        return firstDiagnostic;
+function throwFailure(failure: ThrownFailure): never {
+    if (failure.kind === 'usage') {
+        throw failure.error;
     }
 
-    function throwFirstUnsettled(): void {
-        const diagnostic = settle();
+    throwDiagnostic(failure.diagnostic);
+}
 
-        if (diagnostic !== undefined) {
-            throwDiagnostic(diagnostic);
+function createFailureQueue(): FailureQueue {
+    let held: readonly ThrownFailure[] = [];
+
+    return {
+        hold(failure) {
+            held = [
+                ...held,
+                failure
+            ];
+        },
+        read() {
+            return held;
+        },
+        take() {
+            const taken = held;
+
+            held = [];
+
+            return taken;
         }
+    };
+}
+
+function createOperationWindow(): OperationWindow {
+    const queue = createFailureQueue();
+    let open = true;
+
+    return {
+        close() {
+            open = false;
+
+            return queue.take();
+        },
+        hold: queue.hold,
+        isOpen() {
+            return open;
+        },
+        read: queue.read
+    };
+}
+
+function throwFirstFailure(failures: readonly ThrownFailure[]): void {
+    const failure = failures.find(isUsageFailure) ?? failures[0];
+
+    if (failure !== undefined) {
+        throwFailure(failure);
+    }
+}
+
+function createThrownDiagnostics(): ThrownDiagnostics {
+    const owner = Object.freeze({});
+    const betweenOperations = createFailureQueue();
+
+    function readOpenWindow(): OperationWindow | undefined {
+        const scope = storage.getStore();
+
+        return scope?.owner === owner && scope.window.isOpen() ? scope.window : undefined;
+    }
+
+    function hold(failure: ThrownFailure): void {
+        (readOpenWindow() ?? betweenOperations).hold(failure);
+    }
+
+    function settleOperation(window: OperationWindow): void {
+        throwFirstFailure([ ...betweenOperations.take(), ...window.close() ]);
     }
 
     return {
         hold(diagnostic) {
-            unsettled = [
-                ...unsettled,
-                diagnostic
-            ];
+            hold({ diagnostic, kind: 'diagnostic' });
         },
-        run(action) {
-            try {
-                const result = action();
-
-                throwFirstUnsettled();
-
-                return result;
-            } catch (error) {
-                settle();
-                throw error;
-            }
+        holdUsageError(error) {
+            hold({ error, kind: 'usage' });
         },
-        async runAsync(action) {
-            try {
-                const result = await action();
+        holdsUsageError() {
+            return readOpenWindow()?.read().some(isUsageFailure) === true;
+        },
+        run(context, action) {
+            const window = createOperationWindow();
 
-                throwFirstUnsettled();
+            return storage.run({ context, owner, window }, function runInOperationWindow() {
+                try {
+                    const result = action();
 
-                return result;
-            } catch (error) {
-                settle();
-                throw error;
-            }
+                    settleOperation(window);
+
+                    return result;
+                } catch (error) {
+                    window.close();
+                    throw error;
+                }
+            });
+        },
+        async runAsync(context, action) {
+            const window = createOperationWindow();
+
+            return storage.run({ context, owner, window }, async function runInOperationWindow() {
+                try {
+                    const result = await action();
+
+                    settleOperation(window);
+
+                    return result;
+                } catch (error) {
+                    window.close();
+                    throw error;
+                }
+            });
         }
     };
 }
@@ -138,7 +241,7 @@ function recordIntrospectionConsoleDiagnostic(message: unknown): void {
         return;
     }
 
-    storage.getStore()?.recordConsoleWarning(consoleMessage);
+    storage.getStore()?.context.recordConsoleWarning(consoleMessage);
 }
 
 function subscribeConsoleDiagnostics(consoleDiagnostics: IntrospectionConsoleDiagnostics): void {
@@ -214,6 +317,8 @@ export function createIntrospectionDiagnostics(
         get warnings() {
             return warnings;
         },
+        holdUsageError: thrownDiagnostics.holdUsageError,
+        holdsUsageError: thrownDiagnostics.holdsUsageError,
         recordCaughtError(cause) {
             caughtErrors = Object.freeze([
                 ...caughtErrors,
@@ -226,15 +331,11 @@ export function createIntrospectionDiagnostics(
         recordUncaughtError(cause) {
             appendUncaughtError(createDiagnosticRecord(cause));
         },
-        run<Result>(action: () => Result) {
-            return storage.run(context, function runWithDiagnostics() {
-                return thrownDiagnostics.run(action);
-            });
+        run(action) {
+            return thrownDiagnostics.run(context, action);
         },
-        async runAsync<Result>(action: () => Promise<Result>) {
-            return storage.run(context, async function runWithDiagnostics() {
-                return thrownDiagnostics.runAsync(action);
-            });
+        async runAsync(action) {
+            return thrownDiagnostics.runAsync(context, action);
         }
     };
 }

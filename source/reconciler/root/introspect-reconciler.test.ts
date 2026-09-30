@@ -122,6 +122,60 @@ type ActEnvironmentCommit = {
     readonly textContent: string;
 };
 
+type BackgroundWarningView = ClockedView & {
+    readonly finishFlushWithWarning: () => Promise<void>;
+};
+
+function introspectWithBackgroundWarning(message: string): BackgroundWarningView {
+    const macrotask = Promise.withResolvers<undefined>();
+    const flushed = Promise.withResolvers<undefined>();
+    const recorders: ((consoleMessage: unknown) => void)[] = [];
+    const clock = createDeterministicClock({ initialUnixEpochMicroseconds: 0n });
+    const view = createUnitIntrospectionView(
+        React.createElement(Page, { title: 'first' }),
+        { depth: 'full', strictMode: false, waitTimeout, warningMode: 'throw' },
+        {
+            subscribe(record) {
+                recorders.push(record);
+            }
+        },
+        {
+            ...createUnitRuntimeDependencies(),
+            clock,
+            macrotasks: {
+                async waitForNext() {
+                    await macrotask.promise;
+
+                    for (const record of recorders) {
+                        record([ message ]);
+                    }
+
+                    flushed.resolve(undefined);
+                }
+            }
+        }
+    ) as IntrospectionView<HostSchema>;
+
+    return {
+        clock,
+        async finishFlushWithWarning() {
+            macrotask.resolve(undefined);
+            await flushed.promise;
+        },
+        view
+    };
+}
+
+function readThrown(action: () => void): unknown {
+    try {
+        action();
+    } catch (error) {
+        return error;
+    }
+
+    return undefined;
+}
+
 function clickFirstButton(element: React.ReactElement): ActEnvironmentCommit {
     const view = introspect(element, {
         depth: 'full',
@@ -412,6 +466,31 @@ export const testNode = suite('custom reconciler host layer', [
         macrotask.resolve(undefined);
 
         scope.assert.equal(error instanceof Error ? error.message : error, 'waitForIdle timed out after 25 ms.');
+
+        return scope.assert.collect();
+    }),
+    test('throws a warning recorded by a timed out waitForIdle from the next operation', async function (scope) {
+        const { clock, finishFlushWithWarning, view } = introspectWithBackgroundWarning(
+            'Warning: late background warning'
+        );
+        const idle = readRejection(view.waitForIdle());
+
+        clock.advanceByMilliseconds(waitTimeout);
+
+        const timeout = await idle;
+
+        await finishFlushWithWarning();
+
+        const nextOperation = readThrown(function updatePage() {
+            view.update(React.createElement(Page, { title: 'next' }));
+        });
+
+        scope.assert.deepEqual(
+            [ timeout, nextOperation ].map(function readMessage(error) {
+                return error instanceof Error ? error.message : error;
+            }),
+            [ 'waitForIdle timed out after 25 ms.', 'Warning: late background warning' ]
+        );
 
         return scope.assert.collect();
     }),
