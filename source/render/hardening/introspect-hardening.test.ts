@@ -3,6 +3,7 @@ import React from 'react';
 import type { IntrospectionError, IntrospectionNode } from '../../public/introspect-public-types.ts';
 import type { IntrospectionConsoleDiagnostics } from '../../diagnostics/introspect-diagnostics.ts';
 import { createUnitIntrospectionView as introspect } from '../../runtime/view/introspect-unit-view.test.ts';
+import { createFakeRefNode, matchRefs } from '../../refs/introspect-ref.ts';
 import { normalizeSnapshotValue } from '../../snapshot/normalization/introspect-id-normalization.ts';
 
 type ElementProp = {
@@ -64,6 +65,20 @@ function PortalOutput(): React.ReactNode {
     return createPortalValue(React.createElement('span', null, 'portal'));
 }
 
+function PortalToggle(): React.ReactNode {
+    const [ showPortal, setShowPortal ] = React.useState(false);
+
+    if (showPortal) {
+        return createPortalValue(React.createElement('span', null, 'portal'));
+    }
+
+    return React.createElement('button', {
+        onClick() {
+            setShowPortal(true);
+        }
+    }, 'open');
+}
+
 function Leaf(props: LeafProps): React.ReactNode {
     Reflect.ownKeys(props);
 
@@ -103,6 +118,30 @@ function FailingLeaf(props: FailingLeafProps): React.ReactNode {
 const FailingClassLeaf = class extends React.Component<FailingLeafProps> {
     public override render(): React.ReactNode {
         throw new Error(this.props.message);
+    }
+};
+
+type CatchAllBoundaryProps = {
+    readonly children: React.ReactNode;
+};
+
+type CatchAllBoundaryState = {
+    readonly failed: boolean;
+};
+
+const CatchAllBoundary = class extends React.Component<CatchAllBoundaryProps, CatchAllBoundaryState> {
+    public constructor(props: CatchAllBoundaryProps) {
+        super(props);
+
+        this.state = { failed: false };
+    }
+
+    public static getDerivedStateFromError(): CatchAllBoundaryState {
+        return { failed: true };
+    }
+
+    public override render(): React.ReactNode {
+        return this.state.failed ? 'fallback' : this.props.children;
     }
 };
 
@@ -165,6 +204,61 @@ export const testNode = suite('unsupported React concepts and hardening', [
                 );
             },
             { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('fails clearly for portal render output under an error boundary', function (scope) {
+        scope.assert.throws(
+            function () {
+                introspect(React.createElement(CatchAllBoundary, null, React.createElement(PortalOutput)), {
+                    depth: 'full',
+                    strictMode: false
+                });
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+
+        return scope.assert.collect();
+    }),
+    test('fails clearly for portal output that appears under an error boundary after an event', function (scope) {
+        const view = introspect(React.createElement(CatchAllBoundary, null, React.createElement(PortalToggle)), {
+            depth: 'full',
+            strictMode: false
+        });
+
+        scope.assert.throws(
+            function () {
+                view.locate('button').sendEvent('click');
+            },
+            { message: 'React Introspect cannot represent portal output yet.' }
+        );
+        scope.assert.equal(view.caughtErrors.length, 0);
+
+        return scope.assert.collect();
+    }),
+    test('fails clearly for an ambiguous ref rule under an error boundary', function (scope) {
+        const inputNode = createFakeRefNode({ tag: 'input' });
+
+        scope.assert.throws(
+            function () {
+                introspect(
+                    React.createElement(
+                        CatchAllBoundary,
+                        null,
+                        React.createElement('input', { name: 'email', ref: React.createRef() })
+                    ),
+                    {
+                        depth: 'full',
+                        refs: matchRefs([
+                            { node: inputNode, type: 'input' },
+                            { node: inputNode, props: { name: 'email' } }
+                        ]),
+                        strictMode: false
+                    }
+                );
+            },
+            { message: 'Ref target input matches multiple ref rules.' }
         );
 
         return scope.assert.collect();

@@ -89,6 +89,16 @@ function publishEmptyErrorSnapshot(target: SessionRenderTarget, renderCountBefor
     target.container.discard(errorRenderCount);
 }
 
+function captureCaughtError(target: SessionRenderTarget, cause: unknown): void {
+    if (isIntrospectionUsageError(cause)) {
+        target.usageErrors.hold(cause);
+
+        return;
+    }
+
+    target.diagnostics.recordCaughtError(cause);
+}
+
 function captureUncaughtError(target: SessionRenderTarget, cause: unknown): void {
     if (isIntrospectionUsageError(cause)) {
         target.usageErrors.hold(cause);
@@ -156,7 +166,9 @@ function createIntrospectionReconcilerSession(
         usageErrors: createUsageErrorRelay()
     };
     const root = createReconcilerContainer(runtime, container, {
-        recordCaughtError: options.diagnostics.recordCaughtError,
+        recordCaughtError(cause) {
+            captureCaughtError(target, cause);
+        },
         recordRecoverableError: options.diagnostics.recordRecoverableError,
         recordUncaughtError(cause) {
             captureUncaughtError(target, cause);
