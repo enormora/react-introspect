@@ -147,24 +147,14 @@ function createIntrospectionViewWithDependencies(
         locateAll(selector: unknown) {
             return createIntrospectionListLocator(view, selector);
         },
-        unmount() {
-            reconcilerRoot.unmount();
-        },
+        unmount: reconcilerRoot.unmount,
         update(nextElement: React.ReactElement) {
             reconcilerRoot.update(createIntrospectionRenderElement(nextElement, depth));
         },
-        async waitForIdle() {
-            await reconcilerRoot.waitForIdle();
-        },
-        async waitForNextRender() {
-            await reconcilerRoot.waitForNextRender();
-        },
-        async waitForRenderCount(count: number) {
-            await reconcilerRoot.waitForRenderCount(count);
-        },
-        async waitUntil(predicate: () => boolean) {
-            await reconcilerRoot.waitUntil(predicate);
-        }
+        waitForIdle: reconcilerRoot.waitForIdle,
+        waitForNextRender: reconcilerRoot.waitForNextRender,
+        waitForRenderCount: reconcilerRoot.waitForRenderCount,
+        waitUntil: reconcilerRoot.waitUntil
     });
 
     return view;
