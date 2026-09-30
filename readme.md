@@ -1467,6 +1467,8 @@ assert.throws(() => {
 }, /portal/i);
 ```
 
+An error boundary above the portal does not stop this failure. The boundary's `getDerivedStateFromError` and `componentDidCatch` still run, but the call still throws.
+
 Use a browser or DOM test when the portal target matters.
 
 ### Lazy roots without Suspense
