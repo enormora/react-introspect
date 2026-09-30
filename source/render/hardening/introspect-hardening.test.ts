@@ -145,6 +145,23 @@ const CatchAllBoundary = class extends React.Component<CatchAllBoundaryProps, Ca
     }
 };
 
+type IterableChildRootProps = {
+    readonly items: Iterable<React.ReactNode>;
+};
+
+function IterableChildRoot(props: IterableChildRootProps): React.ReactNode {
+    return React.createElement(Icon, null, props.items);
+}
+
+function* createLabels(): Generator<React.ReactNode> {
+    yield React.createElement('span', null, 'first');
+    yield React.createElement('span', null, 'second');
+}
+
+function readTextContent(node: IntrospectionNode): string {
+    return node.textContent;
+}
+
 function readErrorMessage(error: IntrospectionError): string {
     return error.message;
 }
@@ -295,6 +312,16 @@ export const testNode = suite('unsupported React concepts and hardening', [
             },
             { message: 'React Introspect cannot represent portal output yet.' }
         );
+
+        return scope.assert.collect();
+    }),
+    test('keeps given children that come from a generator', function (scope) {
+        const view = introspect(React.createElement(IterableChildRoot, { items: createLabels() }), {
+            strictMode: false
+        });
+        const icon = requireValue(view.find(Icon));
+
+        scope.assert.deepEqual(Array.from(icon.givenChildren, readTextContent), [ 'first', 'second' ]);
 
         return scope.assert.collect();
     }),
