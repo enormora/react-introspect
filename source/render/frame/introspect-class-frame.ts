@@ -297,14 +297,12 @@ const IntrospectionClassFrameBase = class
         const previous = this.committedRender;
 
         if (previous !== undefined) {
-            assignClassField(this.userInstance, 'props', previous.props);
-            assignClassField(this.userInstance, 'state', previous.state);
+            this.showUserInstance(previous.props, previous.state);
         }
 
         const shouldUpdate = previous === undefined || this.shouldRender(previous, props, state);
 
-        assignClassField(this.userInstance, 'props', props);
-        assignClassField(this.userInstance, 'state', state);
+        this.showUserInstance(props, state);
 
         return {
             next: {
@@ -315,6 +313,11 @@ const IntrospectionClassFrameBase = class
             previous,
             shouldUpdate
         };
+    }
+
+    protected showUserInstance(props: Readonly<Record<PropertyKey, unknown>>, state: unknown): void {
+        assignClassField(this.userInstance, 'props', props);
+        assignClassField(this.userInstance, 'state', state);
     }
 
     protected renderUserOutput(): IntrospectionTransformedNode {
