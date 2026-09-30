@@ -1,8 +1,5 @@
 import React from 'react';
-import type {
-    IntrospectionHiddenReason,
-    IntrospectionNotRenderedReason
-} from '../../public/introspect-public-types.ts';
+import type { IntrospectionHiddenReason } from '../../public/introspect-public-types.ts';
 import {
     createIdNormalizer,
     normalizeSnapshotProps,
@@ -20,15 +17,12 @@ import {
     type IntrospectionSnapshot,
     registerSnapshotNode,
     type SnapshotNode,
-    type SnapshotNotRendered,
-    type SnapshotPlacement,
     type SnapshotProps,
-    type SnapshotRender,
     type SnapshotSourceElement,
     type SnapshotSourceNode,
-    type SnapshotSourceRenderStatus,
-    type SnapshotVisibility
+    type SnapshotSourceRenderStatus
 } from './introspect-snapshot-contract.ts';
+import { hiddenByFromSource, renderFromSource } from './introspect-snapshot-render.ts';
 import { toSourceElement } from './introspect-snapshot-source-mapping.ts';
 
 type SnapshotNodeDescription = Pick<SnapshotNode, Exclude<keyof SnapshotNode, 'id'>>;
@@ -75,46 +69,6 @@ type SourceElementRenderedChildrenRequest = SnapshotChildPlacement & {
 type PropsSnapshotRequest = SnapshotChildPlacement & {
     readonly props: SnapshotProps;
 };
-
-function hiddenByFromSource(
-    inheritedHiddenBy: IntrospectionHiddenReason | undefined,
-    sourceVisibility: SnapshotVisibility,
-    activityMode: 'hidden' | 'visible' | undefined
-): IntrospectionHiddenReason | undefined {
-    if (inheritedHiddenBy !== undefined) {
-        return inheritedHiddenBy;
-    }
-
-    if (sourceVisibility === 'hidden') {
-        return 'suspended';
-    }
-
-    return activityMode === 'hidden' ? 'activity' : undefined;
-}
-
-function placementFromSource(hiddenBy: IntrospectionHiddenReason | undefined): SnapshotPlacement {
-    return hiddenBy === undefined ? { visibility: 'visible' } : { hiddenBy, visibility: 'hidden' };
-}
-
-const notRenderedFromSource: Readonly<
-    Record<IntrospectionNotRenderedReason, (hiddenBy: IntrospectionHiddenReason | undefined) => SnapshotNotRendered>
-> = {
-    depth(hiddenBy) {
-        return { ...placementFromSource(hiddenBy), reason: 'depth', status: 'notRendered' };
-    },
-    unsupported() {
-        return { reason: 'unsupported', status: 'notRendered' };
-    }
-};
-
-function renderFromSource(
-    renderStatus: SnapshotSourceRenderStatus,
-    hiddenBy: IntrospectionHiddenReason | undefined
-): SnapshotRender {
-    return renderStatus.status === 'rendered'
-        ? { ...placementFromSource(hiddenBy), status: 'rendered' }
-        : notRenderedFromSource[renderStatus.reason](hiddenBy);
-}
 
 function createSnapshotBuilder(normalizeIdString: (value: string) => string): SnapshotBuilder {
     const nodes: SnapshotNode[] = [];
