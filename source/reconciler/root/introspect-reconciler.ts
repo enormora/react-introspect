@@ -15,6 +15,7 @@ import {
 } from './introspect-react-root.ts';
 import {
     createWaiterQueue,
+    type WaiterQueue,
     type WaitOperation,
     withDeadline
 } from './introspect-wait.ts';
@@ -45,10 +46,8 @@ export type IntrospectionReconcilerModuleDependencies = {
 type IntrospectionReconcilerSession = {
     readonly act: (action: () => unknown) => unknown;
     readonly readMounted: () => boolean;
-    readonly readRenderCount: () => number;
     readonly render: (element: Readonly<React.ReactElement> | null) => void;
-    readonly waitForIdle: () => Promise<void>;
-    readonly waitUntil: (operation: WaitOperation, predicate: () => boolean) => Promise<void>;
+    readonly waits: RootWaits;
 };
 
 type SessionRenderTarget = {
@@ -114,6 +113,57 @@ function renderWithDiagnostics(target: SessionRenderTarget, mounted: boolean, co
     captureMissingInitialCommit(target, renderCountBefore);
 }
 
+type RootWaitDependencies = {
+    readonly clock: IntrospectionRuntimeDependencies['clock'];
+    readonly diagnostics: IntrospectionDiagnostics;
+    readonly flushUntilIdle: () => Promise<void>;
+    readonly readRenderCount: () => number;
+    readonly timeoutInMilliseconds: number;
+    readonly waiters: WaiterQueue;
+};
+
+type RootWaits = Pick<
+    IntrospectionReconcilerRoot,
+    'waitForIdle' | 'waitForNextRender' | 'waitForRenderCount' | 'waitUntil'
+>;
+
+function createRootWaits(dependencies: RootWaitDependencies): RootWaits {
+    const { clock, diagnostics, flushUntilIdle, readRenderCount, timeoutInMilliseconds, waiters } = dependencies;
+
+    async function waitUntil(operation: WaitOperation, predicate: () => boolean): Promise<void> {
+        await diagnostics.runAsync(async function waitUntilWithDiagnostics() {
+            if (predicate()) {
+                return;
+            }
+
+            await waiters.waitUntil(predicate, { clock, flushUntilIdle, operation, timeoutInMilliseconds });
+        });
+    }
+
+    async function waitForRenderCount(operation: WaitOperation, count: number): Promise<void> {
+        await waitUntil(operation, function didRenderCount() {
+            return readRenderCount() >= count;
+        });
+    }
+
+    return {
+        async waitForIdle() {
+            await diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
+                await withDeadline(clock, timeoutInMilliseconds, 'waitForIdle', flushUntilIdle());
+            });
+        },
+        async waitForNextRender() {
+            await waitForRenderCount('waitForNextRender', readRenderCount() + 1);
+        },
+        async waitForRenderCount(count: number) {
+            await waitForRenderCount('waitForRenderCount', count);
+        },
+        async waitUntil(predicate: () => boolean) {
+            await waitUntil('waitUntil', predicate);
+        }
+    };
+}
+
 function createIntrospectionReconcilerSession(
     runtime: IntrospectionRuntimeDependencies,
     options: IntrospectionReconcilerRootOptions
@@ -156,6 +206,14 @@ function createIntrospectionReconcilerSession(
         flushPassiveEffects(runtime, waiters.settle);
     }
 
+    const waits = createRootWaits({
+        clock: runtime.clock,
+        diagnostics: options.diagnostics,
+        flushUntilIdle,
+        readRenderCount: target.readRenderCount,
+        timeoutInMilliseconds: options.waitTimeout,
+        waiters
+    });
     const session: IntrospectionReconcilerSession = {
         act(action) {
             return options.diagnostics.run(function actWithDiagnostics() {
@@ -163,7 +221,6 @@ function createIntrospectionReconcilerSession(
             });
         },
         readMounted: container.readMounted,
-        readRenderCount: target.readRenderCount,
         render(element) {
             options.diagnostics.run(function renderElementWithDiagnostics() {
                 renderWithDiagnostics(target, element !== null, function commitElement() {
@@ -171,38 +228,10 @@ function createIntrospectionReconcilerSession(
                 });
             });
         },
-        async waitForIdle() {
-            await options.diagnostics.runAsync(async function waitForIdleWithDiagnostics() {
-                await withDeadline(runtime.clock, options.waitTimeout, 'waitForIdle', flushUntilIdle());
-            });
-        },
-        async waitUntil(operation, predicate) {
-            await options.diagnostics.runAsync(async function waitUntilWithDiagnostics() {
-                if (predicate()) {
-                    return;
-                }
-
-                await waiters.waitUntil(predicate, {
-                    clock: runtime.clock,
-                    flushUntilIdle,
-                    operation,
-                    timeoutInMilliseconds: options.waitTimeout
-                });
-            });
-        }
+        waits
     };
 
     return session;
-}
-
-async function waitForRenderCount(
-    session: IntrospectionReconcilerSession,
-    operation: WaitOperation,
-    count: number
-): Promise<void> {
-    return session.waitUntil(operation, function didRenderCount() {
-        return session.readRenderCount() >= count;
-    });
 }
 
 function createIntrospectionReconcilerRoot(
@@ -223,16 +252,7 @@ function createIntrospectionReconcilerRoot(
         update(element: React.ReactElement) {
             session.render(element);
         },
-        waitForIdle: session.waitForIdle,
-        async waitForNextRender() {
-            return waitForRenderCount(session, 'waitForNextRender', session.readRenderCount() + 1);
-        },
-        async waitForRenderCount(count: number) {
-            return waitForRenderCount(session, 'waitForRenderCount', count);
-        },
-        async waitUntil(predicate: () => boolean) {
-            return session.waitUntil('waitUntil', predicate);
-        }
+        ...session.waits
     };
 }
 
