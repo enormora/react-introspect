@@ -29,10 +29,10 @@ lint: eslint lint-filename lint-unused-code lint-dependencies lint-duplication
 lint-fix: eslint-fix
 
 test-unit:
-    NODE_OPTIONS='--allow-fs-read=. --allow-fs-write=target' overkill run --config tool-configurations/overkill.config.ts --profile microtest
+    overkill run --config tool-configurations/overkill.config.ts --profile microtest
 
 test-unit-with-coverage:
-    NODE_OPTIONS='--allow-fs-read=. --allow-fs-write=target' overkill run --config tool-configurations/overkill.config.ts --profile microtest --coverage --measure-resource-usage
+    overkill run --config tool-configurations/overkill.config.ts --profile microtest --coverage --measure-resource-usage
 
 test-types:
     ./node_modules/.bin/tstyche --config tool-configurations/tstyche.json
