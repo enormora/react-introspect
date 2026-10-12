@@ -21,7 +21,6 @@
     ],
     "ignoreDependencies": [
         "@ls-lint/ls-lint",
-        "c8",
         "jscpd"
     ]
 }

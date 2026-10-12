@@ -1,34 +1,40 @@
 import { defineConfig } from '@overkill-dev/test/config';
 
-const microtestFiles = {
-    exclude: [ 'source/integration-tests/**' ],
-    include: [ 'source/**/*.test.ts' ]
-} as const;
-
-const microtestTimeouts = {
-    collectionMilliseconds: 30_000
-} as const;
-
 export const config = defineConfig({
     runtimeStateDir: 'target/.overkill',
     profiles: {
-        coverage: {
-            execution: {
-                processModel: 'in-process',
-                scheduling: 'concurrent'
-            },
-            testFamily: 'microtest',
-            files: microtestFiles,
-            timeouts: microtestTimeouts
-        },
         microtest: {
             execution: {
                 processModel: 'supervised-process',
                 scheduling: 'concurrent'
             },
             testFamily: 'microtest',
-            files: microtestFiles,
-            timeouts: microtestTimeouts
+            files: {
+                exclude: [ 'source/integration-tests/**' ],
+                include: [ 'source/**/*.test.ts' ]
+            },
+            timeouts: {
+                collectionMilliseconds: 30_000
+            },
+            coverage: {
+                outputDir: '../target/coverage',
+                outputs: [ 'lcov', 'text' ],
+                sources: {
+                    mode: 'all',
+                    include: [ 'source/**/*.ts' ],
+                    exclude: [
+                        'source/**/*.entry-point.ts',
+                        'source/**/*.test.ts',
+                        'source/**/*.type-test.ts',
+                        'source/**/*-types.ts'
+                    ]
+                },
+                thresholds: {
+                    branches: 100,
+                    functions: 100,
+                    lines: 100
+                }
+            }
         },
         integration: {
             execution: {
