@@ -32,7 +32,7 @@ test-unit:
     overkill run --config tool-configurations/overkill.config.ts --profile microtest
 
 test-unit-with-coverage:
-    overkill run --config tool-configurations/overkill.config.ts --profile microtest --coverage --measure-resource-usage
+    overkill run --config tool-configurations/overkill.config.ts --profile microtest --coverage
 
 test-types:
     ./node_modules/.bin/tstyche --config tool-configurations/tstyche.json
