@@ -215,6 +215,19 @@ export const testNode = suite('introspection host tree', [
 
         return scope.assert.collect();
     }),
+    test('keeps the children of a parent that does not hold the removed child', function (scope) {
+        const host = createContainer();
+        const parent = createInstance(host, 'section', {});
+        const kept = createText(host, 'kept');
+        const stranger = createText(host, 'stranger');
+
+        hostConfig.appendChild(parent, kept);
+        hostConfig.removeChild(parent, stranger);
+
+        scope.assert.deepEqual(parent.readChildren(), [ kept ]);
+
+        return scope.assert.collect();
+    }),
     test('removes children from parents', function (scope) {
         const host = createContainer();
         const text = createText(host, 'removed');
