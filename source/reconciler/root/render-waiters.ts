@@ -35,7 +35,7 @@ export type WaiterQueue = {
 };
 
 function outcomeOfSatisfaction(satisfied: boolean): PredicateOutcome {
-    return satisfied ? { kind: 'satisfied' } : { kind: 'pending' };
+    return { kind: satisfied ? 'satisfied' : 'pending' };
 }
 
 function evaluatePredicate(predicate: () => boolean): PredicateOutcome {
