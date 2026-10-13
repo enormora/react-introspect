@@ -123,15 +123,19 @@ export function createWaiterQueue(): WaiterQueue {
         };
     }
 
+    function settleWaiter(waiter: Waiter): void {
+        const outcome = evaluatePredicate(waiter.predicate);
+
+        if (outcome.kind !== 'pending') {
+            waiters.delete(waiter);
+            waiter.resolve(outcome);
+        }
+    }
+
     return {
         settle() {
             for (const waiter of Array.from(waiters)) {
-                const outcome = evaluatePredicate(waiter.predicate);
-
-                if (outcome.kind !== 'pending') {
-                    waiters.delete(waiter);
-                    waiter.resolve(outcome);
-                }
+                settleWaiter(waiter);
             }
         },
         async waitUntil(predicate, bounds) {
