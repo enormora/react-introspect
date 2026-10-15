@@ -15,18 +15,15 @@ const packageMetadata = {
     engines: rootPackageJson.engines
 };
 
-export const config = {
+export const configuration = {
     registrySettings: {
-        auth: {
-            publish: { type: 'npm-oidc', provider: 'auto' },
-            metadata: 'auto'
+        authentication: {
+            publish: { type: 'npm-open-identity-connect', provider: 'automatic' },
+            metadata: 'automatic'
         }
     },
     checks: {
-        typeScriptIntegrity: {
-            enabled: true,
-            declarations: 'all'
-        },
+        typeScriptIntegrity: { enabled: true, declarations: 'all' },
         noDuplicatedFiles: {
             enabled: true
         },
@@ -34,32 +31,22 @@ export const config = {
             enabled: true,
             files: [ 'LICENSE', 'readme.md', 'banner.svg', 'logo.svg' ]
         },
-        maxBundleSize: {
-            enabled: true
-        },
-        noUnusedBundleDependencies: {
-            enabled: true
-        },
-        noDevDependencyImports: {
-            enabled: true
-        },
-        uniqueTargetPaths: {
-            enabled: true
-        },
+        noUnusedBundleDependencies: { enabled: true },
+        noDevelopmentDependencyImports: { enabled: true },
+        uniqueTargetPaths: { enabled: true },
         noSideEffects: {
             enabled: false
         },
-        noUnexposedExecutables: {
-            enabled: true
-        }
+        noUnexposedExecutables: { enabled: true },
+        nodeEngineCompatibility: { enabled: true }
     },
     commonPackageSettings: {
         sourcesFolder: path.join(projectFolder, 'target/build/source'),
-        mainPackageJson: rootPackageJson,
+        mainPackageManifest: rootPackageJson,
         includeSourceMapFiles: true,
         publishSettings: {
             access: 'public',
-            provenance: { type: 'auto' }
+            provenance: { type: 'automatic' }
         }
     },
     packages: [
@@ -67,7 +54,7 @@ export const config = {
             name: 'react-introspect',
             roots: {
                 main: {
-                    js: 'react-introspect.entry-point.js',
+                    javaScript: 'react-introspect.entry-point.js',
                     declarationFile: 'react-introspect.entry-point.d.ts'
                 }
             },
@@ -89,7 +76,7 @@ export const config = {
                     targetFilePath: 'logo.svg'
                 }
             ],
-            additionalPackageJsonAttributes: packageMetadata
+            additionalPackageManifestAttributes: packageMetadata
         }
     ]
 };
