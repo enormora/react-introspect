@@ -51,7 +51,3 @@ test: test-unit-with-coverage test-types test-runtime-integration test-runtime-i
 
 publish-dry-run: test-package-smoke
     packtory publish
-
-check-packages: compile
-    rm -rf target/package-checks
-    packtory pack --all --format folder --out target/package-checks

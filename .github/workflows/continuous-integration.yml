@@ -84,8 +84,8 @@ jobs:
                   node-version-file: package.json
             - name: Install dependencies
               run: npm ci
-            - name: Run package smoke tests
-              run: npx just test-package-smoke
+            - name: Run package smoke tests and publish dry run
+              run: npx just publish-dry-run
 
     workflow-security:
         runs-on: ubuntu-latest
