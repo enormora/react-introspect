@@ -67,7 +67,7 @@ jobs:
             - name: Install dependencies
               run: npm ci
             - name: Run tests
-              run: npx just test
+              run: npx just compile test-unit-with-coverage test-types test-runtime-integration test-runtime-integration-production
 
     package-dry-run:
         runs-on: ubuntu-latest
@@ -84,7 +84,7 @@ jobs:
                   node-version-file: package.json
             - name: Install dependencies
               run: npm ci
-            - name: Dry-run package publish
+            - name: Run package smoke tests and publish dry run
               run: npx just publish-dry-run
 
     workflow-security:

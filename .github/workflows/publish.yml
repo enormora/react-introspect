@@ -122,9 +122,15 @@ jobs:
             - name: Publish package
               id: publish-package
               continue-on-error: true
-              run: npx packtory publish --no-dry-run
+              run: |
+                  set -o pipefail
+                  mkdir -p target/release
+                  npx packtory publish --no-dry-run 2>&1 | tee target/release/publish.log
             - name: Re-publish after a transient sigstore failure
               if: steps.publish-package.outcome == 'failure'
               run: |
+                  if ! grep -Eiq 'equivalent entry already exists|ECONNRESET|ETIMEDOUT|EAI_AGAIN|status (429|500|502|503|504)' target/release/publish.log; then
+                      exit 1
+                  fi
                   sleep 10
                   npx packtory publish --no-dry-run
