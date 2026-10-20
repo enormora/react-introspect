@@ -31,7 +31,7 @@
         "@enormora/eslint-config-node": "0.0.48",
         "@enormora/eslint-config-test-base": "0.0.40",
         "@enormora/eslint-config-typescript": "0.0.77",
-        "@ls-lint/ls-lint": "2.3.1",
+        "@ls-lint/ls-lint": "2.3.2",
         "@overkill-dev/test": "0.0.29",
         "@packtory/cli": "0.0.124",
         "@packtory/github-release-gate": "0.0.85",
