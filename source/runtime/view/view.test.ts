@@ -105,7 +105,7 @@ export const testNode = suite('introspection view', [
         const element = React.createElement(Frame, null, React.createElement(IdLabel));
 
         function usesPresetIdPrefix(view: RuntimeIntrospectionView): boolean {
-            const id = view.find('span')?.props.id;
+            const id = view.find('span')?.props['id'];
 
             return typeof id === 'string' && id.includes('preset-');
         }

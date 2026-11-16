@@ -49,5 +49,5 @@ export type IntrospectionClassComponent = {
 export function isClassComponent(value: unknown): value is IntrospectionClassComponent {
     const prototype: unknown = typeof value === 'function' ? Reflect.get(value, 'prototype') : undefined;
 
-    return isObjectOrFunction(prototype) && prototype.isReactComponent !== undefined;
+    return isObjectOrFunction(prototype) && prototype['isReactComponent'] !== undefined;
 }

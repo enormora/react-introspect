@@ -66,12 +66,12 @@ function createComponentMetadata(request: ComponentMetadataRequest): Introspecti
     const { activityMode, caughtError, element, renderStatus } = request;
     const { props } = element;
 
-    assertSupportedReactValue(props.children);
+    assertSupportedReactValue(props['children']);
 
     const metadata: IntrospectionComponentMetadata = {
         activityMode,
         caughtError,
-        givenChildren: props.children,
+        givenChildren: props['children'],
         key: element.key,
         props: readPublicProps(props, internalPropKeys),
         renderStatus,

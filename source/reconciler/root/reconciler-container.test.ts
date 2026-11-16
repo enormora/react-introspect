@@ -61,7 +61,7 @@ export const testNode = suite('React root access', [
             timeoutHandle: noHostTimeout
         };
         const counted = createRuntimeSettlingOnSecondMacrotask(function clearScheduledTask() {
-            root.callbackNode = null;
+            root['callbackNode'] = null;
         });
 
         await flushScheduledWork(counted.runtime, root);
@@ -73,7 +73,7 @@ export const testNode = suite('React root access', [
     test('keeps flushing while the root holds a commit scheduled for later', async function (scope) {
         const root: Record<string, unknown> = { callbackNode: null, timeoutHandle: 1 };
         const counted = createRuntimeSettlingOnSecondMacrotask(function commitScheduledWork() {
-            root.timeoutHandle = noHostTimeout;
+            root['timeoutHandle'] = noHostTimeout;
         });
 
         await flushScheduledWork(counted.runtime, root);

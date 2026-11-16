@@ -67,13 +67,13 @@ export const testNode = suite('prop values on introspection nodes', [
     test('hides ref from the props of elements found in props', function (scope) {
         const view = introspectCard();
 
-        scope.assert.deepEqual(readNodeProps(readRootProps(view).icon), { title: 'icon' });
+        scope.assert.deepEqual(readNodeProps(readRootProps(view)['icon']), { title: 'icon' });
 
         return scope.assert.collect();
     }),
     test('exposes elements inside null-prototype prop objects as introspection nodes', function (scope) {
         const view = introspectCard();
-        const options: unknown = readRootProps(view).options;
+        const options: unknown = readRootProps(view)['options'];
         const badge: unknown = typeof options === 'object' && options !== null
             ? Reflect.get(options, 'badge')
             : undefined;
@@ -96,7 +96,7 @@ export const testNode = suite('prop values on introspection nodes', [
         }) as IntrospectionView;
         const node = requireRoot(view);
         const rootProps = readRootProps(view);
-        const exposedSettings = rootProps.settings as Readonly<Record<PropertyKey, unknown>>;
+        const exposedSettings = rootProps['settings'] as Readonly<Record<PropertyKey, unknown>>;
         const picked = node.pickProps([ '__proto__', 'title' ] as never);
 
         scope.assert.deepEqual(

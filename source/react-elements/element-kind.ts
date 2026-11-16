@@ -77,7 +77,7 @@ function isFunctionComponentType(value: unknown): value is FunctionComponentType
 }
 
 function hasReactType(value: unknown, type: symbol): value is PropsRecord {
-    return isObjectOrFunction(value) && value.$$typeof === type;
+    return isObjectOrFunction(value) && value['$$typeof'] === type;
 }
 
 export function hasReactTypeMarker(value: PropsRecord): boolean {
@@ -99,8 +99,8 @@ function readMemoKind(type: unknown): ReactElementKind | undefined {
         return undefined;
     }
 
-    const ownCompare = isMemoCompare(type.compare) ? type.compare : shallowEquals;
-    const innerKind = readMemoKind(type.type);
+    const ownCompare = isMemoCompare(type['compare']) ? type['compare'] : shallowEquals;
+    const innerKind = readMemoKind(type['type']);
 
     return {
         compare: innerKind?.kind === 'memo'
@@ -109,7 +109,7 @@ function readMemoKind(type: unknown): ReactElementKind | undefined {
             }
             : ownCompare,
         displayName: readDisplayName(type),
-        inner: type.type,
+        inner: type['type'],
         kind: 'memo',
         type
     };
@@ -138,7 +138,7 @@ function readResolvedLazyType(payload: unknown): unknown {
 
     const moduleObject = payload[lazyResultKey];
 
-    return isObjectOrFunction(moduleObject) ? moduleObject.default : undefined;
+    return isObjectOrFunction(moduleObject) ? moduleObject['default'] : undefined;
 }
 
 const resolvedLazyTypes = new WeakMap<WeakKey, unknown>();

@@ -456,7 +456,7 @@ export const testNode = suite('execution shallow function components', [
         const shell = requireValue(view.find(Shell));
 
         scope.assert.deepEqual({
-            buttonLabel: view.find(Button)?.props.label,
+            buttonLabel: view.find(Button)?.props['label'],
             givenType: shell.givenChildren.first?.type,
             hostButton: view.find('button'),
             renders: [ counts.readParentRenders(), counts.readShellRenders(), counts.readButtonRenders() ],
@@ -517,7 +517,7 @@ export const testNode = suite('execution shallow function components', [
         scope.assert.equal(counts.readShellRenders(), 1);
         scope.assert.equal(counts.readButtonRenders(), 0);
         scope.assert.equal(requireValue(view.find(Shell)).renderedChildren.status, 'rendered');
-        scope.assert.equal(button.props.label, 'Save');
+        scope.assert.equal(button.props['label'], 'Save');
         scope.assert(assertUnexecutedPassThrough, button, [ '#empty' ]);
 
         return scope.assert.collect();
@@ -962,7 +962,7 @@ export const testNode = suite('execution shallow function components', [
         });
 
         scope.assert.equal(suspense.type, React.Suspense);
-        scope.assert.equal(React.isValidElement(suspenseProps.fallback), true);
+        scope.assert.equal(React.isValidElement(suspenseProps['fallback']), true);
         scope.assert.equal(lazyView.find('span')?.textContent, 'lazy');
 
         return scope.assert.collect();
