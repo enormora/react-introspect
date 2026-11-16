@@ -469,7 +469,7 @@ export const testNode = suite('unsupported React concepts and hardening', [
             iconProps: icon.props,
             iconType: icon.type,
             internalMarker: serialized.includes('react-introspect-internal'),
-            metadata: leaf.props.metadata,
+            metadata: leaf.props['metadata'],
             reactOwner: serialized.includes('_owner'),
             reactStore: serialized.includes('_store'),
             reactTypeMarker: serialized.includes('$$typeof'),

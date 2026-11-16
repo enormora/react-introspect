@@ -2,9 +2,15 @@
     "extends": "../tsconfig.base.json",
     "compilerOptions": {
         "tsBuildInfoFile": "../target/buildcache/sources.tsbuildinfo",
-        "rootDir": "..",
-        "types": ["node"]
+        "rootDir": ".."
     },
-    "include": ["./**/*.ts", "../tool-configurations/overkill.config.ts", "../react-reconciler-runtime.d.ts"],
-    "exclude": ["./**/*.test.ts", "./**/*.type-test.ts"]
+    "include": [
+        "./**/*.ts",
+        "../tool-configurations/overkill.config.ts",
+        "../react-reconciler-runtime.d.ts"
+    ],
+    "exclude": [
+        "./**/*.test.ts",
+        "./**/*.type-test.ts"
+    ]
 }
