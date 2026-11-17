@@ -55,7 +55,7 @@ function readRootField(root: ReconcilerRoot, field: string): unknown {
 function hasScheduledRootTask(root: ReconcilerRoot): boolean {
     const task = readRootField(root, 'callbackNode');
 
-    return isObject(task) && typeof task['callback'] === 'function';
+    return isObject(task) && typeof task.callback === 'function';
 }
 
 function hasPendingRootWork(root: ReconcilerRoot): boolean {

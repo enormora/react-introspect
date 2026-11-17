@@ -7,7 +7,6 @@
             "ESNext.Collection",
             "ESNext.Disposable"
         ],
-        "importHelpers": true,
         "outDir": "./target/build"
     }
 }

@@ -14,5 +14,5 @@ export type IntrospectionRenderChildren = (
 ) => IntrospectionTransformedNode;
 
 export function readElementRef(element: IntrospectionElement): unknown {
-    return element.props['ref'];
+    return element.props.ref;
 }

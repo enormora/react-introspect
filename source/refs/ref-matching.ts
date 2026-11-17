@@ -20,7 +20,7 @@ export function createFakeRefNode<Node>(node: Node): IntrospectionFakeRefNode<No
 }
 
 function isIntrospectionRefMatcher(value: unknown): value is IntrospectionRefMatcher {
-    return isObject(value) && value['type'] === matcherType && Array.isArray(value['rules']);
+    return isObject(value) && value.type === matcherType && Array.isArray(value.rules);
 }
 
 export function matchRefs<HostSchema extends IntrospectionHostSchema>(

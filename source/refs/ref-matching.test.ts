@@ -187,7 +187,7 @@ export const testNode = suite('refs', [
                         const targetProps = target.props as Readonly<Record<PropertyKey, unknown>>;
 
                         return createFocusNode(function focusTarget() {
-                            names.push(String(targetProps['name'] ?? targetProps['type']));
+                            names.push(String(targetProps.name ?? targetProps.type));
                         });
                     },
                     type: 'input'

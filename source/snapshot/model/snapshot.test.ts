@@ -329,17 +329,17 @@ export const testNode = suite('snapshot tree model', [
             strictMode: false
         });
         const widgetProps = requireValue(view.root).props as Readonly<Record<string, unknown>>;
-        const slots = widgetProps['slots'] as readonly unknown[];
+        const slots = widgetProps.slots as readonly unknown[];
 
         scope.assert.deepEqual({
-            createdAt: widgetProps['createdAt'] === props.createdAt,
+            createdAt: widgetProps.createdAt === props.createdAt,
             firstSlot: isIntrospectionNode(slots[0]) ? slots[0].type : undefined,
-            list: widgetProps['list'] === props.list,
-            lookup: widgetProps['lookup'] === props.lookup,
-            record: widgetProps['record'] === props.record,
-            recordFrozen: Object.isFrozen(widgetProps['record']),
+            list: widgetProps.list === props.list,
+            lookup: widgetProps.lookup === props.lookup,
+            record: widgetProps.record === props.record,
+            recordFrozen: Object.isFrozen(widgetProps.record),
             secondSlot: slots[1] === config,
-            set: widgetProps['set'] === props.set,
+            set: widgetProps.set === props.set,
             slotsFrozen: Object.isFrozen(slots),
             slotsRebuilt: slots !== props.slots
         }, {
@@ -360,7 +360,7 @@ export const testNode = suite('snapshot tree model', [
     test('cuts circular values that pass through elements in props', function (scope) {
         const settings: Record<string, unknown> = {};
 
-        settings['icon'] = React.createElement(Icon, { name: 'loop', settings } as IconProps);
+        settings.icon = React.createElement(Icon, { name: 'loop', settings } as IconProps);
 
         const view = introspect(React.createElement(Widget, { label: 'Loop', metadata: settings } as never), {
             depth: 0,
@@ -369,7 +369,7 @@ export const testNode = suite('snapshot tree model', [
         const { metadata } = requireValue(view.root).props as Readonly<
             Record<string, Readonly<Record<string, unknown>>>
         >;
-        const icon = metadata?.['icon'];
+        const icon = metadata?.icon;
 
         scope.assert.deepEqual(
             { iconProps: isIntrospectionNode(icon) ? icon.props : undefined },

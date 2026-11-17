@@ -87,7 +87,7 @@ function createReader(snapshot: IntrospectionSnapshot, count: Count): SnapshotRe
 function createCyclicRecord(): Readonly<Record<string, unknown>> {
     const cyclic: Record<string, unknown> = {};
 
-    cyclic['self'] = cyclic;
+    cyclic.self = cyclic;
 
     return cyclic;
 }
@@ -151,11 +151,11 @@ export const testNode = suite('introspection node', [
             renderedChildren: [],
             textContent: ''
         }));
-        const slots = node.props['slots'] as readonly unknown[];
+        const slots = node.props.slots as readonly unknown[];
 
         scope.assert.deepEqual({
-            config: node.props['config'] === config,
-            cyclic: node.props['cyclic'] === cyclic,
+            config: node.props.config === config,
+            cyclic: node.props.cyclic === cyclic,
             firstSlot: (slots[0] as { readonly name: string; }).name,
             secondSlot: slots[1] === config,
             slotsRebuilt: slots !== props.slots
