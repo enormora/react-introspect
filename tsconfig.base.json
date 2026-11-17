@@ -1,6 +1,7 @@
 {
     "extends": "@enormora/tsconfig-node/tsconfig.json",
     "compilerOptions": {
+        "importHelpers": true,
         "lib": [
             "ES2025",
             "ESNext.Array",
