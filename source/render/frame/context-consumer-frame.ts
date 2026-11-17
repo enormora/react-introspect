@@ -16,7 +16,7 @@ function isConsumerRenderProp(value: unknown): value is ConsumerRenderProp {
 }
 
 function renderConsumer(props: IntrospectionConsumerFrameProps, value: unknown): React.ReactElement {
-    const renderProp = props.element.props['children'];
+    const renderProp = props.element.props.children;
 
     if (!isConsumerRenderProp(renderProp)) {
         return createUnexecutedComponentHost(props.element, 'unsupported');

@@ -72,7 +72,7 @@ export const testNode = suite('introspection id normalization', [
                 })
             }
         );
-        const nested = normalized['nested'] as readonly Readonly<Record<string, unknown>>[];
+        const nested = normalized.nested as readonly Readonly<Record<string, unknown>>[];
 
         scope.assert.deepEqual(normalized, {
             element: {
@@ -85,14 +85,14 @@ export const testNode = suite('introspection id normalization', [
         });
         scope.assert.equal(Object.isFrozen(nested), true);
         scope.assert.equal(Object.isFrozen(nested[0]), true);
-        scope.assert.equal(nested[0]?.['config'], config);
+        scope.assert.equal(nested[0]?.config, config);
 
         return scope.assert.collect();
     }),
     test('keeps values without elements by reference', function (scope) {
         const cyclic: Record<string, unknown> = { id: '_test-r_a_' };
 
-        cyclic['self'] = cyclic;
+        cyclic.self = cyclic;
 
         const props = {
             createdAt: new Date(0),
@@ -116,13 +116,13 @@ export const testNode = suite('introspection id normalization', [
         });
 
         scope.assert.deepEqual({
-            createdAt: normalized['createdAt'] === props.createdAt,
-            cyclic: normalized['cyclic'] === props.cyclic,
-            list: normalized['list'] === props.list,
-            lookup: normalized['lookup'] === props.lookup,
-            record: normalized['record'] === props.record,
-            recordFrozen: Object.isFrozen(normalized['record']),
-            set: normalized['set'] === props.set
+            createdAt: normalized.createdAt === props.createdAt,
+            cyclic: normalized.cyclic === props.cyclic,
+            list: normalized.list === props.list,
+            lookup: normalized.lookup === props.lookup,
+            record: normalized.record === props.record,
+            recordFrozen: Object.isFrozen(normalized.record),
+            set: normalized.set === props.set
         }, {
             createdAt: true,
             cyclic: true,
@@ -138,8 +138,8 @@ export const testNode = suite('introspection id normalization', [
     test('cuts cycles inside containers that hold elements', function (scope) {
         const value: Record<string, unknown> = { icon: React.createElement('svg') };
 
-        value['self'] = value;
-        value['inner'] = { back: value };
+        value.self = value;
+        value.inner = { back: value };
 
         const normalized = normalizeSnapshotProps({ value }, {
             ancestors: new WeakSet(),

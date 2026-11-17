@@ -38,7 +38,7 @@ function isIntrospectionElement(element: React.ReactElement): element is Introsp
 }
 
 function readActivityMode(element: IntrospectionElement): 'hidden' | 'visible' {
-    return element.props['mode'] === 'hidden' ? 'hidden' : 'visible';
+    return element.props.mode === 'hidden' ? 'hidden' : 'visible';
 }
 
 function createIntrospectionElement(element: React.ReactElement): IntrospectionElement {
@@ -129,19 +129,19 @@ function transformNode(node: unknown, depth: IntrospectionFrameDepth): Introspec
 }
 
 function transformFragmentElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    return React.createElement(React.Fragment, null, transformNode(element.props['children'], depth));
+    return React.createElement(React.Fragment, null, transformNode(element.props.children, depth));
 }
 
 function transformRenderableElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    return React.cloneElement(element, elementKeyProps(element), transformNode(element.props['children'], depth));
+    return React.cloneElement(element, elementKeyProps(element), transformNode(element.props.children, depth));
 }
 
 function transformSuspenseElement(element: IntrospectionElement, depth: IntrospectionFrameDepth): React.ReactElement {
-    const children = transformNode(element.props['children'], depth);
+    const children = transformNode(element.props.children, depth);
 
     return React.cloneElement(element, {
         ...elementKeyProps(element),
-        fallback: transformNode(element.props['fallback'], depth)
+        fallback: transformNode(element.props.fallback, depth)
     }, children);
 }
 
@@ -149,7 +149,7 @@ function cloneWithTransformedChildren(
     element: IntrospectionElement,
     depth: IntrospectionFrameDepth
 ): React.ReactElement {
-    return React.cloneElement(element, {}, transformNode(element.props['children'], depth));
+    return React.cloneElement(element, {}, transformNode(element.props.children, depth));
 }
 
 function createClassFrameElement(

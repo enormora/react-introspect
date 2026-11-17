@@ -55,13 +55,13 @@ function createHostEvent(
     const event: Record<PropertyKey, unknown> = {
         defaultPrevented: false,
         isDefaultPrevented() {
-            return event['defaultPrevented'] === true;
+            return event.defaultPrevented === true;
         },
         isPropagationStopped() {
             return propagationStopped;
         },
         preventDefault() {
-            event['defaultPrevented'] = true;
+            event.defaultPrevented = true;
         },
         stopPropagation() {
             propagationStopped = true;

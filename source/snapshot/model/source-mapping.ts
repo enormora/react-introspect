@@ -26,7 +26,7 @@ function flattenReactNodes(children: unknown): readonly unknown[] {
 
 export function toSourceElement(element: React.ReactElement<SnapshotProps>): SnapshotSourceElement {
     // eslint-disable-next-line @typescript-eslint/no-use-before-define -- React values map to source nodes recursively
-    const children = toSnapshotSourceNodes(element.props['children']);
+    const children = toSnapshotSourceNodes(element.props.children);
 
     return {
         activityMode: undefined,
