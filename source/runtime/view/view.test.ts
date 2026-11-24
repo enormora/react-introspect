@@ -95,6 +95,12 @@ function Frame(props: React.PropsWithChildren): React.ReactNode {
     return props.children;
 }
 
+function usesPresetIdPrefix(view: RuntimeIntrospectionView): boolean {
+    const id = view.find('span')?.props.id;
+
+    return typeof id === 'string' && id.includes('preset-');
+}
+
 export const testNode = suite('introspection view', [
     test('applies preconfigured defaults with per-call options overriding key by key', function (scope) {
         const introspectWithDefaults = createUnitIntrospectionViewModule().preconfigure({
@@ -103,12 +109,6 @@ export const testNode = suite('introspection view', [
             strictMode: false
         });
         const element = React.createElement(Frame, null, React.createElement(IdLabel));
-
-        function usesPresetIdPrefix(view: RuntimeIntrospectionView): boolean {
-            const id = view.find('span')?.props.id;
-
-            return typeof id === 'string' && id.includes('preset-');
-        }
 
         scope.assert.deepEqual({
             defaultsOnly: usesPresetIdPrefix(introspectWithDefaults(element, {})),

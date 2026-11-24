@@ -76,11 +76,13 @@ function TransitionValueReader(props: TransitionValueReaderProps): React.ReactNo
     return React.createElement('span', null, value);
 }
 
+function rejectMissingResolution(): void {
+    throw new Error('Expected suspense resolver to be initialized.');
+}
+
 function createSuspenseResource(): SuspenseResource {
     let ready = false;
-    let resolvePromise = function rejectMissingResolution(): void {
-        throw new Error('Expected suspense resolver to be initialized.');
-    };
+    let resolvePromise: () => void = rejectMissingResolution;
 
     const promise = new Promise<void>(function captureResolver(resolve) {
         resolvePromise = resolve;

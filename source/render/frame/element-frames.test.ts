@@ -447,6 +447,16 @@ function NestedGivenPage(): React.ReactNode {
     );
 }
 
+function Missing(): null {
+    return null;
+}
+
+function readTextValue(node: IntrospectionNode): unknown {
+    const { props } = node;
+
+    return typeof props === 'object' && props !== null ? Reflect.get(props, 'value') : undefined;
+}
+
 export const testNode = suite('execution shallow function components', [
     test('keeps child components visible but unexecuted at depth 1', function (scope) {
         const { Button, counts, Parent, Shell } = createDepthComponents();
@@ -550,9 +560,6 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('executes the whole tree when the depthFrom component never renders', function (scope) {
         const { Harness, log, Page } = createAnchoredComponents();
-        const Missing: React.FC = function Missing() {
-            return null;
-        };
 
         introspect(React.createElement(Harness, null, React.createElement(Page)), {
             depthFrom: Missing,
@@ -665,12 +672,6 @@ export const testNode = suite('execution shallow function components', [
         const view = introspect(React.createElement(NumericTextRoot), { strictMode: false });
         const leaf = requireValue(view.find(GivenLeaf));
         const main = requireValue(view.find('main'));
-
-        function readTextValue(node: IntrospectionNode): unknown {
-            const { props } = node;
-
-            return typeof props === 'object' && props !== null ? Reflect.get(props, 'value') : undefined;
-        }
 
         scope.assert.deepEqual(
             {

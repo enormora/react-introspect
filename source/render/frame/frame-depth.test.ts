@@ -5,6 +5,10 @@ function Start(): null {
     return null;
 }
 
+function readNextBudget(budget: number | 'full'): number | 'full' {
+    return nextDepth(createFrameDepth({ budget, depthFrom: undefined, transparent: [] }), 'span').budget;
+}
+
 export const testNode = suite('introspection frame depth', [
     test('treats depths as the same only when budget, counting and policy all match', function (scope) {
         const counting = createFrameDepth({ budget: 2, depthFrom: undefined, transparent: [] });
@@ -28,10 +32,6 @@ export const testNode = suite('introspection frame depth', [
         return scope.assert.collect();
     }),
     test('decrements numeric depth and preserves full depth', function (scope) {
-        function readNextBudget(budget: number | 'full'): number | 'full' {
-            return nextDepth(createFrameDepth({ budget, depthFrom: undefined, transparent: [] }), 'span').budget;
-        }
-
         scope.assert.equal(readNextBudget('full'), 'full');
         scope.assert.equal(readNextBudget(2), 1);
         scope.assert.equal(readNextBudget(0), 0);
