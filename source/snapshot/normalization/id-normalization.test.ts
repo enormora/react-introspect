@@ -165,12 +165,10 @@ export const testNode = suite('introspection id normalization', [
     test('describes elements inside leaf values as plain data', function (scope) {
         const list = [ 1 ];
         const plain = { list };
+        const element = React.createElement('b', { title: 'plain' }, React.createElement('i'));
 
         scope.assert.deepEqual(
-            normalizeSnapshotValue(
-                { element: React.createElement('b', { title: 'plain' }, React.createElement('i')), plain },
-                String
-            ),
+            normalizeSnapshotValue({ element, plain }, String),
             {
                 element: {
                     key: null,

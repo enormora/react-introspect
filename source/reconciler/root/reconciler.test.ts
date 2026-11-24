@@ -885,11 +885,12 @@ export const testNode = suite('custom reconciler host layer', [
     test(
         'renders React.use fulfilled promise values',
         function (scope) {
+            const textPromise = createFulfilledReactPromise('resolved');
             const view = introspect(
                 React.createElement(
                     React.Suspense,
                     { fallback: React.createElement(Loading) },
-                    React.createElement(PromiseReader, { textPromise: createFulfilledReactPromise('resolved') })
+                    React.createElement(PromiseReader, { textPromise })
                 ),
                 {
                     depth: 'full',
@@ -909,11 +910,12 @@ export const testNode = suite('custom reconciler host layer', [
         'records React.use rejected promise errors',
         function (scope) {
             const error = new Error('load failed');
+            const textPromise = createRejectedReactPromise(error);
             const view = introspect(
                 React.createElement(
                     React.Suspense,
                     { fallback: React.createElement(Loading) },
-                    React.createElement(PromiseReader, { textPromise: createRejectedReactPromise(error) })
+                    React.createElement(PromiseReader, { textPromise })
                 ),
                 {
                     depth: 'full',

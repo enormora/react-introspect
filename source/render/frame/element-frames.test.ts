@@ -760,15 +760,12 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('executes components inside StrictMode and Profiler', function (scope) {
+        const profiledLabel = React.createElement(PlainLabel, { label: 'profiled' });
         const view = introspect(
             React.createElement(
                 React.StrictMode,
                 null,
-                React.createElement(
-                    React.Profiler,
-                    { id: 'labels', onRender: ignoreProfile },
-                    React.createElement(PlainLabel, { label: 'profiled' })
-                )
+                React.createElement(React.Profiler, { id: 'labels', onRender: ignoreProfile }, profiledLabel)
             ),
             {
                 depth: 'full',

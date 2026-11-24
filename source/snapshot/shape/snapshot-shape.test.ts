@@ -90,11 +90,10 @@ export const testNode = suite('introspection snapshot shape', [
         return scope.assert.collect();
     }),
     test('names memo components after the component they wrap', function (scope) {
+        const MemoForwardRefInput = React.memo(React.forwardRef(InputComponent));
+
         scope.assert.equal(getTypeName(React.memo(Label), 'executed'), 'Label');
-        scope.assert.equal(
-            getTypeName(React.memo(React.forwardRef(InputComponent)), 'executed'),
-            'ForwardRef(InputComponent)'
-        );
+        scope.assert.equal(getTypeName(MemoForwardRefInput, 'executed'), 'ForwardRef(InputComponent)');
         scope.assert.equal(
             getTypeName(
                 React.memo(function () {
@@ -122,25 +121,26 @@ export const testNode = suite('introspection snapshot shape', [
         return scope.assert.collect();
     }),
     test('prefers the display name of memo and forwardRef wrappers', function (scope) {
-        scope.assert.equal(
-            getTypeName(Object.assign(React.memo(Label), { displayName: 'ShownMemo' }), 'executed'),
-            'ShownMemo'
-        );
-        scope.assert.equal(
-            getTypeName(Object.assign(React.forwardRef(InputComponent), { displayName: 'ShownInput' }), 'executed'),
-            'ShownInput'
-        );
-        scope.assert.equal(getTypeName(Object.assign(React.memo(Label), { displayName: '' }), 'executed'), 'Label');
+        const ShownMemo = Object.assign(React.memo(Label), { displayName: 'ShownMemo' });
+        const ShownInput = Object.assign(React.forwardRef(InputComponent), { displayName: 'ShownInput' });
+        const UnnamedMemo = Object.assign(React.memo(Label), { displayName: '' });
+
+        scope.assert.equal(getTypeName(ShownMemo, 'executed'), 'ShownMemo');
+        scope.assert.equal(getTypeName(ShownInput, 'executed'), 'ShownInput');
+        scope.assert.equal(getTypeName(UnnamedMemo, 'executed'), 'Label');
 
         return scope.assert.collect();
     }),
     test('names lazy components after the component they resolved to', function (scope) {
+        const executedMemoOfLazy = createMemoType(createResolvedLazyLabel());
+        const unexecutedMemoOfLazy = createMemoType(createResolvedLazyLabel());
+
         scope.assert.equal(getTypeName(createResolvedLazyLabel(), 'executed'), 'Label');
-        scope.assert.equal(getTypeName(createMemoType(createResolvedLazyLabel()), 'executed'), 'Label');
+        scope.assert.equal(getTypeName(executedMemoOfLazy, 'executed'), 'Label');
         scope.assert.equal(getTypeName(createPendingLazyType(), 'executed'), 'Component');
         scope.assert.equal(getTypeName(createLazyType({ _result: undefined, _status: 1 }), 'executed'), 'Component');
         scope.assert.equal(getTypeName(createResolvedLazyLabel(), 'unexecuted'), 'Component');
-        scope.assert.equal(getTypeName(createMemoType(createResolvedLazyLabel()), 'unexecuted'), 'Memo');
+        scope.assert.equal(getTypeName(unexecutedMemoOfLazy, 'unexecuted'), 'Memo');
 
         return scope.assert.collect();
     }),
@@ -158,8 +158,10 @@ export const testNode = suite('introspection snapshot shape', [
         return scope.assert.collect();
     }),
     test('names memo components without a known inner name Memo', function (scope) {
+        const memoOfPendingLazy = createMemoType(createPendingLazyType());
+
         scope.assert.equal(getTypeName(createMemoType({}), 'executed'), 'Memo');
-        scope.assert.equal(getTypeName(createMemoType(createPendingLazyType()), 'executed'), 'Memo');
+        scope.assert.equal(getTypeName(memoOfPendingLazy, 'executed'), 'Memo');
 
         return scope.assert.collect();
     })
