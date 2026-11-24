@@ -405,7 +405,7 @@ export const testNode = suite('snapshot tree model', [
 
         scope.assert.equal(view.find({ key: 'host' })?.path, section.path);
         scope.assert.equal(view.find({ textContent: 'Save now' })?.path, section.path);
-        scope.assert.equal(view.find({ textContent: /^Save\snow$/ })?.path, section.path);
+        scope.assert.equal(view.find({ textContent: /^Save\snow$/u })?.path, section.path);
         scope.assert.equal(
             view
                 .find({
@@ -470,7 +470,7 @@ export const testNode = suite('snapshot tree model', [
         const serializedRoot = JSON.stringify(view.root);
 
         scope.assert.string(serializedRoot);
-        scope.assert.match(requireValue(serializedRoot), /"name":"Fragment"/);
+        scope.assert.match(requireValue(serializedRoot), /"name":"Fragment"/u);
 
         return scope.assert.collect();
     })

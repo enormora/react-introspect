@@ -161,7 +161,7 @@ if (unknownHost !== undefined) {
 expect({
     has: { type: 'strong' as const },
     props: { disabled: true },
-    textContent: /save/i,
+    textContent: /save/iu,
     type: 'button' as const,
     where(node: IntrospectionNode<HostSchema['button'], 'button', HostSchema>) {
         return node.name === 'button';
