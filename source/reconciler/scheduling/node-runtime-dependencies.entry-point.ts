@@ -1,4 +1,4 @@
-import * as timersPromises from 'node:timers/promises';
+import timersPromises from 'node:timers/promises';
 import { createClock } from '@enormora/clock';
 import type {
     IntrospectionMacrotasks,

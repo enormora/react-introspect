@@ -1,5 +1,5 @@
-import * as timers from 'node:timers';
-import * as timersPromises from 'node:timers/promises';
+import timers from 'node:timers';
+import timersPromises from 'node:timers/promises';
 import { createDeterministicClock } from '@enormora/clock/deterministic-clock';
 import { suite, test } from '@overkill-dev/test';
 import type { Clock } from '@enormora/clock';

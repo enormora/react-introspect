@@ -1,4 +1,4 @@
-import * as timers from 'node:timers';
+import timers from 'node:timers';
 import { suite, test } from '@overkill-dev/test';
 import React from 'react';
 import { introspect, type IntrospectionView } from '../../react-introspect.entry-point.ts';
