@@ -141,13 +141,16 @@ export const testNode = suite('introspection id normalization', [
         value.self = value;
         value.inner = { back: value };
 
-        const normalized = normalizeSnapshotProps({ value }, {
-            ancestors: new WeakSet(),
-            describeElement(element) {
-                return element.type;
-            },
-            normalizeIdString: String
-        });
+        const normalized = normalizeSnapshotProps(
+            { value },
+            {
+                ancestors: new WeakSet(),
+                describeElement(element) {
+                    return element.type;
+                },
+                normalizeIdString: String
+            }
+        );
 
         scope.assert.deepEqual(normalized, {
             value: {

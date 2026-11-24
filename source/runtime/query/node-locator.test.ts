@@ -162,19 +162,22 @@ export const testNode = suite('introspection locators', [
 
         nodes[0] = createSaveButton('Saving');
 
-        scope.assert.deepEqual({ initial, updated: locator.textContent }, {
-            initial: {
-                key: 'save',
-                kind: 'host',
-                name: 'button',
-                omitted: { omitted: [ 'title' ] },
-                picked: { picked: [ 'title' ] },
-                props: { title: 'Save' },
-                textContent: 'Save',
-                type: 'button'
-            },
-            updated: 'Saving'
-        });
+        scope.assert.deepEqual(
+            { initial, updated: locator.textContent },
+            {
+                initial: {
+                    key: 'save',
+                    kind: 'host',
+                    name: 'button',
+                    omitted: { omitted: [ 'title' ] },
+                    picked: { picked: [ 'title' ] },
+                    props: { title: 'Save' },
+                    textContent: 'Save',
+                    type: 'button'
+                },
+                updated: 'Saving'
+            }
+        );
 
         return scope.assert.collect();
     }),

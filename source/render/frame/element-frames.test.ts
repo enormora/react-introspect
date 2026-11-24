@@ -938,10 +938,13 @@ export const testNode = suite('execution shallow function components', [
 
         const opaque = requireValue(view.find('opaque'));
 
-        scope.assert.deepEqual({ state: opaque.state, visibility: opaque.visibility }, {
-            state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
-            visibility: 'notRendered'
-        });
+        scope.assert.deepEqual(
+            { state: opaque.state, visibility: opaque.visibility },
+            {
+                state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
+                visibility: 'notRendered'
+            }
+        );
 
         return scope.assert.collect();
     }),

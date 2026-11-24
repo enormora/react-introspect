@@ -1015,10 +1015,13 @@ export const testNode = suite('custom reconciler host layer', [
             resolved: reconcilerRuntime.resolveUpdatePriority()
         };
 
-        scope.assert.deepEqual({ discretePriorities, initialPriorities }, {
-            discretePriorities: { current: DiscreteEventPriority, resolved: DiscreteEventPriority },
-            initialPriorities: { current: NoEventPriority, resolved: DefaultEventPriority }
-        });
+        scope.assert.deepEqual(
+            { discretePriorities, initialPriorities },
+            {
+                discretePriorities: { current: DiscreteEventPriority, resolved: DiscreteEventPriority },
+                initialPriorities: { current: NoEventPriority, resolved: DefaultEventPriority }
+            }
+        );
 
         return scope.assert.collect();
     }),

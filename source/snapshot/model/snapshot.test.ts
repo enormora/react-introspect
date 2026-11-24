@@ -161,11 +161,14 @@ function createMixedTree(): React.ReactElement {
 
 function createMixedSnapshot(): IntrospectionSnapshot {
     let publishedSnapshot = createEmptyIntrospectionSnapshot(0);
-    const diagnostics = createIntrospectionDiagnostics({ errorMode: 'capture', warningMode: 'throw' }, {
-        subscribe() {
-            return undefined;
+    const diagnostics = createIntrospectionDiagnostics(
+        { errorMode: 'capture', warningMode: 'throw' },
+        {
+            subscribe() {
+                return undefined;
+            }
         }
-    });
+    );
 
     createIntrospectionReconcilerModule({ runtime: createUnitRuntimeDependencies() }).createRoot({
         diagnostics,
