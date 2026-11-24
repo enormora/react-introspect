@@ -8,7 +8,9 @@ import type {
 import { createIntrospectionList } from './node-list.ts';
 import { createIntrospectionListLocator, createIntrospectionLocator } from './node-locator.ts';
 
-function createNode(name: string): RuntimeIntrospectionNode {
+function createButtonNode(): RuntimeIntrospectionNode {
+    const name = 'button';
+
     return {
         callProp(property: PropertyKey, parameter: unknown) {
             return `${String(property)}:${String(parameter)}`;
@@ -107,7 +109,7 @@ function createView(nodes: readonly RuntimeIntrospectionNode[]): RuntimeIntrospe
 
 function createSaveButton(title: string): RuntimeIntrospectionNode {
     return {
-        ...createNode('button'),
+        ...createButtonNode(),
         key: 'save',
         omitProps(keys) {
             return { omitted: keys };
@@ -145,7 +147,7 @@ function requireError(action: () => void): Error {
 
 export const testNode = suite('introspection locators', [
     test('resolves nodes lazily through the owning view', function (scope) {
-        const view = createView([ createNode('button') ]);
+        const view = createView([ createButtonNode() ]);
         const locator = createIntrospectionLocator(view, 'button');
 
         scope.assert.equal(locator.exists, true);
@@ -219,8 +221,8 @@ export const testNode = suite('introspection locators', [
         return scope.assert.collect();
     }),
     test('returns list locator accessors from current matches', function (scope) {
-        const first = createNode('button');
-        const second = createNode('button');
+        const first = createButtonNode();
+        const second = createButtonNode();
         const locator = createIntrospectionListLocator(createView([ first, second ]), 'button');
 
         scope.assert.equal(locator.length, 2);
@@ -232,8 +234,8 @@ export const testNode = suite('introspection locators', [
         return scope.assert.collect();
     }),
     test('re-reads list locator matches on every access', function (scope) {
-        const first = createNode('button');
-        const second = createNode('button');
+        const first = createButtonNode();
+        const second = createButtonNode();
         const nodes = [ first ];
         const locator = createIntrospectionListLocator(createView(nodes), 'button');
         const lengthBefore = locator.length;

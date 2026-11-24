@@ -239,8 +239,8 @@ function Suspends(): React.ReactNode {
     throw new SuspenseThenableError();
 }
 
-function createExternalStore(initialValue: string): ExternalStore {
-    let value = initialValue;
+function createExternalStore(): ExternalStore {
+    let value = 'before';
     const listeners = new Set<() => void>();
 
     return {
@@ -536,7 +536,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('fails a render wait with the usage error a scheduled commit held', async function (scope) {
-        const store = createExternalStore('before');
+        const store = createExternalStore();
         const view = introspect(React.createElement(TransitionPortalReader, { store }), {
             depth: 'full',
             strictMode: false,
@@ -555,7 +555,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('waits for transition work scheduled by a store update outside React', async function (scope) {
-        const store = createExternalStore('before');
+        const store = createExternalStore();
         const view = introspect(React.createElement(TransitionStoreReader, { store }), {
             depth: 'full',
             strictMode: false
@@ -572,7 +572,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('waits for transition work scheduled by a store update in a microtask', async function (scope) {
-        const store = createExternalStore('before');
+        const store = createExternalStore();
         const view = introspect(React.createElement(TransitionStoreReader, { store }), {
             depth: 'full',
             strictMode: false
