@@ -275,15 +275,12 @@ export const testNode = suite('unsupported React concepts and hardening', [
         return scope.assert.collect();
     }),
     test('reports portal output under a boundary before ref shorthands its fallback cannot satisfy', function (scope) {
+        const refInput = React.createElement('input', { ref: React.createRef() });
+
         scope.assert.throws(
             function () {
                 introspect(
-                    React.createElement(
-                        CatchAllBoundary,
-                        null,
-                        React.createElement('input', { ref: React.createRef() }),
-                        React.createElement(PortalOutput)
-                    ),
+                    React.createElement(CatchAllBoundary, null, refInput, React.createElement(PortalOutput)),
                     {
                         depth: 'full',
                         refs: { input: createFakeRefNode({ tag: 'input' }) },
@@ -298,15 +295,12 @@ export const testNode = suite('unsupported React concepts and hardening', [
     }),
     test('fails clearly for an ambiguous ref rule under an error boundary', function (scope) {
         const inputNode = createFakeRefNode({ tag: 'input' });
+        const emailInput = React.createElement('input', { name: 'email', ref: React.createRef() });
 
         scope.assert.throws(
             function () {
                 introspect(
-                    React.createElement(
-                        CatchAllBoundary,
-                        null,
-                        React.createElement('input', { name: 'email', ref: React.createRef() })
-                    ),
+                    React.createElement(CatchAllBoundary, null, emailInput),
                     {
                         depth: 'full',
                         refs: matchRefs([
@@ -346,14 +340,11 @@ export const testNode = suite('unsupported React concepts and hardening', [
         return scope.assert.collect();
     }),
     test('fails clearly for portal children inside a Set of given children', function (scope) {
+        const portalItems = new Set([ createPortalValue(React.createElement('span', null, 'portal')) ]);
+
         scope.assert.throws(
             function () {
-                introspect(
-                    React.createElement(IterableChildRoot, {
-                        items: new Set([ createPortalValue(React.createElement('span', null, 'portal')) ])
-                    }),
-                    { strictMode: false }
-                );
+                introspect(React.createElement(IterableChildRoot, { items: portalItems }), { strictMode: false });
             },
             { message: 'React Introspect cannot represent portal output yet.' }
         );
@@ -373,13 +364,9 @@ export const testNode = suite('unsupported React concepts and hardening', [
         return scope.assert.collect();
     }),
     test('keeps later views working after portal children fail inside the commit', function (scope) {
+        const portalItems = new Set([ createPortalValue(React.createElement('span', null, 'portal')) ]);
         const failure = describeFailure(function introspectPortalSet() {
-            introspect(
-                React.createElement(IterableChildRoot, {
-                    items: new Set([ createPortalValue(React.createElement('span', null, 'portal')) ])
-                }),
-                { strictMode: false }
-            );
+            introspect(React.createElement(IterableChildRoot, { items: portalItems }), { strictMode: false });
         });
         const laterView = introspect(React.createElement('main', null, 'after'), { strictMode: false });
 

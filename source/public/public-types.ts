@@ -32,6 +32,7 @@ export type IntrospectionOptions<HostSchema extends IntrospectionHostSchema = In
     readonly warningMode?: 'capture' | 'ignore' | 'throw';
 };
 
+// eslint-disable-next-line @typescript-eslint/no-generated-empty-object-type -- the default schema intentionally declares no host tags
 export type IntrospectionHostSchema = Readonly<Record<never, unknown>>;
 
 export type IntrospectionNodeKind = 'component' | 'empty' | 'fragment' | 'host' | 'opaque' | 'text';

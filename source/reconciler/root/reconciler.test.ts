@@ -239,8 +239,8 @@ function Suspends(): React.ReactNode {
     throw new SuspenseThenableError();
 }
 
-function createExternalStore(initialValue: string): ExternalStore {
-    let value = initialValue;
+function createExternalStore(): ExternalStore {
+    let value = 'before';
     const listeners = new Set<() => void>();
 
     return {
@@ -536,7 +536,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('fails a render wait with the usage error a scheduled commit held', async function (scope) {
-        const store = createExternalStore('before');
+        const store = createExternalStore();
         const view = introspect(React.createElement(TransitionPortalReader, { store }), {
             depth: 'full',
             strictMode: false,
@@ -555,7 +555,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('waits for transition work scheduled by a store update outside React', async function (scope) {
-        const store = createExternalStore('before');
+        const store = createExternalStore();
         const view = introspect(React.createElement(TransitionStoreReader, { store }), {
             depth: 'full',
             strictMode: false
@@ -572,7 +572,7 @@ export const testNode = suite('custom reconciler host layer', [
         return scope.assert.collect();
     }),
     test('waits for transition work scheduled by a store update in a microtask', async function (scope) {
-        const store = createExternalStore('before');
+        const store = createExternalStore();
         const view = introspect(React.createElement(TransitionStoreReader, { store }), {
             depth: 'full',
             strictMode: false
@@ -885,11 +885,12 @@ export const testNode = suite('custom reconciler host layer', [
     test(
         'renders React.use fulfilled promise values',
         function (scope) {
+            const textPromise = createFulfilledReactPromise('resolved');
             const view = introspect(
                 React.createElement(
                     React.Suspense,
                     { fallback: React.createElement(Loading) },
-                    React.createElement(PromiseReader, { textPromise: createFulfilledReactPromise('resolved') })
+                    React.createElement(PromiseReader, { textPromise })
                 ),
                 {
                     depth: 'full',
@@ -909,11 +910,12 @@ export const testNode = suite('custom reconciler host layer', [
         'records React.use rejected promise errors',
         function (scope) {
             const error = new Error('load failed');
+            const textPromise = createRejectedReactPromise(error);
             const view = introspect(
                 React.createElement(
                     React.Suspense,
                     { fallback: React.createElement(Loading) },
-                    React.createElement(PromiseReader, { textPromise: createRejectedReactPromise(error) })
+                    React.createElement(PromiseReader, { textPromise })
                 ),
                 {
                     depth: 'full',
@@ -1015,10 +1017,13 @@ export const testNode = suite('custom reconciler host layer', [
             resolved: reconcilerRuntime.resolveUpdatePriority()
         };
 
-        scope.assert.deepEqual({ discretePriorities, initialPriorities }, {
-            discretePriorities: { current: DiscreteEventPriority, resolved: DiscreteEventPriority },
-            initialPriorities: { current: NoEventPriority, resolved: DefaultEventPriority }
-        });
+        scope.assert.deepEqual(
+            { discretePriorities, initialPriorities },
+            {
+                discretePriorities: { current: DiscreteEventPriority, resolved: DiscreteEventPriority },
+                initialPriorities: { current: NoEventPriority, resolved: DefaultEventPriority }
+            }
+        );
 
         return scope.assert.collect();
     }),

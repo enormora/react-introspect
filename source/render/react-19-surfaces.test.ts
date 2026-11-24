@@ -220,10 +220,13 @@ export const testNode = suite('React 19 special surfaces', [
 
         const panel = requireValue(view.find(Panel));
 
-        scope.assert.deepEqual({ state: panel.state, visibility: panel.visibility }, {
-            state: { activityMode: undefined, reason: 'depth', rendered: false, visible: false },
-            visibility: 'hidden'
-        });
+        scope.assert.deepEqual(
+            { state: panel.state, visibility: panel.visibility },
+            {
+                state: { activityMode: undefined, reason: 'depth', rendered: false, visible: false },
+                visibility: 'hidden'
+            }
+        );
 
         return scope.assert.collect();
     }),

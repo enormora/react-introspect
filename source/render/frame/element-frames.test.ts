@@ -447,6 +447,16 @@ function NestedGivenPage(): React.ReactNode {
     );
 }
 
+function Missing(): null {
+    return null;
+}
+
+function readTextValue(node: IntrospectionNode): unknown {
+    const { props } = node;
+
+    return typeof props === 'object' && props !== null ? Reflect.get(props, 'value') : undefined;
+}
+
 export const testNode = suite('execution shallow function components', [
     test('keeps child components visible but unexecuted at depth 1', function (scope) {
         const { Button, counts, Parent, Shell } = createDepthComponents();
@@ -550,9 +560,6 @@ export const testNode = suite('execution shallow function components', [
     }),
     test('executes the whole tree when the depthFrom component never renders', function (scope) {
         const { Harness, log, Page } = createAnchoredComponents();
-        const Missing: React.FC = function Missing() {
-            return null;
-        };
 
         introspect(React.createElement(Harness, null, React.createElement(Page)), {
             depthFrom: Missing,
@@ -666,12 +673,6 @@ export const testNode = suite('execution shallow function components', [
         const leaf = requireValue(view.find(GivenLeaf));
         const main = requireValue(view.find('main'));
 
-        function readTextValue(node: IntrospectionNode): unknown {
-            const { props } = node;
-
-            return typeof props === 'object' && props !== null ? Reflect.get(props, 'value') : undefined;
-        }
-
         scope.assert.deepEqual(
             {
                 given: Array.from(leaf.givenChildren, readTextValue),
@@ -760,15 +761,12 @@ export const testNode = suite('execution shallow function components', [
         return scope.assert.collect();
     }),
     test('executes components inside StrictMode and Profiler', function (scope) {
+        const profiledLabel = React.createElement(PlainLabel, { label: 'profiled' });
         const view = introspect(
             React.createElement(
                 React.StrictMode,
                 null,
-                React.createElement(
-                    React.Profiler,
-                    { id: 'labels', onRender: ignoreProfile },
-                    React.createElement(PlainLabel, { label: 'profiled' })
-                )
+                React.createElement(React.Profiler, { id: 'labels', onRender: ignoreProfile }, profiledLabel)
             ),
             {
                 depth: 'full',
@@ -938,10 +936,13 @@ export const testNode = suite('execution shallow function components', [
 
         const opaque = requireValue(view.find('opaque'));
 
-        scope.assert.deepEqual({ state: opaque.state, visibility: opaque.visibility }, {
-            state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
-            visibility: 'notRendered'
-        });
+        scope.assert.deepEqual(
+            { state: opaque.state, visibility: opaque.visibility },
+            {
+                state: { activityMode: undefined, reason: 'unsupported', rendered: false, visible: false },
+                visibility: 'notRendered'
+            }
+        );
 
         return scope.assert.collect();
     }),

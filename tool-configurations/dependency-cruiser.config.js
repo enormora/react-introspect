@@ -1,13 +1,13 @@
 const configFiles = [
-    '^tool-configurations/dependency-cruiser\\.config\\.js$',
-    '^tool-configurations/eslint\\.config\\.js$',
-    '^tool-configurations/overkill\\.config\\.ts$',
-    '^packtory\\.config\\.js$'
+    String.raw`^tool-configurations/dependency-cruiser\.config\.js$`,
+    String.raw`^tool-configurations/eslint\.config\.js$`,
+    String.raw`^tool-configurations/overkill\.config\.ts$`,
+    String.raw`^packtory\.config\.js$`
 ];
 
-const entryPointFiles = [ '^source/.+\\.entry-point\\.ts$' ];
-const testFiles = [ '\\.(test|type-test)\\.ts$' ];
-const excludedFiles = [ '^(\\./)?target/' ];
+const entryPointFiles = [ String.raw`^source/.+\.entry-point\.ts$` ];
+const testFiles = [ String.raw`\.(test|type-test)\.ts$` ];
+const excludedFiles = [ String.raw`^(\./)?target/` ];
 const ignoreFromOrphans = [ ...configFiles, ...entryPointFiles, ...testFiles ];
 
 /**
@@ -133,7 +133,7 @@ export default {
                 numberOfDependentsLessThan: 1,
                 pathNot: [
                     ...ignoreFromOrphans,
-                    '.*(?<!\\.(ts|js))$',
+                    String.raw`.*(?<!\.(ts|js))$`,
                     '^node_modules/',
                     ...excludedFiles
                 ]
@@ -167,7 +167,7 @@ export default {
             to: {
                 dependencyTypes: [ 'npm-dev' ],
                 moreThanOneDependencyType: false,
-                pathNot: [ '^node_modules/@types/', '\\.d\\.ts$' ]
+                pathNot: [ '^node_modules/@types/', String.raw`\.d\.ts$` ]
             }
         },
         {

@@ -702,13 +702,12 @@ export const testNode = suite('class components and error boundaries', [
         const LazyPanel = createLazyRefPanel();
         const memoRef = React.createRef<RefPanelInstance>();
         const lazyRef = React.createRef<RefPanelInstance>();
+        const panels = [
+            React.createElement(MemoPanel, createRefPanelProps('memo', memoRef)),
+            React.createElement(LazyPanel, createRefPanelProps('lazy', lazyRef))
+        ];
         const view = introspect(
-            React.createElement(
-                React.Fragment,
-                null,
-                React.createElement(MemoPanel, createRefPanelProps('memo', memoRef)),
-                React.createElement(LazyPanel, createRefPanelProps('lazy', lazyRef))
-            ),
+            React.createElement(React.Fragment, null, ...panels),
             {
                 depth: 'full',
                 strictMode: false

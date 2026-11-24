@@ -345,11 +345,11 @@ const IntrospectionClassFrameBase = class
         props: Readonly<Record<PropertyKey, unknown>>,
         state: unknown
     ): boolean {
-        const instance = this.userInstance;
-
         if (this.shouldForceRender) {
             return true;
         }
+
+        const instance = this.userInstance;
 
         if (typeof instance.shouldComponentUpdate === 'function') {
             return instance.shouldComponentUpdate(props, state, instance.context);
