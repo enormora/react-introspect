@@ -36,7 +36,7 @@
         "@overkill-dev/test": "0.0.38",
         "@packtory/cli": "0.0.127",
         "@packtory/github-release-gate": "0.0.88",
-        "dependency-cruiser": "18.8.0",
+        "dependency-cruiser": "18.9.0",
         "eslint": "10.15.0",
         "jscpd": "5.4.3",
         "knip": "6.47.0",
