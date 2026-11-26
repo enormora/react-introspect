@@ -39,7 +39,7 @@
         "dependency-cruiser": "18.9.0",
         "eslint": "10.15.0",
         "jscpd": "5.4.3",
-        "knip": "6.47.0",
+        "knip": "6.48.0",
         "react": "19.3.1",
         "rust-just": "1.59.0",
         "tstyche": "7.2.5",
