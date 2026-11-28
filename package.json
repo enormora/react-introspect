@@ -27,10 +27,10 @@
         "tslib": "2.9.1"
     },
     "devDependencies": {
-        "@enormora/eslint-config-base": "0.0.82",
+        "@enormora/eslint-config-base": "0.0.84",
         "@enormora/eslint-config-node": "0.0.55",
-        "@enormora/eslint-config-test-base": "0.0.49",
-        "@enormora/eslint-config-typescript": "0.0.86",
+        "@enormora/eslint-config-test-base": "0.0.51",
+        "@enormora/eslint-config-typescript": "0.0.88",
         "@enormora/tsconfig-node": "0.0.3",
         "@ls-lint/ls-lint": "2.3.2",
         "@overkill-dev/test": "0.0.38",
